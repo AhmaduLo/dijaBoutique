@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @Builder
 @ToString
 @EqualsAndHashCode(of = "id")
-public class DepenseEntity {
+public class DepenseEntity  extends BaseEntity{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -154,7 +154,6 @@ public class DepenseEntity {
      * LIFECYCLE CALLBACKS
      */
 
-    @PrePersist
     protected void onCreate() {
         // Date par défaut
         if (this.dateDepense == null) {
@@ -172,7 +171,6 @@ public class DepenseEntity {
         }
     }
 
-    @PreUpdate
     protected void onUpdate() {
         // Validation métier supplémentaire si nécessaire
     }
