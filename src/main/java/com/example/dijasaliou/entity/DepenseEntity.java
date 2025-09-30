@@ -27,9 +27,9 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = "utilisateur")
+@ToString
 @EqualsAndHashCode(of = "id")
-public class DepenceEntity {
+public class DepenseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -74,13 +74,6 @@ public class DepenceEntity {
     @ToString.Exclude
     private UserEntity utilisateur;
 
-    @CreationTimestamp
-    @Column(name = "date_creation", nullable = false, updatable = false)
-    private LocalDateTime dateCreation;
-
-    @UpdateTimestamp
-    @Column(name = "date_modification")
-    private LocalDateTime dateModification;
 
     /**
      * ENUM pour les catégories de dépenses
@@ -157,6 +150,97 @@ public class DepenceEntity {
         }
     }
 
-    
+    /**
+     * LIFECYCLE CALLBACKS
+     */
+
+    @PrePersist
+    protected void onCreate() {
+        // Date par défaut
+        if (this.dateDepense == null) {
+            this.dateDepense = LocalDate.now();
+        }
+
+        // Nettoyer les champs
+        if (this.libelle != null) {
+            this.libelle = this.libelle.trim();
+        }
+
+        // Définir récurrence selon la catégorie
+        if (this.estRecurrente == null && this.categorie != null) {
+            this.estRecurrente = this.categorie.isRecurrenteParDefaut();
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        // Validation métier supplémentaire si nécessaire
+    }
+
+    /**
+     * MÉTHODES MÉTIER
+     */
+
+    /**
+     * Vérifie si la dépense est récente (< 30 jours)
+     */
+    public boolean estRecente() {
+        return dateDepense != null &&
+                dateDepense.isAfter(LocalDate.now().minusDays(30));
+    }
+
+    /**
+     * Retourne le mois de la dépense
+     */
+    public int getMois() {
+        return dateDepense != null ? dateDepense.getMonthValue() : 0;
+    }
+
+    /**
+     * Retourne l'année de la dépense
+     */
+    public int getAnnee() {
+        return dateDepense != null ? dateDepense.getYear() : 0;
+    }
+
+    /**
+     * Vérifie si c'est une grosse dépense (> seuil)
+     */
+    public boolean estGrosseDépense(BigDecimal seuil) {
+        return montant != null && montant.compareTo(seuil) > 0;
+    }
+
+    /**
+     * Retourne le libellé de la catégorie
+     */
+    public String getLibelleCategorie() {
+        return categorie != null ? categorie.getLibelle() : "";
+    }
+
+    /**
+     * Vérifie si des notes sont présentes
+     */
+    public boolean aDesNotes() {
+        return notes != null && !notes.trim().isEmpty();
+    }
+
+    /**
+     * VALIDATION MÉTIER PERSONNALISÉE
+     *
+     * Cette méthode peut être appelée dans le Service
+     * avant de sauvegarder
+     */
+    public void valider() throws IllegalArgumentException {
+        // Vérifications métier
+        if (montant != null && montant.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Le montant doit être positif");
+        }
+
+        if (dateDepense != null && dateDepense.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("La date ne peut pas être dans le futur");
+        }
+
+        // Plus de validations selon vos règles métier...
+    }
 
 }
