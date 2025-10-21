@@ -21,6 +21,14 @@ public class DepenseService {
         this.depenseRepository = depenseRepository;
     }
 
+
+    /**
+     * Récupérer toutes les dépenses
+     */
+    public List<DepenseEntity> obtenirToutesLesDepenses() {
+        return depenseRepository.findAll();
+    }
+
     /**
      * Récupérer une dépense par ID
      */
