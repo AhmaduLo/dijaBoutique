@@ -3,12 +3,10 @@ package com.example.dijasaliou.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -72,6 +70,7 @@ public class DepenseEntity  extends BaseEntity{
             foreignKey = @ForeignKey(name = "fk_depense_utilisateur")
     )
     @ToString.Exclude
+    @JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
     private UserEntity utilisateur;
 
 

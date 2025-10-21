@@ -1,15 +1,15 @@
 package com.example.dijasaliou.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 
 @Entity
@@ -21,7 +21,6 @@ import java.time.LocalDateTime;
 @Builder
 @ToString  // Évite StackOverflowError
 @EqualsAndHashCode(of = "id")
-
 public class AchatEntity extends BaseEntity{
 
     @Id
@@ -78,6 +77,8 @@ public class AchatEntity extends BaseEntity{
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "utilisateur_id", nullable = false, foreignKey = @ForeignKey(name = "fk_achat_utilisateur"))
     @ToString.Exclude
+    @JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
+    @JsonIgnore
     private UserEntity utilisateur;
 
 

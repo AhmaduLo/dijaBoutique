@@ -1,15 +1,14 @@
 package com.example.dijasaliou.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+
 
 @Entity
 @Table(
@@ -74,7 +73,9 @@ public class VenteEntity  extends BaseEntity{
             nullable = false,
             foreignKey = @ForeignKey(name = "fk_vente_utilisateur")
     )
+    //@JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
     @ToString.Exclude
+    @JsonIgnore
     private UserEntity utilisateur;
 
 
