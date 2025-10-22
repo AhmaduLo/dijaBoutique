@@ -1,5 +1,6 @@
 package com.example.dijasaliou.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -71,6 +72,7 @@ public class DepenseEntity  extends BaseEntity{
     )
     @ToString.Exclude
     @JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
+    @JsonIgnore
     private UserEntity utilisateur;
 
 

@@ -4,11 +4,16 @@ import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.service.UserService;
 import com.example.dijasaliou.service.VenteService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller REST pour les ventes
@@ -77,5 +82,64 @@ public class VenteController {
     public ResponseEntity<Void> supprimer(@PathVariable Long id) {
         venteService.supprimerVente(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/ventes/utilisateur/{utilisateurId}
+     * Récupérer toutes les ventes d'un utilisateur spécifique
+     *
+     * Exemple : GET /api/ventes/utilisateur/1
+     */
+    @GetMapping("/utilisateur/{utilisateurId}")
+    public ResponseEntity<List<VenteEntity>> obtenirVentesParUtilisateur(
+            @PathVariable Long utilisateurId) {
+
+        // Récupérer l'utilisateur
+        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+
+        // Récupérer ses ventes
+        List<VenteEntity> ventes = venteService.obtenirVentesParUtilisateur(utilisateur);
+
+        return ResponseEntity.ok(ventes);
+    }
+
+    /**
+     * GET /api/ventes/chiffre-affaires?debut=2025-01-01&fin=2025-12-31
+     * Calculer le chiffre d'affaires sur une période
+     *
+     * Exemple : GET /api/ventes/chiffre-affaires?debut=2025-10-01&fin=2025-10-31
+     */
+    @GetMapping("/chiffre-affaires")
+    public ResponseEntity<BigDecimal> calculerChiffreAffaires(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+
+        BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
+        return ResponseEntity.ok(ca);
+    }
+
+    /**
+     * GET /api/ventes/statistiques?debut=2025-01-01&fin=2025-12-31
+     * Obtenir les statistiques de ventes sur une période
+     * (nombre de ventes, CA total, liste des ventes)
+     *
+     * Exemple : GET /api/ventes/statistiques?debut=2025-10-01&fin=2025-10-31
+     */
+    @GetMapping("/statistiques")
+    public ResponseEntity<Map<String, Object>> obtenirStatistiques(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+
+        List<VenteEntity> ventes = venteService.obtenirVentesParPeriode(debut, fin);
+        BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("dateDebut", debut);
+        stats.put("dateFin", fin);
+        stats.put("nombreVentes", ventes.size());
+        stats.put("chiffreAffaires", ca);
+        stats.put("ventes", ventes);
+
+        return ResponseEntity.ok(stats);
     }
 }
