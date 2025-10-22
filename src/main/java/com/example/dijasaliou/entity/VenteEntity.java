@@ -1,6 +1,7 @@
 package com.example.dijasaliou.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -73,7 +74,7 @@ public class VenteEntity  extends BaseEntity{
             nullable = false,
             foreignKey = @ForeignKey(name = "fk_vente_utilisateur")
     )
-    //@JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
+    @JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
     @ToString.Exclude
     @JsonIgnore
     private UserEntity utilisateur;

@@ -4,11 +4,17 @@ import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AchatService;
 import com.example.dijasaliou.service.UserService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller REST pour les achats
@@ -31,7 +37,7 @@ public class AchatController {
     }
 
     /**
-     * ROUTE 1 : Récupérer tous les achats
+     * ROUTE 1 : Récupérer tous les achatsdate_depense
      *
      * URL : GET http://localhost:8080/api/achats
      *
@@ -56,6 +62,24 @@ public class AchatController {
     public ResponseEntity<AchatEntity> obtenirParId(@PathVariable Long id) {
         AchatEntity achat = achatService.obtenirAchatParId(id);
         return ResponseEntity.ok(achat);
+    }
+
+    /**
+     * GET /api/achats/utilisateur/{utilisateurId}
+     * Récupérer tous les achats d'un utilisateur spécifique
+     *
+     * Exemple : GET /api/achats/utilisateur/1
+     */
+    @GetMapping("/utilisateur/{utilisateurId}")
+    public ResponseEntity<List<AchatEntity>> obtenirAchatsParUtilisateur(@PathVariable Long utilisateurId) {
+        // 1. Récupérer l'utilisateur depuis la base
+        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+
+        // 2. Récupérer ses achats
+        List<AchatEntity> achats = achatService.obtenirAchatsParUtilisateur(utilisateur);
+
+        // 3. Retourner la liste
+        return ResponseEntity.ok(achats);
     }
 
     /**
@@ -97,6 +121,27 @@ public class AchatController {
 
         AchatEntity achat = achatService.modifierAchat(id, achatModifie);
         return ResponseEntity.ok(achat);
+    }
+
+    /**
+     * GET /api/achats/statistiques?debut=2025-01-01&fin=2025-12-31
+     */
+    @GetMapping("/statistiques")
+    public ResponseEntity<Map<String, Object>> obtenirStatistiques(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+
+        List<AchatEntity> achats = achatService.obtenirAchatsParPeriode(debut, fin);
+        BigDecimal total = achatService.calculerTotalAchats(debut, fin);
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("dateDebut", debut);
+        stats.put("dateFin", fin);
+        stats.put("nombreAchats", achats.size());
+        stats.put("montantTotal", total);
+        stats.put("achats", achats);
+
+        return ResponseEntity.ok(stats);
     }
 
     /**
