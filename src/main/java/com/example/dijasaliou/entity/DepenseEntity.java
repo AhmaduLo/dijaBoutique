@@ -1,5 +1,6 @@
 package com.example.dijasaliou.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @Builder
 @ToString
-@EqualsAndHashCode(of = "id")
+@EqualsAndHashCode(callSuper = false)
 public class DepenseEntity  extends BaseEntity{
 
     @Id
@@ -58,6 +59,7 @@ public class DepenseEntity  extends BaseEntity{
     private String notes;
 
     @Column(name = "est_recurrente")
+    @Builder.Default
     private Boolean estRecurrente = false;
 
 
@@ -70,9 +72,8 @@ public class DepenseEntity  extends BaseEntity{
             nullable = false,
             foreignKey = @ForeignKey(name = "fk_depense_utilisateur")
     )
+    @JsonBackReference("user-depenses")
     @ToString.Exclude
-    @JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
-    @JsonIgnore
     private UserEntity utilisateur;
 
 

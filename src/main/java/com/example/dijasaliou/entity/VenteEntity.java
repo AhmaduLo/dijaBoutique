@@ -1,5 +1,6 @@
 package com.example.dijasaliou.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
@@ -27,7 +28,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @ToString
-@EqualsAndHashCode(of = "id")
+@EqualsAndHashCode(callSuper = false)
 
 public class VenteEntity  extends BaseEntity{
 
@@ -74,9 +75,8 @@ public class VenteEntity  extends BaseEntity{
             nullable = false,
             foreignKey = @ForeignKey(name = "fk_vente_utilisateur")
     )
-    @JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
+    @JsonBackReference("user-ventes")
     @ToString.Exclude
-    @JsonIgnore
     private UserEntity utilisateur;
 
 

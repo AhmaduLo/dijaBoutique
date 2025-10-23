@@ -20,8 +20,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString  // Évite StackOverflowError
-@EqualsAndHashCode(of = "id")
+@ToString
+@EqualsAndHashCode(callSuper = false)
 public class AchatEntity extends BaseEntity{
 
     @Id
@@ -77,9 +77,8 @@ public class AchatEntity extends BaseEntity{
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "utilisateur_id", nullable = false, foreignKey = @ForeignKey(name = "fk_achat_utilisateur"))
+    @JsonBackReference("user-achats")
     @ToString.Exclude
-    @JsonIgnoreProperties({"achats", "ventes", "depenses", "motDePasse"})
-    @JsonIgnore
     private UserEntity utilisateur;
 
 

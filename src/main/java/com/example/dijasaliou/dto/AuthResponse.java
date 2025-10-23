@@ -26,10 +26,5 @@ import lombok.NoArgsConstructor;
 @Builder
 public class AuthResponse {
     private String token;
-    private String type = "Bearer";
-    private Long id;
-    private String email;
-    private String nom;
-    private String prenom;
-    private UserEntity.Role role;
+    private UserEntity user;
 }

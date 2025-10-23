@@ -65,12 +65,7 @@ public class AuthService {
         // Retourner la réponse
         return AuthResponse.builder()
                 .token(token)
-                .type("Bearer")
-                .id(savedUser.getId())
-                .email(savedUser.getEmail())
-                .nom(savedUser.getNom())
-                .prenom(savedUser.getPrenom())
-                .role(savedUser.getRole())
+                .user(user)
                 .build();
     }
 
@@ -98,12 +93,7 @@ public class AuthService {
         // Retourner la réponse
         return AuthResponse.builder()
                 .token(token)
-                .type("Bearer")
-                .id(user.getId())
-                .email(user.getEmail())
-                .nom(user.getNom())
-                .prenom(user.getPrenom())
-                .role(user.getRole())
+                .user(user)
                 .build();
     }
 }

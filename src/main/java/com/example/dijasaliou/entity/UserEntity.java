@@ -1,5 +1,7 @@
 package com.example.dijasaliou.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -15,9 +17,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"achats", "ventes", "depenses"}) // Évite les boucles infinies
-@EqualsAndHashCode(of = "id")  // Égalité basée uniquement sur l'ID
-
+@ToString
+@EqualsAndHashCode(callSuper = false)
 public class UserEntity extends BaseEntity {
 
     @Id
@@ -34,10 +35,12 @@ public class UserEntity extends BaseEntity {
     private String email;
 
     @Column(name = "mot_de_passe", nullable = false, length = 255)
+    @JsonIgnore
     private String motDePasse;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
+    @Builder.Default
     private Role role = Role.USER;
 
     @CreationTimestamp
@@ -46,14 +49,20 @@ public class UserEntity extends BaseEntity {
 
     @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default  // Pour Lombok Builder
+    @JsonManagedReference("user-achats")
+    @ToString.Exclude
     private List<AchatEntity> achats = new ArrayList<>();
 
     @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
+    @JsonManagedReference("user-ventes")
+    @ToString.Exclude
     private List<VenteEntity> ventes = new ArrayList<>();
 
     @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
+    @JsonManagedReference("user-depenses")
+    @ToString.Exclude
     private List<DepenseEntity> depenses = new ArrayList<>();
 
 
