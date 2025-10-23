@@ -1,5 +1,6 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.DepenseDto;
 import com.example.dijasaliou.entity.DepenseEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.DepenseService;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Controller REST pour les dépenses
@@ -35,18 +37,21 @@ public class DepenseController {
      * GET /api/depenses
      */
     @GetMapping
-    public ResponseEntity<List<DepenseEntity>> obtenirTous() {
+    public ResponseEntity<List<DepenseDto>> obtenirTous() {
         List<DepenseEntity> depenses = depenseService.obtenirToutesLesDepenses();
-        return ResponseEntity.ok(depenses);
+        List<DepenseDto> depensesDto = depenses.stream()
+                .map(DepenseDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(depensesDto);
     }
 
     /**
      * GET /api/depenses/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<DepenseEntity> obtenirParId(@PathVariable Long id) {
+    public ResponseEntity<DepenseDto> obtenirParId(@PathVariable Long id) {
         DepenseEntity depense = depenseService.obtenirDepenseParId(id);
-        return ResponseEntity.ok(depense);
+        return ResponseEntity.ok(DepenseDto.fromEntity(depense));
     }
 
     /**
@@ -54,39 +59,43 @@ public class DepenseController {
      * Récupérer toutes les dépenses d'un utilisateur
      */
     @GetMapping("/utilisateur/{utilisateurId}")
-    public ResponseEntity<List<DepenseEntity>> obtenirDepensesParUtilisateur(
+    public ResponseEntity<List<DepenseDto>> obtenirDepensesParUtilisateur(
             @PathVariable Long utilisateurId) {
 
         UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
         List<DepenseEntity> depenses = depenseService.obtenirDepensesParUtilisateur(utilisateur);
 
-        return ResponseEntity.ok(depenses);
+        List<DepenseDto> depensesDto = depenses.stream()
+                .map(DepenseDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(depensesDto);
     }
 
     /**
      * POST /api/depenses
      */
     @PostMapping
-    public ResponseEntity<DepenseEntity> creer(
+    public ResponseEntity<DepenseDto> creer(
             @RequestBody DepenseEntity depense,
             @RequestParam Long utilisateurId) {
 
         UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
         DepenseEntity depenseCree = depenseService.creerDepense(depense, utilisateur);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(depenseCree);
+        return ResponseEntity.status(HttpStatus.CREATED).body(DepenseDto.fromEntity(depenseCree));
     }
 
     /**
      * PUT /api/depenses/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<DepenseEntity> modifier(
+    public ResponseEntity<DepenseDto> modifier(
             @PathVariable Long id,
             @RequestBody DepenseEntity depenseModifiee) {
 
         DepenseEntity depense = depenseService.modifierDepense(id, depenseModifiee);
-        return ResponseEntity.ok(depense);
+        return ResponseEntity.ok(DepenseDto.fromEntity(depense));
     }
 
     /**
@@ -105,11 +114,14 @@ public class DepenseController {
      * Exemple : GET /api/depenses/categorie/LOYER
      */
     @GetMapping("/categorie/{categorie}")
-    public ResponseEntity<List<DepenseEntity>> obtenirDepensesParCategorie(
+    public ResponseEntity<List<DepenseDto>> obtenirDepensesParCategorie(
             @PathVariable DepenseEntity.CategorieDepense categorie) {
 
         List<DepenseEntity> depenses = depenseService.obtenirDepensesParCategorie(categorie);
-        return ResponseEntity.ok(depenses);
+        List<DepenseDto> depensesDto = depenses.stream()
+                .map(DepenseDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(depensesDto);
     }
 
     /**
@@ -137,12 +149,17 @@ public class DepenseController {
         List<DepenseEntity> depenses = depenseService.obtenirDepensesParPeriode(debut, fin);
         BigDecimal total = depenseService.calculerTotalDepenses(debut, fin);
 
+        // Convertir en DTOs
+        List<DepenseDto> depensesDto = depenses.stream()
+                .map(DepenseDto::fromEntity)
+                .collect(Collectors.toList());
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
-        stats.put("nombreDepenses", depenses.size());
+        stats.put("nombreDepenses", depensesDto.size());
         stats.put("montantTotal", total);
-        stats.put("depenses", depenses);
+        stats.put("depenses", depensesDto);
 
         return ResponseEntity.ok(stats);
     }

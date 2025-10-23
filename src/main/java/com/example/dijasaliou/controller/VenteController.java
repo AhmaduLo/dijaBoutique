@@ -1,5 +1,6 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.service.UserService;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Controller REST pour les ventes
@@ -35,44 +37,47 @@ public class VenteController {
      * GET /api/ventes
      */
     @GetMapping
-    public ResponseEntity<List<VenteEntity>> obtenirTous() {
+    public ResponseEntity<List<VenteDto>> obtenirTous() {
         List<VenteEntity> ventes = venteService.obtenirToutesLesVentes();
-        return ResponseEntity.ok(ventes);
+        List<VenteDto> ventesDto = ventes.stream()
+                .map(VenteDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(ventesDto);
     }
 
     /**
      * GET /api/ventes/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<VenteEntity> obtenirParId(@PathVariable Long id) {
+    public ResponseEntity<VenteDto> obtenirParId(@PathVariable Long id) {
         VenteEntity vente = venteService.obtenirVenteParId(id);
-        return ResponseEntity.ok(vente);
+        return ResponseEntity.ok(VenteDto.fromEntity(vente));
     }
 
     /**
      * POST /api/ventes
      */
     @PostMapping
-    public ResponseEntity<VenteEntity> creer(
+    public ResponseEntity<VenteDto> creer(
             @RequestBody VenteEntity vente,
             @RequestParam Long utilisateurId) {
 
         UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
         VenteEntity venteCree = venteService.creerVente(vente, utilisateur);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(venteCree);
+        return ResponseEntity.status(HttpStatus.CREATED).body(VenteDto.fromEntity(venteCree));
     }
 
     /**
      * PUT /api/ventes/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<VenteEntity> modifier(
+    public ResponseEntity<VenteDto> modifier(
             @PathVariable Long id,
             @RequestBody VenteEntity venteModifiee) {
 
         VenteEntity vente = venteService.modifierVente(id, venteModifiee);
-        return ResponseEntity.ok(vente);
+        return ResponseEntity.ok(VenteDto.fromEntity(vente));
     }
 
     /**
@@ -91,7 +96,7 @@ public class VenteController {
      * Exemple : GET /api/ventes/utilisateur/1
      */
     @GetMapping("/utilisateur/{utilisateurId}")
-    public ResponseEntity<List<VenteEntity>> obtenirVentesParUtilisateur(
+    public ResponseEntity<List<VenteDto>> obtenirVentesParUtilisateur(
             @PathVariable Long utilisateurId) {
 
         // Récupérer l'utilisateur
@@ -100,7 +105,12 @@ public class VenteController {
         // Récupérer ses ventes
         List<VenteEntity> ventes = venteService.obtenirVentesParUtilisateur(utilisateur);
 
-        return ResponseEntity.ok(ventes);
+        // Convertir en DTOs
+        List<VenteDto> ventesDto = ventes.stream()
+                .map(VenteDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ventesDto);
     }
 
     /**
@@ -133,12 +143,17 @@ public class VenteController {
         List<VenteEntity> ventes = venteService.obtenirVentesParPeriode(debut, fin);
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
 
+        // Convertir en DTOs
+        List<VenteDto> ventesDto = ventes.stream()
+                .map(VenteDto::fromEntity)
+                .collect(Collectors.toList());
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
-        stats.put("nombreVentes", ventes.size());
+        stats.put("nombreVentes", ventesDto.size());
         stats.put("chiffreAffaires", ca);
-        stats.put("ventes", ventes);
+        stats.put("ventes", ventesDto);
 
         return ResponseEntity.ok(stats);
     }

@@ -1,5 +1,6 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.AchatDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AchatService;
@@ -11,10 +12,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Controller REST pour les achats
@@ -37,16 +38,20 @@ public class AchatController {
     }
 
     /**
-     * ROUTE 1 : Récupérer tous les achatsdate_depense
+     * ROUTE 1 : Récupérer tous les achats
      *
      * URL : GET http://localhost:8080/api/achats
      *
      * @GetMapping : Dit que c'est une route GET (lecture)
-     * @return Liste de tous les achats en JSON
+     * @return Liste de tous les achats en JSON avec informations utilisateur
      */
     @GetMapping
-    public List<AchatEntity> obtenirTous() {
-        return achatService.obtenirTousLesAchats();
+    public ResponseEntity<List<AchatDto>> obtenirTous() {
+        List<AchatEntity> achats = achatService.obtenirTousLesAchats();
+        List<AchatDto> achatsDto = achats.stream()
+                .map(AchatDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(achatsDto);
     }
 
     /**
@@ -59,9 +64,9 @@ public class AchatController {
      *           → id = 5
      */
     @GetMapping("/{id}")
-    public ResponseEntity<AchatEntity> obtenirParId(@PathVariable Long id) {
+    public ResponseEntity<AchatDto> obtenirParId(@PathVariable Long id) {
         AchatEntity achat = achatService.obtenirAchatParId(id);
-        return ResponseEntity.ok(achat);
+        return ResponseEntity.ok(AchatDto.fromEntity(achat));
     }
 
     /**
@@ -71,15 +76,18 @@ public class AchatController {
      * Exemple : GET /api/achats/utilisateur/1
      */
     @GetMapping("/utilisateur/{utilisateurId}")
-    public ResponseEntity<List<AchatEntity>> obtenirAchatsParUtilisateur(@PathVariable Long utilisateurId) {
+    public ResponseEntity<List<AchatDto>> obtenirAchatsParUtilisateur(@PathVariable Long utilisateurId) {
         // 1. Récupérer l'utilisateur depuis la base
         UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
 
         // 2. Récupérer ses achats
         List<AchatEntity> achats = achatService.obtenirAchatsParUtilisateur(utilisateur);
 
-        // 3. Retourner la liste
-        return ResponseEntity.ok(achats);
+        // 3. Convertir en DTOs et retourner
+        List<AchatDto> achatsDto = achats.stream()
+                .map(AchatDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(achatsDto);
     }
 
     /**
@@ -93,7 +101,7 @@ public class AchatController {
      *           Body : { "quantite": 10, "nomProduit": "Collier", ... }
      */
     @PostMapping
-    public ResponseEntity<AchatEntity> creer(
+    public ResponseEntity<AchatDto> creer(
             @RequestBody AchatEntity achat,
             @RequestParam Long utilisateurId) {
 
@@ -104,7 +112,7 @@ public class AchatController {
         AchatEntity achatCree = achatService.creerAchat(achat, utilisateur);
 
         // Retourner avec code 201 Created
-        return ResponseEntity.status(HttpStatus.CREATED).body(achatCree);
+        return ResponseEntity.status(HttpStatus.CREATED).body(AchatDto.fromEntity(achatCree));
     }
 
     /**
@@ -115,12 +123,12 @@ public class AchatController {
      *           Body : { "quantite": 20, "nomProduit": "Collier doré", ... }
      */
     @PutMapping("/{id}")
-    public ResponseEntity<AchatEntity> modifier(
+    public ResponseEntity<AchatDto> modifier(
             @PathVariable Long id,
             @RequestBody AchatEntity achatModifie) {
 
         AchatEntity achat = achatService.modifierAchat(id, achatModifie);
-        return ResponseEntity.ok(achat);
+        return ResponseEntity.ok(AchatDto.fromEntity(achat));
     }
 
     /**
@@ -134,12 +142,17 @@ public class AchatController {
         List<AchatEntity> achats = achatService.obtenirAchatsParPeriode(debut, fin);
         BigDecimal total = achatService.calculerTotalAchats(debut, fin);
 
+        // Convertir les achats en DTOs
+        List<AchatDto> achatsDto = achats.stream()
+                .map(AchatDto::fromEntity)
+                .collect(Collectors.toList());
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
-        stats.put("nombreAchats", achats.size());
+        stats.put("nombreAchats", achatsDto.size());
         stats.put("montantTotal", total);
-        stats.put("achats", achats);
+        stats.put("achats", achatsDto);
 
         return ResponseEntity.ok(stats);
     }
