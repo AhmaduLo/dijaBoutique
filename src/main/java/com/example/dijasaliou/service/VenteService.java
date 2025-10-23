@@ -1,8 +1,10 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.VenteRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -16,9 +18,11 @@ import java.util.List;
 public class VenteService {
 
     private final VenteRepository venteRepository;
+    private final StockService stockService;
 
-    public VenteService(VenteRepository venteRepository) {
+    public VenteService(VenteRepository venteRepository, @Lazy StockService stockService) {
         this.venteRepository = venteRepository;
+        this.stockService = stockService;
     }
 
     /**
@@ -42,6 +46,9 @@ public class VenteService {
     public VenteEntity creerVente(VenteEntity vente, UserEntity utilisateur) {
         // Validation
         validerVente(vente);
+
+        // Vérifier le stock disponible
+        verifierStockAvantVente(vente.getNomProduit(), vente.getQuantite());
 
         // Associer l'utilisateur
         vente.setUtilisateur(utilisateur);
@@ -123,6 +130,36 @@ public class VenteService {
 
         if (vente.getNomProduit() == null || vente.getNomProduit().trim().isEmpty()) {
             throw new IllegalArgumentException("Le nom du produit est obligatoire");
+        }
+    }
+
+    /**
+     * Vérifier le stock avant une vente
+     * Lance une exception si le stock est insuffisant
+     */
+    private void verifierStockAvantVente(String nomProduit, Integer quantite) {
+        try {
+            StockDto stock = stockService.obtenirStockParNomProduit(nomProduit);
+
+            if (!stock.estSuffisant(quantite)) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Stock insuffisant pour '%s' ! Disponible : %d, Demandé : %d",
+                                nomProduit,
+                                stock.getStockDisponible(),
+                                quantite
+                        )
+                );
+            }
+        } catch (RuntimeException e) {
+            // Si le produit n'existe pas dans les achats, on peut quand même vendre
+            // (cas d'un produit jamais acheté mais qu'on souhaite vendre)
+            // Commentez cette partie si vous voulez forcer l'achat avant la vente
+            if (e.getMessage().contains("Produit non trouvé")) {
+                // Permettre la vente même sans achat préalable
+                return;
+            }
+            throw e;
         }
     }
 }
