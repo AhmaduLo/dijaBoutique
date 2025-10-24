@@ -207,4 +207,60 @@ public class StockController {
 
         return ResponseEntity.ok(resume);
     }
+
+    /**
+     * GET /api/stock/produits-disponibles
+     * Obtenir la liste des produits disponibles pour la vente
+     *
+     * Retourne uniquement les produits avec stock > 0
+     * Trié par nom de produit (alphabétique)
+     *
+     * Utile pour :
+     * - Liste déroulante dans le formulaire de vente
+     * - Autocomplete dans Angular
+     *
+     * Exemple : GET /api/stock/produits-disponibles
+     */
+    @GetMapping("/produits-disponibles")
+    public ResponseEntity<List<Map<String, Object>>> obtenirProduitsDisponibles() {
+        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+
+        // Filtrer uniquement les produits avec stock > 0
+        List<Map<String, Object>> produitsDisponibles = stocks.stream()
+                .filter(s -> s.getStockDisponible() > 0)
+                .sorted((s1, s2) -> s1.getNomProduit().compareToIgnoreCase(s2.getNomProduit()))
+                .map(stock -> {
+                    Map<String, Object> produit = new HashMap<>();
+                    produit.put("nomProduit", stock.getNomProduit());
+                    produit.put("stockDisponible", stock.getStockDisponible());
+                    produit.put("prixMoyenVente", stock.getPrixMoyenVente());
+                    produit.put("statut", stock.getStatut());
+                    return produit;
+                })
+                .toList();
+
+        return ResponseEntity.ok(produitsDisponibles);
+    }
+
+    /**
+     * GET /api/stock/noms-produits
+     * Obtenir uniquement la liste des noms de produits disponibles
+     *
+     * Version simplifiée pour une liste déroulante simple
+     *
+     * Exemple : GET /api/stock/noms-produits
+     * Réponse : ["Collier en or", "Bracelet", "Bague"]
+     */
+    @GetMapping("/noms-produits")
+    public ResponseEntity<List<String>> obtenirNomsProduits() {
+        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+
+        List<String> nomsProduits = stocks.stream()
+                .filter(s -> s.getStockDisponible() > 0)
+                .map(StockDto::getNomProduit)
+                .sorted(String::compareToIgnoreCase)
+                .toList();
+
+        return ResponseEntity.ok(nomsProduits);
+    }
 }
