@@ -52,11 +52,17 @@ public class SecurityConfig {
 
                 // Règles d'autorisation
                 .authorizeHttpRequests(auth -> auth
-                        // Routes publiques (pas besoin de token)
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
+                        // Routes publiques (login + register temporairement)
+                        .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/auth/login").permitAll()
+                        .requestMatchers("/api/auth/register").permitAll()  // ⚠️ TEMPORAIRE - MODE DEV
+                        .requestMatchers("/auth/register").permitAll()       // ⚠️ TEMPORAIRE - MODE DEV
 
-                        // Toutes les autres routes nécessitent un token
+                        // Routes ADMIN uniquement (création de compte, gestion utilisateurs)
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers("/admin/**").hasAuthority("ADMIN")
+
+                        // Toutes les autres routes nécessitent un token (USER ou ADMIN)
                         .anyRequest().authenticated()
                 )
         // Ajouter le filtre JWT AVANT le filtre d'authentification standard

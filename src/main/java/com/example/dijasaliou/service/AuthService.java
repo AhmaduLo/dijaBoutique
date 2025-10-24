@@ -32,7 +32,11 @@ public class AuthService {
     }
 
     /**
-     * INSCRIPTION
+     * INSCRIPTION (TEMPORAIREMENT ACTIVÉE)
+     *
+     * ⚠️ MODE DÉVELOPPEMENT : INSCRIPTION PUBLIQUE ACTIVÉE ⚠️
+     *
+     * En production, désactivez ceci et utilisez uniquement /api/admin/utilisateurs
      *
      * 1. Vérifier que l'email n'existe pas déjà
      * 2. Hasher le mot de passe
@@ -41,7 +45,6 @@ public class AuthService {
      * 5. Retourner la réponse avec le token
      */
     public AuthResponse register(RegisterRequest request) {
-
         // Vérifier si l'email existe déjà
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Un utilisateur avec cet email existe déjà");
@@ -65,7 +68,7 @@ public class AuthService {
         // Retourner la réponse
         return AuthResponse.builder()
                 .token(token)
-                .user(user)
+                .user(savedUser)
                 .build();
     }
 

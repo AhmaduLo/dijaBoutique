@@ -39,11 +39,12 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("Utilisateur non trouvé : " + email));
 
         // 2. Convertir UserEntity en UserDetails (format Spring Security)
+        // Note : On n'utilise PAS le préfixe "ROLE_" pour utiliser hasAuthority() dans SecurityConfig
         return User.builder()
                 .username(user.getEmail())
                 .password(user.getMotDePasse())
                 .authorities(Collections.singletonList(
-                        new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+                        new SimpleGrantedAuthority(user.getRole().name())
                 ))
                 .build();
     }

@@ -47,6 +47,15 @@ public class UserEntity extends BaseEntity {
     @Column(name = "date_creation", nullable = false, updatable = false)
     private LocalDateTime dateCreation;
 
+    /**
+     * Référence à l'utilisateur (ADMIN) qui a créé ce compte
+     * null = compte créé lors de l'initialisation (premier ADMIN)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_user_id")
+    @JsonIgnore
+    private UserEntity createdByUser;
+
     @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default  // Pour Lombok Builder
     @JsonManagedReference("user-achats")
