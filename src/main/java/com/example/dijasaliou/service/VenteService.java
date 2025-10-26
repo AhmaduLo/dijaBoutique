@@ -74,6 +74,7 @@ public class VenteService {
         venteExistante.setPrixUnitaire(venteModifiee.getPrixUnitaire());
         venteExistante.setDateVente(venteModifiee.getDateVente());
         venteExistante.setClient(venteModifiee.getClient());
+        venteExistante.setUtilisateur(venteModifiee.getUtilisateur());
 
         venteExistante.calculerPrixTotal();
 

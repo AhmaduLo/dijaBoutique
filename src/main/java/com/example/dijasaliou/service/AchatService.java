@@ -108,6 +108,7 @@ public class AchatService {
         achatExistant.setPrixUnitaire(achatModifie.getPrixUnitaire());
         achatExistant.setDateAchat(achatModifie.getDateAchat());
         achatExistant.setFournisseur(achatModifie.getFournisseur());
+        achatExistant.setUtilisateur(achatModifie.getUtilisateur());
 
         // 4. Recalculer le prix total
         achatExistant.calculerPrixTotal();

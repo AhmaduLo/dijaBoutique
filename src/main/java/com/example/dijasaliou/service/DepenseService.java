@@ -64,6 +64,7 @@ public class DepenseService {
         depenseExistante.setCategorie(depenseModifiee.getCategorie());
         depenseExistante.setEstRecurrente(depenseModifiee.getEstRecurrente());
         depenseExistante.setNotes(depenseModifiee.getNotes());
+        depenseExistante.setUtilisateur(depenseModifiee.getUtilisateur());
 
         return depenseRepository.save(depenseExistante);
     }

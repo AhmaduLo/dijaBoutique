@@ -92,8 +92,16 @@ public class DepenseController {
     @PutMapping("/{id}")
     public ResponseEntity<DepenseDto> modifier(
             @PathVariable Long id,
-            @RequestBody DepenseEntity depenseModifiee) {
+            @RequestBody DepenseEntity depenseModifiee,
+            @RequestParam Long utilisateurId) {
 
+        // Récupérer l'utilisateur qui modifie
+        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+
+        // Mettre à jour l'utilisateur de la dépense
+        depenseModifiee.setUtilisateur(utilisateur);
+
+        // Sauvegarder avec le nouvel utilisateur
         DepenseEntity depense = depenseService.modifierDepense(id, depenseModifiee);
         return ResponseEntity.ok(DepenseDto.fromEntity(depense));
     }

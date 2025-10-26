@@ -74,8 +74,16 @@ public class VenteController {
     @PutMapping("/{id}")
     public ResponseEntity<VenteDto> modifier(
             @PathVariable Long id,
-            @RequestBody VenteEntity venteModifiee) {
+            @RequestBody VenteEntity venteModifiee,
+            @RequestParam Long utilisateurId) {
 
+        // Récupérer l'utilisateur qui modifie
+        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+
+        // Mettre à jour l'utilisateur de la vente
+        venteModifiee.setUtilisateur(utilisateur);
+
+        // Sauvegarder avec le nouvel utilisateur
         VenteEntity vente = venteService.modifierVente(id, venteModifiee);
         return ResponseEntity.ok(VenteDto.fromEntity(vente));
     }

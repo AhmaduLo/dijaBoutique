@@ -119,14 +119,22 @@ public class AchatController {
      * PUT /api/achats/{id}
      * Modifier un achat existant
      *
-     * Exemple : PUT /api/achats/5
+     * Exemple : PUT /api/achats/5?utilisateurId=1
      *           Body : { "quantite": 20, "nomProduit": "Collier doré", ... }
      */
     @PutMapping("/{id}")
     public ResponseEntity<AchatDto> modifier(
             @PathVariable Long id,
-            @RequestBody AchatEntity achatModifie) {
+            @RequestBody AchatEntity achatModifie,
+            @RequestParam Long utilisateurId) {
 
+        // Récupérer l'utilisateur qui modifie
+        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+
+        // Mettre à jour l'utilisateur de l'achat
+        achatModifie.setUtilisateur(utilisateur);
+
+        // Sauvegarder avec le nouvel utilisateur
         AchatEntity achat = achatService.modifierAchat(id, achatModifie);
         return ResponseEntity.ok(AchatDto.fromEntity(achat));
     }
