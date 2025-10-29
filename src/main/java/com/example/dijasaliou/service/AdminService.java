@@ -2,6 +2,7 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.dto.UserDto;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -94,6 +95,9 @@ public class AdminService {
         // Sauf si explicitement spécifié ADMIN dans la requête
         UserEntity.Role role = request.getRole() != null ? request.getRole() : UserEntity.Role.USER;
 
+        // Récupérer le tenant actuel pour copier nomEntreprise et numeroTelephone
+        TenantEntity tenant = tenantService.getCurrentTenant();
+
         // Créer l'utilisateur
         UserEntity nouvelUtilisateur = UserEntity.builder()
                 .nom(request.getNom())
@@ -101,8 +105,10 @@ public class AdminService {
                 .email(request.getEmail())
                 .motDePasse(passwordEncoder.encode(request.getMotDePasse()))
                 .role(role)
+                .nomEntreprise(tenant.getNomEntreprise()) // Copier du tenant
+                .numeroTelephone(tenant.getNumeroTelephone()) // Copier du tenant
                 .createdByUser(admin) // Enregistrer qui a créé ce compte
-                .tenant(tenantService.getCurrentTenant()) // MULTI-TENANT : Assigner le tenant (CRUCIAL!)
+                .tenant(tenant) // MULTI-TENANT : Assigner le tenant (CRUCIAL!)
                 .build();
 
         UserEntity utilisateurSauvegarde = userRepository.save(nouvelUtilisateur);

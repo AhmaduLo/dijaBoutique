@@ -11,7 +11,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "utilisateurs", indexes = {@Index(name = "idx_email", columnList = "email"), @Index(name = "idx_role", columnList = "role")})
+@Table(name = "utilisateurs", indexes = {
+    @Index(name = "idx_email", columnList = "email"),
+    @Index(name = "idx_role", columnList = "role"),
+    @Index(name = "idx_user_tenant", columnList = "tenant_id")
+})
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "tenant_id = (SELECT t.id FROM tenants t WHERE t.tenant_uuid = :tenantId)")
 @Getter
 @Setter
 @NoArgsConstructor
