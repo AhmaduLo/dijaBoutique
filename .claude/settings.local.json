@@ -1,10 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./mvnw clean compile:*)",
-      "Bash(timeout 30 ./mvnw:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(mvn test:*)",
+      "Bash(./mvnw.cmd test:*)"
     ],
     "deny": [],
     "ask": []
