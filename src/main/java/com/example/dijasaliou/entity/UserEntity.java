@@ -38,6 +38,12 @@ public class UserEntity extends BaseEntity {
     @JsonIgnore
     private String motDePasse;
 
+    @Column(name = "nom_entreprise", nullable = false, length = 100)
+    private String nomEntreprise;
+
+    @Column(name = "numero_telephone", nullable = false, length = 20)
+    private String numeroTelephone;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     @Builder.Default
@@ -46,6 +52,16 @@ public class UserEntity extends BaseEntity {
     @CreationTimestamp
     @Column(name = "date_creation", nullable = false, updatable = false)
     private LocalDateTime dateCreation;
+
+    /**
+     * MULTI-TENANT : Référence au tenant (entreprise)
+     * CRITIQUE : Chaque utilisateur appartient à UN SEUL tenant
+     * Cette relation garantit l'isolation des données
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tenant_id", nullable = false, foreignKey = @ForeignKey(name = "fk_user_tenant"))
+    @JsonIgnore
+    private TenantEntity tenant;
 
     /**
      * Référence à l'utilisateur (ADMIN) qui a créé ce compte

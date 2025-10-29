@@ -19,9 +19,11 @@ import java.util.stream.Collectors;
         indexes = {
                 @Index(name = "idx_depense_date", columnList = "date_depense"),
                 @Index(name = "idx_depense_categorie", columnList = "categorie"),
-                @Index(name = "idx_depense_utilisateur", columnList = "utilisateur_id")
+                @Index(name = "idx_depense_utilisateur", columnList = "utilisateur_id"),
+                @Index(name = "idx_depense_tenant", columnList = "tenant_id")
         }
 )
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "tenant_id = (SELECT t.id FROM tenants t WHERE t.tenant_uuid = :tenantId)")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -75,6 +77,16 @@ public class DepenseEntity  extends BaseEntity{
     @JsonBackReference("user-depenses")
     @ToString.Exclude
     private UserEntity utilisateur;
+
+    /**
+     * MULTI-TENANT : Référence au tenant (entreprise)
+     * SÉCURITÉ CRITIQUE : Permet de filtrer automatiquement les dépenses par entreprise
+     * Chaque dépense appartient à UNE SEULE entreprise
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tenant_id", nullable = false, foreignKey = @ForeignKey(name = "fk_depense_tenant"))
+    @JsonIgnore
+    private TenantEntity tenant;
 
 
     /**

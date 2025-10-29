@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(mvn test:*)",
-      "Bash(./mvnw.cmd test:*)"
+      "Bash(./mvnw.cmd test:*)",
+      "Bash(./mvnw.cmd clean compile)",
+      "Bash(Select-Object -First 150)"
     ],
     "deny": [],
     "ask": []

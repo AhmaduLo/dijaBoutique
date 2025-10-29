@@ -14,7 +14,14 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 
 @Entity
-@Table(name = "achats", indexes = {@Index(name = "idx_achat_date", columnList = "date_achat"), @Index(name = "idx_achat_produit", columnList = "nom_produit"), @Index(name = "idx_achat_utilisateur", columnList = "utilisateur_id")})
+@Table(name = "achats", indexes = {
+    @Index(name = "idx_achat_date", columnList = "date_achat"),
+    @Index(name = "idx_achat_produit", columnList = "nom_produit"),
+    @Index(name = "idx_achat_utilisateur", columnList = "utilisateur_id"),
+    @Index(name = "idx_achat_tenant", columnList = "tenant_id")
+})
+@org.hibernate.annotations.FilterDef(name = "tenantFilter", parameters = @org.hibernate.annotations.ParamDef(name = "tenantId", type = String.class))
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "tenant_id = (SELECT t.id FROM tenants t WHERE t.tenant_uuid = :tenantId)")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -80,6 +87,16 @@ public class AchatEntity extends BaseEntity{
     @JsonBackReference("user-achats")
     @ToString.Exclude
     private UserEntity utilisateur;
+
+    /**
+     * MULTI-TENANT : Référence au tenant (entreprise)
+     * SÉCURITÉ CRITIQUE : Permet de filtrer automatiquement les achats par entreprise
+     * Chaque achat appartient à UNE SEULE entreprise
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tenant_id", nullable = false, foreignKey = @ForeignKey(name = "fk_achat_tenant"))
+    @JsonIgnore
+    private TenantEntity tenant;
 
 
     /**

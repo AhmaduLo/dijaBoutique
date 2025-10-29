@@ -21,12 +21,16 @@ public class AchatService {
     // Le repository pour accéder à la base
     private final AchatRepository achatRepository;
 
+    // MULTI-TENANT : Service pour récupérer le tenant actuel
+    private final TenantService tenantService;
+
     /**
      * Constructeur
-     * Spring injecte automatiquement achatRepository
+     * Spring injecte automatiquement achatRepository et tenantService
      */
-    public AchatService(AchatRepository achatRepository) {
+    public AchatService(AchatRepository achatRepository, TenantService tenantService) {
         this.achatRepository = achatRepository;
+        this.tenantService = tenantService;
     }
 
     /**
@@ -53,20 +57,25 @@ public class AchatService {
      * - Validation des données
      * - Calcul du prix total
      * - Vérifications métier
+     * - MULTI-TENANT : Assignation automatique du tenant
      */
     public AchatEntity creerAchat(AchatEntity achat, UserEntity utilisateur) {
 
         // 1. VALIDATION : Vérifier que les données sont correctes
         validerAchat(achat);
+
         // 2. LOGIQUE : Associer l'utilisateur
         achat.setUtilisateur(utilisateur);
 
-        // 3. LOGIQUE : Calculer le prix total (si pas fait)
+        // 3. MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
+        achat.setTenant(tenantService.getCurrentTenant());
+
+        // 4. LOGIQUE : Calculer le prix total (si pas fait)
         if (achat.getPrixTotal() == null) {
             achat.calculerPrixTotal();
         }
 
-        // 4. SAUVEGARDE : Enregistrer en base
+        // 5. SAUVEGARDE : Enregistrer en base
         return achatRepository.save(achat);
     }
 
@@ -109,6 +118,9 @@ public class AchatService {
         achatExistant.setDateAchat(achatModifie.getDateAchat());
         achatExistant.setFournisseur(achatModifie.getFournisseur());
         achatExistant.setUtilisateur(achatModifie.getUtilisateur());
+
+        // NOTE : On ne modifie PAS le tenant pour des raisons de sécurité
+        // Le tenant est défini à la création et ne change jamais
 
         // 4. Recalculer le prix total
         achatExistant.calculerPrixTotal();

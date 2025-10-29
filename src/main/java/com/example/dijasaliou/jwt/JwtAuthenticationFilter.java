@@ -1,9 +1,11 @@
 package com.example.dijasaliou.jwt;
 
+import com.example.dijasaliou.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,11 +22,13 @@ import java.io.IOException;
  * Responsabilités :
  * 1. Extraire le token du header Authorization
  * 2. Valider le token
- * 3. Extraire l'email du token
+ * 3. Extraire l'email ET le tenant_id du token
  * 4. Charger l'utilisateur
  * 5. Authentifier l'utilisateur dans le contexte Spring Security
+ * 6. MULTI-TENANT : Stocker le tenant_id dans TenantContext
  */
 @Component
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
@@ -65,7 +69,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 // 7. Valider le token
                 if (jwtService.validateToken(token)) {
-                    // 8. Créer l'objet d'authentification
+                    // 8. MULTI-TENANT : Extraire et stocker le tenant_id
+                    String tenantId = jwtService.getTenantIdFromToken(token);
+                    if (tenantId != null && !tenantId.trim().isEmpty()) {
+                        TenantContext.setCurrentTenant(tenantId);
+                        log.debug("Tenant défini dans le contexte: {}", tenantId);
+                    } else {
+                        log.warn("SÉCURITÉ : Token sans tenant_id pour l'utilisateur: {}", email);
+                    }
+
+                    // 9. Créer l'objet d'authentification
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails,
@@ -75,16 +88,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    // 9. Authentifier l'utilisateur dans le contexte Spring Security
+                    // 10. Authentifier l'utilisateur dans le contexte Spring Security
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (Exception e) {
             // Token invalide → Ne rien faire (l'utilisateur restera non authentifié)
-            System.out.println("Token invalide : " + e.getMessage());
+            log.error("Token invalide : {}", e.getMessage());
+            TenantContext.clear(); // Nettoyer le contexte en cas d'erreur
         }
 
-        // 10. Continuer la chaîne de filtres
-        filterChain.doFilter(request, response);
+        try {
+            // 11. Continuer la chaîne de filtres
+            filterChain.doFilter(request, response);
+        } finally {
+            // 12. CRITIQUE : Nettoyer le contexte tenant après chaque requête
+            TenantContext.clear();
+            log.debug("Contexte tenant nettoyé après la requête");
+        }
     }
 }

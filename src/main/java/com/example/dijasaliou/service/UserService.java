@@ -13,9 +13,11 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final TenantService tenantService;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, TenantService tenantService) {
         this.userRepository = userRepository;
+        this.tenantService = tenantService;
     }
 
     /**
@@ -54,6 +56,9 @@ public class UserService {
         validerUtilisateur(utilisateur);
 
         // TODO : Hasher le mot de passe (avec BCrypt plus tard)
+
+        // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
+        utilisateur.setTenant(tenantService.getCurrentTenant());
 
         return userRepository.save(utilisateur);
     }

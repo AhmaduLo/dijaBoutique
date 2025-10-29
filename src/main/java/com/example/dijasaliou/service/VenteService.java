@@ -19,10 +19,12 @@ public class VenteService {
 
     private final VenteRepository venteRepository;
     private final StockService stockService;
+    private final TenantService tenantService;
 
-    public VenteService(VenteRepository venteRepository, @Lazy StockService stockService) {
+    public VenteService(VenteRepository venteRepository, @Lazy StockService stockService, TenantService tenantService) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
+        this.tenantService = tenantService;
     }
 
     /**
@@ -52,6 +54,9 @@ public class VenteService {
 
         // Associer l'utilisateur
         vente.setUtilisateur(utilisateur);
+
+        // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
+        vente.setTenant(tenantService.getCurrentTenant());
 
         // Calculer le prix total
         if (vente.getPrixTotal() == null) {

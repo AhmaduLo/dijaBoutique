@@ -19,9 +19,11 @@ import java.time.LocalDate;
                 @Index(name = "idx_vente_date", columnList = "date_vente"),
                 @Index(name = "idx_vente_produit", columnList = "nom_produit"),
                 @Index(name = "idx_vente_utilisateur", columnList = "utilisateur_id"),
-                @Index(name = "idx_vente_client", columnList = "client")
+                @Index(name = "idx_vente_client", columnList = "client"),
+                @Index(name = "idx_vente_tenant", columnList = "tenant_id")
         }
 )
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "tenant_id = (SELECT t.id FROM tenants t WHERE t.tenant_uuid = :tenantId)")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,7 +31,6 @@ import java.time.LocalDate;
 @Builder
 @ToString
 @EqualsAndHashCode(callSuper = false)
-
 public class VenteEntity  extends BaseEntity{
 
     @Id
@@ -78,6 +79,16 @@ public class VenteEntity  extends BaseEntity{
     @JsonBackReference("user-ventes")
     @ToString.Exclude
     private UserEntity utilisateur;
+
+    /**
+     * MULTI-TENANT : Référence au tenant (entreprise)
+     * SÉCURITÉ CRITIQUE : Permet de filtrer automatiquement les ventes par entreprise
+     * Chaque vente appartient à UNE SEULE entreprise
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "tenant_id", nullable = false, foreignKey = @ForeignKey(name = "fk_vente_tenant"))
+    @JsonIgnore
+    private TenantEntity tenant;
 
 
 

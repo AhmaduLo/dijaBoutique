@@ -16,9 +16,11 @@ import java.util.List;
 public class DepenseService {
 
     private final DepenseRepository depenseRepository;
+    private final TenantService tenantService;
 
-    public DepenseService(DepenseRepository depenseRepository) {
+    public DepenseService(DepenseRepository depenseRepository, TenantService tenantService) {
         this.depenseRepository = depenseRepository;
+        this.tenantService = tenantService;
     }
 
 
@@ -46,6 +48,9 @@ public class DepenseService {
 
         // Associer l'utilisateur
         depense.setUtilisateur(utilisateur);
+
+        // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
+        depense.setTenant(tenantService.getCurrentTenant());
 
         return depenseRepository.save(depense);
     }

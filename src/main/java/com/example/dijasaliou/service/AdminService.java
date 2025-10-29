@@ -29,10 +29,12 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantService tenantService;
 
-    public AdminService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AdminService(UserRepository userRepository, PasswordEncoder passwordEncoder, TenantService tenantService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.tenantService = tenantService;
     }
 
     /**
@@ -100,6 +102,7 @@ public class AdminService {
                 .motDePasse(passwordEncoder.encode(request.getMotDePasse()))
                 .role(role)
                 .createdByUser(admin) // Enregistrer qui a créé ce compte
+                .tenant(tenantService.getCurrentTenant()) // MULTI-TENANT : Assigner le tenant (CRUCIAL!)
                 .build();
 
         UserEntity utilisateurSauvegarde = userRepository.save(nouvelUtilisateur);
