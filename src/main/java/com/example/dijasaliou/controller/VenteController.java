@@ -5,6 +5,7 @@ import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.service.UserService;
 import com.example.dijasaliou.service.VenteService;
+import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -59,7 +60,7 @@ public class VenteController {
      */
     @PostMapping
     public ResponseEntity<VenteDto> creer(
-            @RequestBody VenteEntity vente,
+            @Valid @RequestBody VenteEntity vente,
             @RequestParam Long utilisateurId) {
 
         UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
@@ -74,7 +75,7 @@ public class VenteController {
     @PutMapping("/{id}")
     public ResponseEntity<VenteDto> modifier(
             @PathVariable Long id,
-            @RequestBody VenteEntity venteModifiee,
+            @Valid @RequestBody VenteEntity venteModifiee,
             @RequestParam Long utilisateurId) {
 
         // Récupérer l'utilisateur qui modifie

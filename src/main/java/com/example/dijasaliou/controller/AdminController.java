@@ -4,6 +4,7 @@ import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.dto.UserDto;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AdminService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -78,7 +79,7 @@ public class AdminController {
      */
     @PostMapping("/utilisateurs")
     public ResponseEntity<UserDto> creerUtilisateur(
-            @RequestBody RegisterRequest request,
+            @Valid @RequestBody RegisterRequest request,
             Authentication authentication) {
 
         String emailAdmin = authentication.getName();

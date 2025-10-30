@@ -1,5 +1,6 @@
 package com.example.dijasaliou.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,8 +13,12 @@ import java.util.Map;
 /**
  * Gestionnaire global des exceptions pour l'application
  * Permet de renvoyer des messages d'erreur structurés au frontend
+ *
+ * SÉCURITÉ : Les messages d'erreur génériques sont envoyés au client
+ * Les détails complets sont loggés côté serveur uniquement
  */
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     /**
@@ -70,14 +75,19 @@ public class GlobalExceptionHandler {
 
     /**
      * Gestion de IllegalStateException
+     * Message générique au client, détails loggés serveur
      */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException ex) {
+        // Logger l'erreur complète côté serveur (visible seulement dans les logs)
+        log.error("IllegalStateException: {}", ex.getMessage(), ex);
+
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        errorResponse.put("error", "Erreur d'état");
-        errorResponse.put("message", ex.getMessage());
+        errorResponse.put("error", "Erreur d'état du système");
+        // Message générique pour le client (pas de détails sensibles)
+        errorResponse.put("message", "Une erreur s'est produite lors du traitement de votre demande.");
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -86,14 +96,19 @@ public class GlobalExceptionHandler {
 
     /**
      * Gestion de toutes les autres exceptions
+     * SÉCURITÉ : Message générique au client, détails complets loggés serveur uniquement
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {
+        // Logger l'exception complète côté serveur (visible seulement dans les logs)
+        log.error("Exception non gérée: {}", ex.getMessage(), ex);
+
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         errorResponse.put("error", "Erreur interne du serveur");
-        errorResponse.put("message", ex.getMessage());
+        // Message générique pour le client (SÉCURITÉ : pas de fuite d'informations)
+        errorResponse.put("message", "Une erreur s'est produite. Veuillez réessayer ultérieurement.");
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)

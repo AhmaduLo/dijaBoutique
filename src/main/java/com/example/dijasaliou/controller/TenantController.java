@@ -3,6 +3,7 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.UpdateTenantRequest;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.TenantService;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -67,7 +68,7 @@ public class TenantController {
      */
     @PutMapping
     public ResponseEntity<TenantResponse> updateEntreprise(
-            @RequestBody UpdateTenantRequest request,
+            @Valid @RequestBody UpdateTenantRequest request,
             Authentication authentication
     ) {
         String emailAdmin = authentication.getName();

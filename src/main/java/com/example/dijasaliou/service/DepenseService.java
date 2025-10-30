@@ -1,6 +1,7 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.entity.DepenseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.DepenseRepository;
 import org.springframework.stereotype.Service;
@@ -61,6 +62,12 @@ public class DepenseService {
     public DepenseEntity modifierDepense(Long id, DepenseEntity depenseModifiee) {
         DepenseEntity depenseExistante = obtenirDepenseParId(id);
 
+        // SÉCURITÉ : Vérifier que la dépense appartient au tenant actuel (double sécurité)
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        if (!depenseExistante.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
+            throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
+        }
+
         validerDepense(depenseModifiee);
 
         depenseExistante.setLibelle(depenseModifiee.getLibelle());
@@ -78,9 +85,15 @@ public class DepenseService {
      * Supprimer une dépense
      */
     public void supprimerDepense(Long id) {
-        if (!depenseRepository.existsById(id)) {
-            throw new RuntimeException("Dépense non trouvée avec l'ID : " + id);
+        // Récupérer la dépense existante
+        DepenseEntity depenseExistante = obtenirDepenseParId(id);
+
+        // SÉCURITÉ : Vérifier que la dépense appartient au tenant actuel (double sécurité)
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        if (!depenseExistante.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
+            throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
+
         depenseRepository.deleteById(id);
     }
 

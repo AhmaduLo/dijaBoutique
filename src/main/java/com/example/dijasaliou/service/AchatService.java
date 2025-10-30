@@ -1,6 +1,7 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.AchatRepository;
 import org.springframework.stereotype.Service;
@@ -108,10 +109,16 @@ public class AchatService {
         // 1. Vérifier que l'achat existe
         AchatEntity achatExistant = obtenirAchatParId(id);
 
-        // 2. Valider les nouvelles données
+        // 2. SÉCURITÉ : Vérifier que l'achat appartient au tenant actuel (double sécurité)
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        if (!achatExistant.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
+            throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
+        }
+
+        // 3. Valider les nouvelles données
         validerAchat(achatModifie);
 
-        // 3. Mettre à jour les champs
+        // 4. Mettre à jour les champs
         achatExistant.setQuantite(achatModifie.getQuantite());
         achatExistant.setNomProduit(achatModifie.getNomProduit());
         achatExistant.setPrixUnitaire(achatModifie.getPrixUnitaire());
@@ -122,10 +129,10 @@ public class AchatService {
         // NOTE : On ne modifie PAS le tenant pour des raisons de sécurité
         // Le tenant est défini à la création et ne change jamais
 
-        // 4. Recalculer le prix total
+        // 5. Recalculer le prix total
         achatExistant.calculerPrixTotal();
 
-        // 5. Sauvegarder
+        // 6. Sauvegarder
         return achatRepository.save(achatExistant);
     }
 
@@ -133,12 +140,16 @@ public class AchatService {
      * Supprimer un achat
      */
     public void supprimerAchat(Long id) {
-        // 1. Vérifier que l'achat existe
-        if (!achatRepository.existsById(id)) {
-            throw new RuntimeException("Achat non trouvé avec l'ID : " + id);
+        // 1. Récupérer l'achat existant
+        AchatEntity achatExistant = obtenirAchatParId(id);
+
+        // 2. SÉCURITÉ : Vérifier que l'achat appartient au tenant actuel (double sécurité)
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        if (!achatExistant.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
+            throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
 
-        // 2. Supprimer
+        // 3. Supprimer
         achatRepository.deleteById(id);
     }
 

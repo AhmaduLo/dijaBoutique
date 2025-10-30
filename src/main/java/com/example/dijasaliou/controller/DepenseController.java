@@ -5,6 +5,7 @@ import com.example.dijasaliou.entity.DepenseEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.DepenseService;
 import com.example.dijasaliou.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -77,7 +78,7 @@ public class DepenseController {
      */
     @PostMapping
     public ResponseEntity<DepenseDto> creer(
-            @RequestBody DepenseEntity depense,
+            @Valid @RequestBody DepenseEntity depense,
             @RequestParam Long utilisateurId) {
 
         UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
@@ -92,7 +93,7 @@ public class DepenseController {
     @PutMapping("/{id}")
     public ResponseEntity<DepenseDto> modifier(
             @PathVariable Long id,
-            @RequestBody DepenseEntity depenseModifiee,
+            @Valid @RequestBody DepenseEntity depenseModifiee,
             @RequestParam Long utilisateurId) {
 
         // Récupérer l'utilisateur qui modifie

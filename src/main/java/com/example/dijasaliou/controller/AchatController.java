@@ -5,6 +5,7 @@ import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AchatService;
 import com.example.dijasaliou.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -102,7 +103,7 @@ public class AchatController {
      */
     @PostMapping
     public ResponseEntity<AchatDto> creer(
-            @RequestBody AchatEntity achat,
+            @Valid @RequestBody AchatEntity achat,
             @RequestParam Long utilisateurId) {
 
         // Récupérer l'utilisateur
@@ -125,7 +126,7 @@ public class AchatController {
     @PutMapping("/{id}")
     public ResponseEntity<AchatDto> modifier(
             @PathVariable Long id,
-            @RequestBody AchatEntity achatModifie,
+            @Valid @RequestBody AchatEntity achatModifie,
             @RequestParam Long utilisateurId) {
 
         // Récupérer l'utilisateur qui modifie

@@ -3,6 +3,7 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.UserDto;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -81,7 +82,7 @@ public class UserController {
      * ❌ DÉSACTIVÉ - Seul l'ADMIN peut créer des comptes via /api/admin/utilisateurs
      */
     @PostMapping
-    public ResponseEntity<Map<String, String>> creer(@RequestBody UserEntity utilisateur) {
+    public ResponseEntity<Map<String, String>> creer(@Valid @RequestBody UserEntity utilisateur) {
         Map<String, String> error = new HashMap<>();
         error.put("message", "La création de compte est réservée aux administrateurs");
         error.put("endpoint", "Utilisez /api/admin/utilisateurs (ADMIN uniquement)");
@@ -95,7 +96,7 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<Map<String, String>> modifier(
             @PathVariable Long id,
-            @RequestBody UserEntity utilisateurModifie) {
+            @Valid @RequestBody UserEntity utilisateurModifie) {
 
         Map<String, String> error = new HashMap<>();
         error.put("message", "La modification de compte est réservée aux administrateurs");

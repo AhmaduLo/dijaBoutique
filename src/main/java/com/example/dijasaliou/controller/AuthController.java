@@ -6,6 +6,8 @@ import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +24,9 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
 
     public AuthController(AuthService authService) {
         this.authService = authService;
@@ -54,7 +59,7 @@ public class AuthController {
      */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(
-            @RequestBody RegisterRequest request,
+            @Valid @RequestBody RegisterRequest request,
             HttpServletResponse response) {
         AuthResponse authResponse = authService.register(request);
 
@@ -92,7 +97,7 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
-            @RequestBody LoginRequest request,
+            @Valid @RequestBody LoginRequest request,
             HttpServletResponse response) {
         AuthResponse authResponse = authService.login(request);
 
@@ -117,7 +122,7 @@ public class AuthController {
         jwtCookie.setPath("/");
         jwtCookie.setHttpOnly(true);
         jwtCookie.setMaxAge(0); // Expiration immédiate
-        jwtCookie.setSecure(false); // true en production avec HTTPS
+        jwtCookie.setSecure(cookieSecure); // Lit depuis application.properties
 
         response.addCookie(jwtCookie);
 
@@ -137,7 +142,7 @@ public class AuthController {
     private Cookie createJwtCookie(String token) {
         Cookie cookie = new Cookie("jwt", token);
         cookie.setHttpOnly(true); // JavaScript ne peut pas lire
-        cookie.setSecure(false); // true en production avec HTTPS, false en dev
+        cookie.setSecure(cookieSecure); // Lit depuis application.properties (false=dev, true=prod)
         cookie.setPath("/"); // Disponible pour toute l'application
         cookie.setMaxAge(24 * 60 * 60); // 24 heures
         // Note: SameSite=Strict est géré par le navigateur moderne par défaut

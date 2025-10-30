@@ -1,6 +1,7 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.StockDto;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.VenteRepository;
@@ -72,6 +73,12 @@ public class VenteService {
     public VenteEntity modifierVente(Long id, VenteEntity venteModifiee) {
         VenteEntity venteExistante = obtenirVenteParId(id);
 
+        // SÉCURITÉ : Vérifier que la vente appartient au tenant actuel (double sécurité)
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        if (!venteExistante.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
+            throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
+        }
+
         validerVente(venteModifiee);
 
         venteExistante.setQuantite(venteModifiee.getQuantite());
@@ -90,9 +97,15 @@ public class VenteService {
      * Supprimer une vente
      */
     public void supprimerVente(Long id) {
-        if (!venteRepository.existsById(id)) {
-            throw new RuntimeException("Vente non trouvée avec l'ID : " + id);
+        // Récupérer la vente existante
+        VenteEntity venteExistante = obtenirVenteParId(id);
+
+        // SÉCURITÉ : Vérifier que la vente appartient au tenant actuel (double sécurité)
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        if (!venteExistante.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
+            throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
+
         venteRepository.deleteById(id);
     }
 

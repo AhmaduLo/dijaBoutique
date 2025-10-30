@@ -140,6 +140,12 @@ public class AdminService {
         UserEntity utilisateur = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé avec l'ID : " + id));
 
+        // SÉCURITÉ : Vérifier que l'utilisateur appartient au tenant actuel (double sécurité)
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        if (!utilisateur.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
+            throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
+        }
+
         // Appliquer les modifications
         if (updates.containsKey("nom")) {
             utilisateur.setNom((String) updates.get("nom"));
@@ -175,6 +181,12 @@ public class AdminService {
 
         UserEntity utilisateur = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé avec l'ID : " + id));
+
+        // SÉCURITÉ : Vérifier que l'utilisateur appartient au tenant actuel (double sécurité)
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        if (!utilisateur.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
+            throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
+        }
 
         // Empêcher l'admin de se supprimer lui-même
         if (utilisateur.getEmail().equals(admin.getEmail())) {
