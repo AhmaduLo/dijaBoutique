@@ -1,5 +1,6 @@
 package com.example.dijasaliou.repository;
 
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -36,4 +37,10 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
      * Trouver par nom et prénom
      */
     Optional<UserEntity> findByNomAndPrenom(String nom, String prenom);
+
+    /**
+     * Compter le nombre d'utilisateurs pour un tenant
+     * Utilisé pour vérifier les limites du plan
+     */
+    long countByTenant(TenantEntity tenant);
 }

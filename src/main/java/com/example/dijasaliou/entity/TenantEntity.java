@@ -108,19 +108,21 @@ public class TenantEntity {
      * Enum pour les plans (pour future monétisation)
      */
     public enum Plan {
-        GRATUIT("Plan Gratuit", "Fonctionnalités limitées", 0),
-        BASIC("Plan Basic", "Pour petites entreprises", 9.99),
-        PREMIUM("Plan Premium", "Pour moyennes entreprises", 29.99),
-        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 99.99);
+        GRATUIT("Plan Gratuit", "Fonctionnalités limitées", 0, 3),
+        BASIC("Plan Basic", "Pour petites entreprises", 9.99, 10),
+        PREMIUM("Plan Premium", "Pour moyennes entreprises", 29.99, 50),
+        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 99.99, Integer.MAX_VALUE);
 
         private final String libelle;
         private final String description;
         private final double prixMensuel;
+        private final int maxUtilisateurs;
 
-        Plan(String libelle, String description, double prixMensuel) {
+        Plan(String libelle, String description, double prixMensuel, int maxUtilisateurs) {
             this.libelle = libelle;
             this.description = description;
             this.prixMensuel = prixMensuel;
+            this.maxUtilisateurs = maxUtilisateurs;
         }
 
         public String getLibelle() {
@@ -133,6 +135,10 @@ public class TenantEntity {
 
         public double getPrixMensuel() {
             return prixMensuel;
+        }
+
+        public int getMaxUtilisateurs() {
+            return maxUtilisateurs;
         }
     }
 

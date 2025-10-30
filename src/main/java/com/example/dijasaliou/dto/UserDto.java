@@ -25,6 +25,8 @@ public class UserDto {
     private Long id;
     private String nom;
     private String prenom;
+     private String nomEntreprise;       
+    private String numeroTelephone;
     private String email;
     private UserEntity.Role role;
     private LocalDateTime dateCreation;
@@ -42,6 +44,8 @@ public class UserDto {
                 .id(user.getId())
                 .nom(user.getNom())
                 .prenom(user.getPrenom())
+                .nomEntreprise(user.getNomEntreprise())
+                .numeroTelephone(user.getNumeroTelephone())
                 .email(user.getEmail())
                 .role(user.getRole())
                 .dateCreation(user.getDateCreation())
@@ -61,6 +65,8 @@ public class UserDto {
                 .id(user.getId())
                 .nom(user.getNom())
                 .prenom(user.getPrenom())
+                .nomEntreprise(user.getNomEntreprise())
+                .numeroTelephone(user.getNumeroTelephone())
                 .email(user.getEmail())
                 .role(user.getRole())
                 .build();

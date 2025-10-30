@@ -1,10 +1,12 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.UpdateTenantRequest;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.tenant.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service utilitaire pour la gestion des tenants
@@ -65,5 +67,30 @@ public class TenantService {
                 .orElseThrow(() -> new IllegalArgumentException(
                     "Tenant introuvable pour l'UUID: " + tenantUuid
                 ));
+    }
+
+    /**
+     * Met à jour les informations de l'entreprise (tenant)
+     * Seul un ADMIN peut modifier les informations de son entreprise
+     *
+     * @param request Contient nomEntreprise et numeroTelephone
+     * @return TenantEntity mise à jour
+     */
+    @Transactional
+    public TenantEntity updateTenant(UpdateTenantRequest request) {
+        TenantEntity tenant = getCurrentTenant();
+
+        if (request.getNomEntreprise() != null && !request.getNomEntreprise().trim().isEmpty()) {
+            tenant.setNomEntreprise(request.getNomEntreprise());
+        }
+
+        if (request.getNumeroTelephone() != null && !request.getNumeroTelephone().trim().isEmpty()) {
+            tenant.setNumeroTelephone(request.getNumeroTelephone());
+        }
+
+        TenantEntity tenantSauvegarde = tenantRepository.save(tenant);
+        log.info("Tenant mis à jour : {} - {}", tenantSauvegarde.getNomEntreprise(), tenantSauvegarde.getTenantUuid());
+
+        return tenantSauvegarde;
     }
 }

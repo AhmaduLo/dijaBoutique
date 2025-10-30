@@ -4,6 +4,7 @@ import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.dto.UserDto;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.exception.UserLimitExceededException;
 import com.example.dijasaliou.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -91,12 +92,24 @@ public class AdminService {
             throw new RuntimeException("Un utilisateur avec cet email existe déjà");
         }
 
+        // Récupérer le tenant actuel pour copier nomEntreprise et numeroTelephone
+        TenantEntity tenant = tenantService.getCurrentTenant();
+
+        // Vérifier la limite d'utilisateurs selon le plan
+        long nombreUtilisateursActuels = userRepository.countByTenant(tenant);
+        int maxUtilisateurs = tenant.getPlan().getMaxUtilisateurs();
+
+        if (nombreUtilisateursActuels >= maxUtilisateurs) {
+            throw new UserLimitExceededException(
+                tenant.getPlan().getLibelle(),
+                nombreUtilisateursActuels,
+                maxUtilisateurs
+            );
+        }
+
         // Par défaut, les comptes créés par l'admin sont des USER
         // Sauf si explicitement spécifié ADMIN dans la requête
         UserEntity.Role role = request.getRole() != null ? request.getRole() : UserEntity.Role.USER;
-
-        // Récupérer le tenant actuel pour copier nomEntreprise et numeroTelephone
-        TenantEntity tenant = tenantService.getCurrentTenant();
 
         // Créer l'utilisateur
         UserEntity nouvelUtilisateur = UserEntity.builder()
