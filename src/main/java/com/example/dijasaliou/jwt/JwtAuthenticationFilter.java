@@ -3,6 +3,7 @@ package com.example.dijasaliou.jwt;
 import com.example.dijasaliou.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,7 @@ import java.io.IOException;
  * Filtre JWT qui intercepte CHAQUE requête
  *
  * Responsabilités :
- * 1. Extraire le token du header Authorization
+ * 1. Extraire le token du cookie HttpOnly "jwt" (ou fallback vers header Authorization)
  * 2. Valider le token
  * 3. Extraire l'email ET le tenant_id du token
  * 4. Charger l'utilisateur
@@ -44,18 +45,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
 
-        // 1. Extraire le header Authorization
-        String authHeader = request.getHeader("Authorization");
+        // 1. Essayer d'extraire le token du cookie HttpOnly "jwt"
+        String token = extractJwtFromCookie(request);
 
-        // 2. Vérifier si le header existe et commence par "Bearer "
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            // Pas de token → Continuer sans authentifier
+        // 2. Fallback : si pas de cookie, essayer le header Authorization
+        if (token == null) {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            }
+        }
+
+        // 3. Si aucun token trouvé, continuer sans authentifier
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        // 3. Extraire le token (enlever "Bearer ")
-        String token = authHeader.substring(7);
 
         try {
             // 4. Extraire l'email du token
@@ -106,5 +111,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             TenantContext.clear();
             log.debug("Contexte tenant nettoyé après la requête");
         }
+    }
+
+    /**
+     * Extrait le JWT du cookie HttpOnly "jwt"
+     *
+     * @param request La requête HTTP
+     * @return Le token JWT ou null si le cookie n'existe pas
+     */
+    private String extractJwtFromCookie(HttpServletRequest request) {
+        if (request.getCookies() == null) {
+            return null;
+        }
+
+        for (Cookie cookie : request.getCookies()) {
+            if ("jwt".equals(cookie.getName())) {
+                log.debug("JWT trouvé dans le cookie HttpOnly");
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 }

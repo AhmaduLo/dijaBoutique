@@ -52,8 +52,8 @@ public class SecurityConfig {
 
                 // Règles d'autorisation
                 .authorizeHttpRequests(auth -> auth
-                        // Routes publiques (login + register temporairement)
-                        .requestMatchers("/auth/login", "/auth/register").permitAll()
+                        // Routes publiques (login + register + logout)
+                        .requestMatchers("/auth/login", "/auth/register", "/auth/logout").permitAll()
 
                         // Routes ADMIN uniquement (création de compte, gestion utilisateurs)
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
