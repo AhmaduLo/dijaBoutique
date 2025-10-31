@@ -119,7 +119,7 @@ public class AdminService {
                 .motDePasse(passwordEncoder.encode(request.getMotDePasse()))
                 .role(role)
                 .nomEntreprise(tenant.getNomEntreprise()) // Copier du tenant
-                .numeroTelephone(tenant.getNumeroTelephone()) // Copier du tenant
+                .numeroTelephone(request.getNumeroTelephone()) // Utiliser le numéro fourni dans la requête
                 .createdByUser(admin) // Enregistrer qui a créé ce compte
                 .tenant(tenant) // MULTI-TENANT : Assigner le tenant (CRUCIAL!)
                 .build();
@@ -161,12 +161,15 @@ public class AdminService {
             }
             utilisateur.setEmail(nouvelEmail);
         }
+        if (updates.containsKey("numeroTelephone")) {
+            utilisateur.setNumeroTelephone((String) updates.get("numeroTelephone"));
+        }
         if (updates.containsKey("motDePasse")) {
             String nouveauMotDePasse = (String) updates.get("motDePasse");
             utilisateur.setMotDePasse(passwordEncoder.encode(nouveauMotDePasse));
         }
 
-        UserEntity utilisateurModifie = userRepository.save(utilisateur);
+        UserEntity utilisateurModifie = userRepository.saveAndFlush(utilisateur);
 
         return UserDto.fromEntity(utilisateurModifie);
     }

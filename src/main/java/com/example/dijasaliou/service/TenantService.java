@@ -2,11 +2,15 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.UpdateTenantRequest;
 import com.example.dijasaliou.entity.TenantEntity;
+import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.TenantRepository;
+import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.tenant.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /**
  * Service utilitaire pour la gestion des tenants
@@ -19,9 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class TenantService {
 
     private final TenantRepository tenantRepository;
+    private final UserRepository userRepository;
 
-    public TenantService(TenantRepository tenantRepository) {
+    public TenantService(TenantRepository tenantRepository, UserRepository userRepository) {
         this.tenantRepository = tenantRepository;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -78,18 +84,50 @@ public class TenantService {
      */
     @Transactional
     public TenantEntity updateTenant(UpdateTenantRequest request) {
-        TenantEntity tenant = getCurrentTenant();
+        // Récupérer le tenant actuel
+        TenantEntity tenantActuel = getCurrentTenant();
 
+        // Recharger depuis la base de données avec son ID pour éviter les problèmes de session
+        TenantEntity tenant = tenantRepository.findById(tenantActuel.getId())
+                .orElseThrow(() -> new IllegalStateException("Tenant introuvable"));
+
+        boolean nomEntrepriseChange = false;
+        String nouveauNomEntreprise = null;
+
+        // Mettre à jour les champs
         if (request.getNomEntreprise() != null && !request.getNomEntreprise().trim().isEmpty()) {
-            tenant.setNomEntreprise(request.getNomEntreprise());
+            nouveauNomEntreprise = request.getNomEntreprise().trim();
+            if (!nouveauNomEntreprise.equals(tenant.getNomEntreprise())) {
+                nomEntrepriseChange = true;
+                tenant.setNomEntreprise(nouveauNomEntreprise);
+                log.info("Mise à jour nom entreprise: {} -> {}", tenantActuel.getNomEntreprise(), nouveauNomEntreprise);
+            }
         }
 
         if (request.getNumeroTelephone() != null && !request.getNumeroTelephone().trim().isEmpty()) {
-            tenant.setNumeroTelephone(request.getNumeroTelephone());
+            tenant.setNumeroTelephone(request.getNumeroTelephone().trim());
+            log.info("Mise à jour numéro téléphone: {} -> {}", tenantActuel.getNumeroTelephone(), request.getNumeroTelephone());
         }
 
-        TenantEntity tenantSauvegarde = tenantRepository.save(tenant);
-        log.info("Tenant mis à jour : {} - {}", tenantSauvegarde.getNomEntreprise(), tenantSauvegarde.getTenantUuid());
+        // Forcer la sauvegarde du tenant
+        TenantEntity tenantSauvegarde = tenantRepository.saveAndFlush(tenant);
+        log.info("Tenant mis à jour avec succès : {} - {} - {}",
+                tenantSauvegarde.getNomEntreprise(),
+                tenantSauvegarde.getNumeroTelephone(),
+                tenantSauvegarde.getTenantUuid());
+
+        // Si le nom de l'entreprise a changé, mettre à jour tous les utilisateurs de ce tenant
+        if (nomEntrepriseChange) {
+            List<UserEntity> utilisateurs = tenant.getUtilisateurs();
+            log.info("Mise à jour du nom d'entreprise pour {} utilisateurs", utilisateurs.size());
+
+            for (UserEntity user : utilisateurs) {
+                user.setNomEntreprise(nouveauNomEntreprise);
+            }
+
+            userRepository.saveAllAndFlush(utilisateurs);
+            log.info("Tous les utilisateurs ont été mis à jour avec le nouveau nom d'entreprise: {}", nouveauNomEntreprise);
+        }
 
         return tenantSauvegarde;
     }
