@@ -9,9 +9,7 @@
       "Read(//d/boutique dijaSaliou/**)",
       "Bash(cat:*)",
       "Bash(./mvnw.cmd spring-boot:run:*)",
-      "Bash(curl:*)",
-      "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nAjout de la fonctionnalité mot de passe oublié\n\nFonctionnalités ajoutées :\n- Endpoint /auth/forgot-password pour demander une réinitialisation\n- Endpoint /auth/reset-password pour réinitialiser le mot de passe\n- Envoi d''email avec lien de réinitialisation (expire en 1h)\n- Token unique et sécurisé (UUID)\n- Validation stricte des tokens (expiration, usage unique)\n\nFichiers créés :\n- PasswordResetToken entity pour stocker les tokens\n- PasswordResetTokenRepository\n- ForgotPasswordRequest, ResetPasswordRequest, PasswordResetResponse DTOs\n- EmailService pour l''envoi d''emails HTML\n\nModifications :\n- SecurityConfig : routes publiques forgot-password et reset-password\n- AuthController : endpoints retournent du JSON au lieu de String\n- AuthService : méthodes forgotPassword() et resetPassword()\n- EmailService : lien corrigé /reset-password/token\n- application.properties : configuration SMTP\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
