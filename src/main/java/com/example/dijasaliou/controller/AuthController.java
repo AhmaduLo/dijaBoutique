@@ -1,8 +1,11 @@
 package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.AuthResponse;
+import com.example.dijasaliou.dto.ForgotPasswordRequest;
 import com.example.dijasaliou.dto.LoginRequest;
+import com.example.dijasaliou.dto.PasswordResetResponse;
 import com.example.dijasaliou.dto.RegisterRequest;
+import com.example.dijasaliou.dto.ResetPasswordRequest;
 import com.example.dijasaliou.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -127,6 +130,59 @@ public class AuthController {
         response.addCookie(jwtCookie);
 
         return ResponseEntity.ok("Déconnexion réussie");
+    }
+
+    /**
+     * POST /api/auth/forgot-password
+     * Demande de réinitialisation de mot de passe
+     *
+     * Body :
+     * {
+     *   "email": "dija@boutique.com"
+     * }
+     *
+     * Réponse :
+     * {
+     *   "message": "Si cet email existe, un lien de réinitialisation a été envoyé"
+     * }
+     *
+     * SÉCURITÉ : Le message ne révèle jamais si l'email existe ou non
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<PasswordResetResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+
+        // Message générique pour ne pas révéler si l'email existe
+        PasswordResetResponse response = PasswordResetResponse.builder()
+                .message("Si cet email existe, un lien de réinitialisation a été envoyé")
+                .build();
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/auth/reset-password
+     * Réinitialisation du mot de passe avec le token
+     *
+     * Body :
+     * {
+     *   "token": "uuid-token-from-email",
+     *   "nouveauMotDePasse": "newPassword123",
+     *   "confirmationMotDePasse": "newPassword123"
+     * }
+     *
+     * Réponse :
+     * {
+     *   "message": "Votre mot de passe a été réinitialisé avec succès"
+     * }
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<PasswordResetResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+
+        PasswordResetResponse response = PasswordResetResponse.builder()
+                .message("Votre mot de passe a été réinitialisé avec succès")
+                .build();
+        return ResponseEntity.ok(response);
     }
 
     /**

@@ -4,7 +4,13 @@
       "Bash(mvn test:*)",
       "Bash(./mvnw.cmd test:*)",
       "Bash(./mvnw.cmd clean compile)",
-      "Bash(Select-Object -First 150)"
+      "Bash(Select-Object -First 150)",
+      "Bash(find:*)",
+      "Read(//d/boutique dijaSaliou/**)",
+      "Bash(cat:*)",
+      "Bash(./mvnw.cmd spring-boot:run:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
