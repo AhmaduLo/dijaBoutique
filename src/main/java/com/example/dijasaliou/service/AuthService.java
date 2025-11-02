@@ -71,8 +71,8 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        // 1. Vérifier si l'email existe déjà
-        if (userRepository.existsByEmail(request.getEmail())) {
+        // 1. Vérifier si l'email existe déjà (parmi les utilisateurs actifs)
+        if (userRepository.existsByEmailAndDeletedFalse(request.getEmail())) {
             throw new RuntimeException("Un utilisateur avec cet email existe déjà");
         }
 
@@ -129,8 +129,8 @@ public class AuthService {
      * 5. Retourner la réponse avec le token
      */
     public AuthResponse login(LoginRequest request) {
-        // 1. Trouver l'utilisateur par email
-        UserEntity user = userRepository.findByEmail(request.getEmail())
+        // 1. Trouver l'utilisateur par email (non supprimé uniquement)
+        UserEntity user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
 
         // 2. Vérifier le mot de passe
@@ -176,11 +176,11 @@ public class AuthService {
      */
     @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
-        // 1. Rechercher l'utilisateur par email
-        UserEntity user = userRepository.findByEmail(request.getEmail())
+        // 1. Rechercher l'utilisateur par email (non supprimé uniquement)
+        UserEntity user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElse(null);
 
-        // SÉCURITÉ : Même si l'utilisateur n'existe pas, on ne révèle pas cette information
+        // SÉCURITÉ : Même si l'utilisateur n'existe pas ou est supprimé, on ne révèle pas cette information
         // pour éviter l'énumération des comptes
         if (user == null) {
             // On fait semblant que tout s'est bien passé

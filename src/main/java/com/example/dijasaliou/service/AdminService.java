@@ -43,8 +43,8 @@ public class AdminService {
      * Vérifier qu'un utilisateur est ADMIN
      */
     private UserEntity verifierAdmin(String email) {
-        UserEntity admin = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        UserEntity admin = userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé ou supprimé"));
 
         if (admin.getRole() != UserEntity.Role.ADMIN) {
             throw new RuntimeException("Accès refusé : Vous devez être ADMIN pour effectuer cette action");
@@ -54,13 +54,14 @@ public class AdminService {
     }
 
     /**
-     * Obtenir tous les utilisateurs
+     * Obtenir tous les utilisateurs actifs (non supprimés)
      * Accessible uniquement aux ADMIN
      */
     public List<UserDto> obtenirTousLesUtilisateurs(String emailAdmin) {
         verifierAdmin(emailAdmin);
 
-        List<UserEntity> utilisateurs = userRepository.findAll();
+        // Ne retourner que les utilisateurs actifs
+        List<UserEntity> utilisateurs = userRepository.findByDeletedFalse();
 
         return utilisateurs.stream()
                 .map(UserDto::fromEntity)
@@ -87,16 +88,16 @@ public class AdminService {
     public UserDto creerUtilisateur(RegisterRequest request, String emailAdmin) {
         UserEntity admin = verifierAdmin(emailAdmin);
 
-        // Vérifier si l'email existe déjà
-        if (userRepository.existsByEmail(request.getEmail())) {
+        // Vérifier si l'email existe déjà (parmi les utilisateurs actifs)
+        if (userRepository.existsByEmailAndDeletedFalse(request.getEmail())) {
             throw new RuntimeException("Un utilisateur avec cet email existe déjà");
         }
 
         // Récupérer le tenant actuel pour copier nomEntreprise et numeroTelephone
         TenantEntity tenant = tenantService.getCurrentTenant();
 
-        // Vérifier la limite d'utilisateurs selon le plan
-        long nombreUtilisateursActuels = userRepository.countByTenant(tenant);
+        // Vérifier la limite d'utilisateurs actifs selon le plan
+        long nombreUtilisateursActuels = userRepository.countByTenantAndDeletedFalse(tenant);
         int maxUtilisateurs = tenant.getPlan().getMaxUtilisateurs();
 
         if (nombreUtilisateursActuels >= maxUtilisateurs) {
@@ -156,7 +157,7 @@ public class AdminService {
         if (updates.containsKey("email")) {
             String nouvelEmail = (String) updates.get("email");
             // Vérifier que le nouvel email n'existe pas déjà (sauf si c'est le même)
-            if (!utilisateur.getEmail().equals(nouvelEmail) && userRepository.existsByEmail(nouvelEmail)) {
+            if (!utilisateur.getEmail().equals(nouvelEmail) && userRepository.existsByEmailAndDeletedFalse(nouvelEmail)) {
                 throw new RuntimeException("Un utilisateur avec cet email existe déjà");
             }
             utilisateur.setEmail(nouvelEmail);
@@ -175,8 +176,13 @@ public class AdminService {
     }
 
     /**
-     * Supprimer un utilisateur
+     * Supprimer un utilisateur (SUPPRESSION LOGIQUE)
      * L'ADMIN peut supprimer n'importe quel compte SAUF LE SIEN
+     *
+     * IMPORTANT : Suppression logique pour conserver l'historique
+     * - Les ventes, achats et dépenses de l'utilisateur sont préservés
+     * - L'utilisateur est marqué comme supprimé (deleted = true)
+     * - La date de suppression et l'admin ayant effectué la suppression sont enregistrés
      */
     @Transactional
     public void supprimerUtilisateur(Long id, String emailAdmin) {
@@ -196,7 +202,17 @@ public class AdminService {
             throw new RuntimeException("Vous ne pouvez pas supprimer votre propre compte");
         }
 
-        userRepository.deleteById(id);
+        // Vérifier si l'utilisateur n'est pas déjà supprimé
+        if (Boolean.TRUE.equals(utilisateur.getDeleted())) {
+            throw new RuntimeException("Cet utilisateur a déjà été supprimé");
+        }
+
+        // SUPPRESSION LOGIQUE : Marquer comme supprimé au lieu de supprimer physiquement
+        utilisateur.setDeleted(true);
+        utilisateur.setDateSuppression(LocalDateTime.now());
+        utilisateur.setDeletedByUser(admin);
+
+        userRepository.save(utilisateur);
     }
 
     /**
@@ -224,24 +240,25 @@ public class AdminService {
     }
 
     /**
-     * Obtenir des statistiques sur les utilisateurs
+     * Obtenir des statistiques sur les utilisateurs actifs (non supprimés)
      */
     public Map<String, Object> obtenirStatistiques(String emailAdmin) {
         verifierAdmin(emailAdmin);
 
-        List<UserEntity> tousLesUtilisateurs = userRepository.findAll();
+        // Ne compter que les utilisateurs actifs
+        List<UserEntity> utilisateursActifs = userRepository.findByDeletedFalse();
 
-        long nombreTotal = tousLesUtilisateurs.size();
-        long nombreAdmins = tousLesUtilisateurs.stream()
+        long nombreTotal = utilisateursActifs.size();
+        long nombreAdmins = utilisateursActifs.stream()
                 .filter(u -> u.getRole() == UserEntity.Role.ADMIN)
                 .count();
-        long nombreUsers = tousLesUtilisateurs.stream()
+        long nombreUsers = utilisateursActifs.stream()
                 .filter(u -> u.getRole() == UserEntity.Role.USER)
                 .count();
 
         // Utilisateurs créés dans les 7 derniers jours
         LocalDateTime il7Jours = LocalDateTime.now().minusDays(7);
-        long nouveauxUtilisateurs = tousLesUtilisateurs.stream()
+        long nouveauxUtilisateurs = utilisateursActifs.stream()
                 .filter(u -> u.getDateCreation().isAfter(il7Jours))
                 .count();
 

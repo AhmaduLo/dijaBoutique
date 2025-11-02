@@ -43,4 +43,31 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
      * Utilisé pour vérifier les limites du plan
      */
     long countByTenant(TenantEntity tenant);
+
+    // =============== MÉTHODES POUR SUPPRESSION LOGIQUE ===============
+
+    /**
+     * Trouver un utilisateur par email (non supprimé uniquement)
+     */
+    Optional<UserEntity> findByEmailAndDeletedFalse(String email);
+
+    /**
+     * Trouver tous les utilisateurs actifs (non supprimés)
+     */
+    List<UserEntity> findByDeletedFalse();
+
+    /**
+     * Trouver tous les utilisateurs d'un rôle (non supprimés)
+     */
+    List<UserEntity> findByRoleAndDeletedFalse(UserEntity.Role role);
+
+    /**
+     * Compter le nombre d'utilisateurs actifs pour un tenant
+     */
+    long countByTenantAndDeletedFalse(TenantEntity tenant);
+
+    /**
+     * Vérifier si un email existe parmi les utilisateurs actifs
+     */
+    boolean existsByEmailAndDeletedFalse(String email);
 }

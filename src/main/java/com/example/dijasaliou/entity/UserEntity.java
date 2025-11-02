@@ -59,6 +59,23 @@ public class UserEntity extends BaseEntity {
     private LocalDateTime dateCreation;
 
     /**
+     * SUPPRESSION LOGIQUE : Champs pour soft delete
+     * Permet de conserver l'historique des ventes, achats et dépenses
+     * même après la suppression d'un utilisateur
+     */
+    @Column(name = "deleted", nullable = false)
+    @Builder.Default
+    private Boolean deleted = false;
+
+    @Column(name = "date_suppression")
+    private LocalDateTime dateSuppression;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deleted_by_user_id")
+    @JsonIgnore
+    private UserEntity deletedByUser;
+
+    /**
      * MULTI-TENANT : Référence au tenant (entreprise)
      * CRITIQUE : Chaque utilisateur appartient à UN SEUL tenant
      * Cette relation garantit l'isolation des données
@@ -77,19 +94,24 @@ public class UserEntity extends BaseEntity {
     @JsonIgnore
     private UserEntity createdByUser;
 
-    @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    /**
+     * Relations sans CASCADE ni ORPHAN REMOVAL
+     * Les ventes, achats et dépenses sont préservés même après suppression de l'utilisateur
+     * Cela permet de maintenir l'intégrité des données historiques
+     */
+    @OneToMany(mappedBy = "utilisateur", fetch = FetchType.LAZY)
     @Builder.Default  // Pour Lombok Builder
     @JsonManagedReference("user-achats")
     @ToString.Exclude
     private List<AchatEntity> achats = new ArrayList<>();
 
-    @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "utilisateur", fetch = FetchType.LAZY)
     @Builder.Default
     @JsonManagedReference("user-ventes")
     @ToString.Exclude
     private List<VenteEntity> ventes = new ArrayList<>();
 
-    @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "utilisateur", fetch = FetchType.LAZY)
     @Builder.Default
     @JsonManagedReference("user-depenses")
     @ToString.Exclude

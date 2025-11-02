@@ -21,14 +21,15 @@ public class UserService {
     }
 
     /**
-     * Récupérer tous les utilisateurs
+     * Récupérer tous les utilisateurs actifs (non supprimés)
      */
     public List<UserEntity> obtenirTousLesUtilisateurs() {
-        return userRepository.findAll();
+        return userRepository.findByDeletedFalse();
     }
 
     /**
      * Récupérer un utilisateur par ID
+     * Note: Peut retourner des utilisateurs supprimés (pour les besoins internes)
      */
     public UserEntity obtenirUtilisateurParId(Long id) {
         return userRepository.findById(id)
@@ -36,10 +37,10 @@ public class UserService {
     }
 
     /**
-     * Récupérer un utilisateur par email
+     * Récupérer un utilisateur actif par email (non supprimé)
      */
     public UserEntity obtenirUtilisateurParEmail(String email) {
-        return userRepository.findByEmail(email)
+        return userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé avec l'email : " + email));
     }
 
@@ -47,8 +48,8 @@ public class UserService {
      * Créer un nouvel utilisateur
      */
     public UserEntity creerUtilisateur(UserEntity utilisateur) {
-        // Validation : Email unique
-        if (userRepository.existsByEmail(utilisateur.getEmail())) {
+        // Validation : Email unique (parmi les utilisateurs actifs)
+        if (userRepository.existsByEmailAndDeletedFalse(utilisateur.getEmail())) {
             throw new IllegalArgumentException("Un utilisateur avec cet email existe déjà");
         }
 
