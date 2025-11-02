@@ -59,7 +59,17 @@ public class SecurityConfig {
                         // Routes ADMIN uniquement (création de compte, gestion utilisateurs)
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
 
-                        // Toutes les autres routes nécessitent un token (USER ou ADMIN)
+                        // Routes réservées aux ADMIN : achats, dépenses, tableaux de bord
+                        .requestMatchers("/achats/**").hasAuthority("ADMIN")
+                        .requestMatchers("/depenses/**").hasAuthority("ADMIN")
+                        .requestMatchers("/tenant/**").hasAuthority("ADMIN")
+                        .requestMatchers("/users/**").hasAuthority("ADMIN")
+
+                        // Routes accessibles aux USER : ventes et stock uniquement
+                        .requestMatchers("/ventes/**").hasAnyAuthority("USER", "ADMIN")
+                        .requestMatchers("/stock/**").hasAnyAuthority("USER", "ADMIN")
+
+                        // Toutes les autres routes nécessitent un token (par sécurité)
                         .anyRequest().authenticated()
                 )
         // Ajouter le filtre JWT AVANT le filtre d'authentification standard
