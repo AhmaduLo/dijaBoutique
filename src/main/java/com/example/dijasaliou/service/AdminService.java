@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -211,6 +212,15 @@ public class AdminService {
         utilisateur.setDeleted(true);
         utilisateur.setDateSuppression(LocalDateTime.now());
         utilisateur.setDeletedByUser(admin);
+
+        // ANONYMISATION : Supprimer les données sensibles (RGPD)
+        // On garde nom et prénom pour l'historique des ventes
+        // On anonymise email, téléphone et mot de passe pour la sécurité
+        String anonymisedEmail = "deleted_" + id + "_" + System.currentTimeMillis() + "@deleted.local";
+        utilisateur.setEmail(anonymisedEmail);
+        utilisateur.setNumeroTelephone("SUPPRIMÉ");
+        utilisateur.setMotDePasse("DELETED_" + UUID.randomUUID().toString());
+        utilisateur.setNomEntreprise("SUPPRIMÉ");
 
         userRepository.save(utilisateur);
     }
