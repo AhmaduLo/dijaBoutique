@@ -19,12 +19,13 @@ import java.util.stream.Collectors;
 /**
  * Controller REST pour la gestion des devises
  *
- * SÉCURITÉ : Tous les endpoints sont réservés aux ADMIN
+ * SÉCURITÉ :
+ * - Lecture (GET) : Accessible à tous les utilisateurs authentifiés
+ * - Modification (POST/PUT/DELETE) : Réservé aux ADMIN
  */
 @RestController
 @RequestMapping("/devises")
 @CrossOrigin(origins = "http://localhost:4200")
-@PreAuthorize("hasAuthority('ADMIN')")
 public class DeviseController {
 
     private final DeviseService deviseService;
@@ -69,8 +70,10 @@ public class DeviseController {
     /**
      * POST /api/devises
      * Créer une nouvelle devise
+     * ADMIN uniquement
      */
     @PostMapping
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<DeviseDto> creerDevise(@Valid @RequestBody CreateDeviseDto dto) {
         DeviseEntity devise = deviseService.creerDevise(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(DeviseDto.fromEntity(devise));
@@ -79,8 +82,10 @@ public class DeviseController {
     /**
      * PUT /api/devises/{id}
      * Modifier une devise
+     * ADMIN uniquement
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<DeviseDto> modifierDevise(
             @PathVariable Long id,
             @Valid @RequestBody UpdateDeviseDto dto) {
@@ -91,8 +96,10 @@ public class DeviseController {
     /**
      * DELETE /api/devises/{id}
      * Supprimer une devise
+     * ADMIN uniquement
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> supprimerDevise(@PathVariable Long id) {
         deviseService.supprimerDevise(id);
         return ResponseEntity.noContent().build();
@@ -101,8 +108,10 @@ public class DeviseController {
     /**
      * PUT /api/devises/{id}/set-default
      * Définir une devise comme devise par défaut
+     * ADMIN uniquement
      */
     @PutMapping("/{id}/set-default")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<DeviseDto> definirDeviseParDefaut(@PathVariable Long id) {
         DeviseEntity devise = deviseService.definirDeviseParDefaut(id);
         return ResponseEntity.ok(DeviseDto.fromEntity(devise));

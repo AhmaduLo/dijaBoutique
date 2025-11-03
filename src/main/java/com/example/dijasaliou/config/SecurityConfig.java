@@ -69,6 +69,9 @@ public class SecurityConfig {
                         .requestMatchers("/ventes/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
                         .requestMatchers("/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
 
+                        // Routes devises : lecture accessible à tous, modification ADMIN uniquement
+                        .requestMatchers("/devises/**").authenticated()
+
                         // Toutes les autres routes nécessitent un token (par sécurité)
                         .anyRequest().authenticated()
                 )
