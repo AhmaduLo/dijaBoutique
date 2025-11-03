@@ -58,16 +58,16 @@ public class SecurityConfig {
 
                         // Routes ADMIN uniquement (création de compte, gestion utilisateurs)
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
-
-                        // Routes réservées aux ADMIN : achats, dépenses, tableaux de bord
-                        .requestMatchers("/achats/**").hasAuthority("ADMIN")
-                        .requestMatchers("/depenses/**").hasAuthority("ADMIN")
-                        .requestMatchers("/tenant/**").hasAuthority("ADMIN")
                         .requestMatchers("/users/**").hasAuthority("ADMIN")
 
-                        // Routes accessibles aux USER : ventes et stock uniquement
-                        .requestMatchers("/ventes/**").hasAnyAuthority("USER", "ADMIN")
-                        .requestMatchers("/stock/**").hasAnyAuthority("USER", "ADMIN")
+                        // Routes accessibles aux GERANT et ADMIN : achats, dépenses, tableaux de bord
+                        .requestMatchers("/achats/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers("/depenses/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers("/tenant/**").hasAnyAuthority("GERANT", "ADMIN")
+
+                        // Routes accessibles aux USER, GERANT et ADMIN : ventes et stock
+                        .requestMatchers("/ventes/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers("/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
 
                         // Toutes les autres routes nécessitent un token (par sécurité)
                         .anyRequest().authenticated()

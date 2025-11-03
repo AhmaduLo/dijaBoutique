@@ -226,7 +226,7 @@ public class AdminService {
     }
 
     /**
-     * Modifier le rôle d'un utilisateur (USER <-> ADMIN)
+     * Modifier le rôle d'un utilisateur (USER <-> GERANT <-> ADMIN)
      */
     @Transactional
     public UserDto modifierRole(Long id, String nouveauRole, String emailAdmin) {
@@ -240,7 +240,7 @@ public class AdminService {
         try {
             role = UserEntity.Role.valueOf(nouveauRole.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Rôle invalide : " + nouveauRole + ". Valeurs acceptées : ADMIN, USER");
+            throw new RuntimeException("Rôle invalide : " + nouveauRole + ". Valeurs acceptées : ADMIN, GERANT, USER");
         }
 
         utilisateur.setRole(role);

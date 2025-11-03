@@ -160,9 +160,15 @@ public class UserEntity extends BaseEntity {
      * <p>
      * Définir comme classe interne = Couplage fort avec Utilisateur
      * Alternative : Classe séparée si utilisé ailleurs
+     *
+     * ADMIN : Accès complet (gestion utilisateurs + toutes fonctionnalités)
+     * GERANT : Accès complet SAUF gestion des utilisateurs (ventes, achats, dépenses, stock, tableaux de bord)
+     * USER : Accès limité (ventes et stock uniquement)
      */
     public enum Role {
-        ADMIN("Administrateur", "Accès complet"), USER("Utilisateur", "Accès standard");
+        ADMIN("Administrateur", "Accès complet à toutes les fonctionnalités"),
+        GERANT("Gérant", "Accès complet sauf gestion des utilisateurs"),
+        USER("Utilisateur", "Accès aux ventes et stock uniquement");
 
         private final String libelle;
         private final String description;
