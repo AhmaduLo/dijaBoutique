@@ -10,7 +10,9 @@
       "Bash(cat:*)",
       "Bash(./mvnw.cmd spring-boot:run:*)",
       "Bash(curl:*)",
-      "Bash(cmd.exe /c \"taskkill /PID 88444 /F\")"
+      "Bash(cmd.exe /c \"taskkill /PID 88444 /F\")",
+      "Bash(cmd.exe /c \"netstat -ano | findstr :8080\")",
+      "Bash(Select-Object -First 5)"
     ],
     "deny": [],
     "ask": []

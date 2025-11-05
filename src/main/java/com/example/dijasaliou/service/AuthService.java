@@ -92,6 +92,10 @@ public class AuthService {
         TenantEntity savedTenant = tenantRepository.save(tenant);
 
         // 4. Créer l'utilisateur ADMIN pour ce tenant
+        // Si aucun rôle n'est spécifié, utiliser USER par défaut
+        // Lors de l'inscription, le premier utilisateur est toujours ADMIN
+        UserEntity.Role userRole = request.getRole() != null ? request.getRole() : UserEntity.Role.ADMIN;
+
         UserEntity user = UserEntity.builder()
                 .nom(request.getNom())
                 .prenom(request.getPrenom())
@@ -100,7 +104,7 @@ public class AuthService {
                 .nomEntreprise(request.getNomEntreprise())
                 .numeroTelephone(request.getNumeroTelephone())
                 .tenant(savedTenant) // CRITIQUE : Lier au tenant
-                .role(UserEntity.Role.ADMIN) // Premier utilisateur = ADMIN
+                .role(userRole) // Utiliser le rôle spécifié ou ADMIN par défaut
                 .build();
 
         UserEntity savedUser = userRepository.save(user);
