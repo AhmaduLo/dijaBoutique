@@ -10,11 +10,13 @@ import lombok.NoArgsConstructor;
  * Utilisé par les admins pour modifier :
  * - Le nom de l'entreprise
  * - Le numéro de téléphone de l'entreprise
+ * - L'adresse de l'entreprise
  *
  * Angular envoie :
  * {
  *   "nomEntreprise": "Nouveau Nom Entreprise",
- *   "numeroTelephone": "+221771234567"
+ *   "numeroTelephone": "+221771234567",
+ *   "adresse": "123 Rue de la République, Dakar"
  * }
  */
 @Data
@@ -23,4 +25,5 @@ import lombok.NoArgsConstructor;
 public class UpdateTenantRequest {
     private String nomEntreprise;
     private String numeroTelephone;
+    private String adresse;
 }

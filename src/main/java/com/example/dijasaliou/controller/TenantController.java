@@ -45,7 +45,8 @@ public class TenantController {
         TenantResponse response = new TenantResponse(
                 tenant.getTenantUuid(),
                 tenant.getNomEntreprise(),
-                tenant.getNumeroTelephone()
+                tenant.getNumeroTelephone(),
+                tenant.getAdresse()
         );
 
         return ResponseEntity.ok(response);
@@ -79,7 +80,8 @@ public class TenantController {
         TenantResponse response = new TenantResponse(
                 tenantMisAJour.getTenantUuid(),
                 tenantMisAJour.getNomEntreprise(),
-                tenantMisAJour.getNumeroTelephone()
+                tenantMisAJour.getNumeroTelephone(),
+                tenantMisAJour.getAdresse()
         );
 
         return ResponseEntity.ok(response);
@@ -91,6 +93,7 @@ public class TenantController {
     public record TenantResponse(
             String tenantUuid,
             String nomEntreprise,
-            String numeroTelephone
+            String numeroTelephone,
+            String adresse
     ) {}
 }

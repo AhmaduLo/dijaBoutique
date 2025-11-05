@@ -85,6 +85,7 @@ public class AuthService {
         TenantEntity tenant = TenantEntity.builder()
                 .nomEntreprise(request.getNomEntreprise())
                 .numeroTelephone(request.getNumeroTelephone())
+                .adresse(request.getAdresseEntreprise())
                 .actif(true)
                 .plan(TenantEntity.Plan.GRATUIT) // Par défaut, plan gratuit
                 .build();

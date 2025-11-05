@@ -109,11 +109,17 @@ public class TenantService {
             log.info("Mise à jour numéro téléphone: {} -> {}", tenantActuel.getNumeroTelephone(), request.getNumeroTelephone());
         }
 
+        if (request.getAdresse() != null) {
+            tenant.setAdresse(request.getAdresse().trim().isEmpty() ? null : request.getAdresse().trim());
+            log.info("Mise à jour adresse: {} -> {}", tenantActuel.getAdresse(), request.getAdresse());
+        }
+
         // Forcer la sauvegarde du tenant
         TenantEntity tenantSauvegarde = tenantRepository.saveAndFlush(tenant);
-        log.info("Tenant mis à jour avec succès : {} - {} - {}",
+        log.info("Tenant mis à jour avec succès : {} - {} - {} - {}",
                 tenantSauvegarde.getNomEntreprise(),
                 tenantSauvegarde.getNumeroTelephone(),
+                tenantSauvegarde.getAdresse(),
                 tenantSauvegarde.getTenantUuid());
 
         // Si le nom de l'entreprise a changé, mettre à jour tous les utilisateurs de ce tenant

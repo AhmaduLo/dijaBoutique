@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
  *   "motDePasse": "password123",
  *   "nomEntreprise": "Boutique DijaSaliou",
  *   "numeroTelephone": "+221771234567",
+ *   "adresseEntreprise": "123 Rue de la République, Dakar",
  *   "role": "USER"
  * }
  */
@@ -29,5 +30,6 @@ public class RegisterRequest {
     private String motDePasse;
     private String nomEntreprise;
     private String numeroTelephone;
+    private String adresseEntreprise;
     private UserEntity.Role role;
 }
