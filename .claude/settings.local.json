@@ -12,7 +12,9 @@
       "Bash(curl:*)",
       "Bash(cmd.exe /c \"taskkill /PID 88444 /F\")",
       "Bash(cmd.exe /c \"netstat -ano | findstr :8080\")",
-      "Bash(Select-Object -First 5)"
+      "Bash(Select-Object -First 5)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

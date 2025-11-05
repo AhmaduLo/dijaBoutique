@@ -30,6 +30,7 @@ public class AchatDto {
     private BigDecimal prixTotal;
     private LocalDate dateAchat;
     private String fournisseur;
+    private BigDecimal prixVenteSuggere;
 
     // Informations sur l'utilisateur qui a créé l'achat
     private UserDto utilisateur;
@@ -55,6 +56,7 @@ public class AchatDto {
                 .prixTotal(achat.getPrixTotal())
                 .dateAchat(achat.getDateAchat())
                 .fournisseur(achat.getFournisseur())
+                .prixVenteSuggere(achat.getPrixVenteSuggere())
                 .utilisateur(UserDto.fromEntityMinimal(achat.getUtilisateur()))
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
@@ -78,6 +80,7 @@ public class AchatDto {
                 .prixTotal(achat.getPrixTotal())
                 .dateAchat(achat.getDateAchat())
                 .fournisseur(achat.getFournisseur())
+                .prixVenteSuggere(achat.getPrixVenteSuggere())
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
                 .annee(achat.getAnnee())

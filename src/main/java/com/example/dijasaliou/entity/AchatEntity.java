@@ -64,6 +64,10 @@ public class AchatEntity extends BaseEntity{
     @Column(name = "fournisseur", length = 100)
     private String fournisseur;
 
+    @DecimalMin(value = "0.01", message = "Le prix de vente suggéré doit être supérieur à 0")
+    @Column(name = "prix_vente_suggere", precision = 10, scale = 2)
+    private BigDecimal prixVenteSuggere;
+
     /**
      * Relation Many-to-One avec Utilisateur
      * <p>
