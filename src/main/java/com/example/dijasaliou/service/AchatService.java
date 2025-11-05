@@ -182,6 +182,16 @@ public class AchatService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-
+    /**
+     * Récupérer tous les produits avec leurs prix de vente suggérés
+     * Cette méthode est utilisée pour permettre aux utilisateurs de type USER
+     * de créer des ventes avec des prix pré-remplis, sans avoir accès aux
+     * informations sensibles des achats (prix d'achat, fournisseur, etc.)
+     *
+     * @return Liste des achats avec uniquement les infos nécessaires pour la vente
+     */
+    public List<AchatEntity> obtenirProduitsAvecPrixVente() {
+        return achatRepository.findAll();
+    }
 
 }

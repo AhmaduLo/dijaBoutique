@@ -1,6 +1,7 @@
 package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.AchatDto;
+import com.example.dijasaliou.dto.ProduitPourVenteDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AchatService;
@@ -178,5 +179,34 @@ public class AchatController {
 
         // Retourner 204 No Content (succès sans contenu)
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/achats/produits-pour-vente
+     * Récupérer la liste des produits avec leurs prix de vente suggérés
+     *
+     * Cette route est accessible à TOUS les utilisateurs (y compris USER)
+     * Elle retourne uniquement les informations nécessaires pour créer une vente :
+     * - Nom du produit
+     * - Prix de vente suggéré
+     *
+     * Les informations sensibles (prix d'achat, fournisseur, etc.) ne sont PAS exposées
+     *
+     * Exemple : GET /api/achats/produits-pour-vente
+     * Retourne : [
+     *   { "nomProduit": "Bracelet", "prixVenteSuggere": 25.00 },
+     *   { "nomProduit": "Collier", "prixVenteSuggere": 50.00 }
+     * ]
+     */
+    @GetMapping("/produits-pour-vente")
+    public ResponseEntity<List<ProduitPourVenteDto>> obtenirProduitsAvecPrixVente() {
+        List<AchatEntity> achats = achatService.obtenirProduitsAvecPrixVente();
+
+        // Convertir en DTO simplifié (uniquement nom produit + prix vente suggéré)
+        List<ProduitPourVenteDto> produits = achats.stream()
+                .map(ProduitPourVenteDto::fromAchat)
+                .toList();
+
+        return ResponseEntity.ok(produits);
     }
 }
