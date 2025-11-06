@@ -63,8 +63,9 @@ public class SecurityConfig {
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/users/**").hasAuthority("ADMIN")
 
-                        // Route spéciale : produits pour vente accessible à TOUS les utilisateurs authentifiés
+                        // Routes spéciales accessibles à TOUS les utilisateurs authentifiés
                         .requestMatchers("/achats/produits-pour-vente").authenticated()
+                        .requestMatchers("/tenant/info").authenticated() // Info entreprise pour factures
 
                         // Routes accessibles aux GERANT et ADMIN : achats, dépenses, tableaux de bord
                         .requestMatchers("/achats/**").hasAnyAuthority("GERANT", "ADMIN")

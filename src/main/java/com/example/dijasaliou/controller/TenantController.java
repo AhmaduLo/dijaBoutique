@@ -12,12 +12,12 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Contrôleur REST pour la gestion des informations de l'entreprise (tenant)
  *
- * Endpoints disponibles (ADMIN uniquement) :
- * - GET /api/admin/entreprise - Récupérer les informations de l'entreprise
- * - PUT /api/admin/entreprise - Modifier les informations de l'entreprise
+ * Endpoints disponibles :
+ * - GET /api/tenant/info - Récupérer les informations de l'entreprise (TOUS les utilisateurs authentifiés)
+ * - GET /api/admin/entreprise - Récupérer les informations de l'entreprise (ADMIN uniquement)
+ * - PUT /api/admin/entreprise - Modifier les informations de l'entreprise (ADMIN uniquement)
  */
 @RestController
-@RequestMapping("/admin/entreprise")
 @Slf4j
 public class TenantController {
 
@@ -28,14 +28,42 @@ public class TenantController {
     }
 
     /**
-     * Récupère les informations de l'entreprise actuelle
+     * Récupère les informations de l'entreprise actuelle (accessible à TOUS les utilisateurs authentifiés)
+     *
+     * GET /api/tenant/info
+     *
+     * Cet endpoint permet à tous les utilisateurs (USER, GERANT, ADMIN) de récupérer
+     * les informations de l'entreprise pour les afficher sur les factures et documents.
+     *
+     * @param authentication Informations de l'utilisateur authentifié
+     * @return Informations du tenant (entreprise)
+     */
+    @GetMapping("/tenant/info")
+    public ResponseEntity<TenantResponse> getEntrepriseInfo(Authentication authentication) {
+        String email = authentication.getName();
+        log.info("Utilisateur {} récupère les informations de l'entreprise", email);
+
+        TenantEntity tenant = tenantService.getCurrentTenant();
+
+        TenantResponse response = new TenantResponse(
+                tenant.getTenantUuid(),
+                tenant.getNomEntreprise(),
+                tenant.getNumeroTelephone(),
+                tenant.getAdresse()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Récupère les informations de l'entreprise actuelle (ADMIN uniquement)
      *
      * GET /api/admin/entreprise
      *
      * @param authentication Informations de l'utilisateur authentifié
      * @return Informations du tenant (entreprise)
      */
-    @GetMapping
+    @GetMapping("/admin/entreprise")
     public ResponseEntity<TenantResponse> getEntreprise(Authentication authentication) {
         String emailAdmin = authentication.getName();
         log.info("Admin {} récupère les informations de son entreprise", emailAdmin);
