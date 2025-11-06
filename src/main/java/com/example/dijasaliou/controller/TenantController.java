@@ -2,6 +2,7 @@ package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.UpdateTenantRequest;
 import com.example.dijasaliou.entity.TenantEntity;
+import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.TenantService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,7 @@ public class TenantController {
      * les informations de l'entreprise pour les afficher sur les factures et documents.
      *
      * @param authentication Informations de l'utilisateur authentifié
-     * @return Informations du tenant (entreprise)
+     * @return Informations du tenant (entreprise) avec les informations du propriétaire
      */
     @GetMapping("/tenant/info")
     public ResponseEntity<TenantResponse> getEntrepriseInfo(Authentication authentication) {
@@ -44,12 +45,16 @@ public class TenantController {
         log.info("Utilisateur {} récupère les informations de l'entreprise", email);
 
         TenantEntity tenant = tenantService.getCurrentTenant();
+        UserEntity admin = tenantService.getAdminProprietaire(tenant);
 
         TenantResponse response = new TenantResponse(
                 tenant.getTenantUuid(),
                 tenant.getNomEntreprise(),
                 tenant.getNumeroTelephone(),
-                tenant.getAdresse()
+                tenant.getAdresse(),
+                admin != null ? admin.getNom() : null,
+                admin != null ? admin.getPrenom() : null,
+                admin != null ? admin.getEmail() : null
         );
 
         return ResponseEntity.ok(response);
@@ -61,7 +66,7 @@ public class TenantController {
      * GET /api/admin/entreprise
      *
      * @param authentication Informations de l'utilisateur authentifié
-     * @return Informations du tenant (entreprise)
+     * @return Informations du tenant (entreprise) avec les informations du propriétaire
      */
     @GetMapping("/admin/entreprise")
     public ResponseEntity<TenantResponse> getEntreprise(Authentication authentication) {
@@ -69,12 +74,16 @@ public class TenantController {
         log.info("Admin {} récupère les informations de son entreprise", emailAdmin);
 
         TenantEntity tenant = tenantService.getCurrentTenant();
+        UserEntity admin = tenantService.getAdminProprietaire(tenant);
 
         TenantResponse response = new TenantResponse(
                 tenant.getTenantUuid(),
                 tenant.getNomEntreprise(),
                 tenant.getNumeroTelephone(),
-                tenant.getAdresse()
+                tenant.getAdresse(),
+                admin != null ? admin.getNom() : null,
+                admin != null ? admin.getPrenom() : null,
+                admin != null ? admin.getEmail() : null
         );
 
         return ResponseEntity.ok(response);
@@ -93,7 +102,7 @@ public class TenantController {
      *
      * @param request Nouvelles informations de l'entreprise
      * @param authentication Informations de l'utilisateur authentifié
-     * @return Informations mises à jour
+     * @return Informations mises à jour avec les informations du propriétaire
      */
     @PutMapping
     public ResponseEntity<TenantResponse> updateEntreprise(
@@ -104,24 +113,31 @@ public class TenantController {
         log.info("Admin {} modifie les informations de son entreprise", emailAdmin);
 
         TenantEntity tenantMisAJour = tenantService.updateTenant(request);
+        UserEntity admin = tenantService.getAdminProprietaire(tenantMisAJour);
 
         TenantResponse response = new TenantResponse(
                 tenantMisAJour.getTenantUuid(),
                 tenantMisAJour.getNomEntreprise(),
                 tenantMisAJour.getNumeroTelephone(),
-                tenantMisAJour.getAdresse()
+                tenantMisAJour.getAdresse(),
+                admin != null ? admin.getNom() : null,
+                admin != null ? admin.getPrenom() : null,
+                admin != null ? admin.getEmail() : null
         );
 
         return ResponseEntity.ok(response);
     }
 
     /**
-     * DTO pour les réponses contenant les informations du tenant
+     * DTO pour les réponses contenant les informations du tenant et du propriétaire
      */
     public record TenantResponse(
             String tenantUuid,
             String nomEntreprise,
             String numeroTelephone,
-            String adresse
+            String adresse,
+            String nomProprietaire,
+            String prenomProprietaire,
+            String emailProprietaire
     ) {}
 }

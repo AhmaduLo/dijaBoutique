@@ -137,4 +137,17 @@ public class TenantService {
 
         return tenantSauvegarde;
     }
+
+    /**
+     * Récupère l'administrateur (propriétaire) qui a créé le tenant
+     *
+     * @param tenant Le tenant dont on veut récupérer l'admin
+     * @return UserEntity de l'admin ou null si non trouvé
+     */
+    public UserEntity getAdminProprietaire(TenantEntity tenant) {
+        return tenant.getUtilisateurs().stream()
+                .filter(user -> user.getRole() == UserEntity.Role.ADMIN)
+                .findFirst()
+                .orElse(null);
+    }
 }
