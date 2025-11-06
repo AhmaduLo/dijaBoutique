@@ -34,4 +34,9 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, Long> {
 
     // Comptage
     long countByCategorie(DepenseEntity.CategorieDepense categorie);
+
+    /**
+     * Supprimer toutes les dépenses d'un utilisateur
+     */
+    void deleteByUtilisateur(UserEntity utilisateur);
 }

@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -183,6 +184,49 @@ public class AuthController {
                 .message("Votre mot de passe a été réinitialisé avec succès")
                 .build();
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * DELETE /api/auth/delete-account
+     * Suppression du compte admin et de toutes les données associées
+     *
+     * ATTENTION : Cette opération est IRRÉVERSIBLE !
+     * Supprime :
+     * - Le compte admin
+     * - Tous les utilisateurs (USER, GERANT)
+     * - Tous les achats
+     * - Toutes les ventes
+     * - Toutes les dépenses
+     * - Toute l'entreprise (tenant)
+     *
+     * Réponse :
+     * {
+     *   "message": "Votre compte et toutes les données associées ont été supprimés"
+     * }
+     *
+     * SÉCURITÉ : Seul un utilisateur ADMIN peut supprimer son compte
+     */
+    @DeleteMapping("/delete-account")
+    public ResponseEntity<PasswordResetResponse> deleteAccount(
+            Authentication authentication,
+            HttpServletResponse response) {
+        String emailAdmin = authentication.getName();
+
+        // Supprimer le compte et toutes les données
+        authService.deleteAdminAccount(emailAdmin);
+
+        // Supprimer le cookie JWT
+        Cookie jwtCookie = new Cookie("jwt", null);
+        jwtCookie.setPath("/");
+        jwtCookie.setHttpOnly(true);
+        jwtCookie.setMaxAge(0); // Expiration immédiate
+        jwtCookie.setSecure(cookieSecure);
+        response.addCookie(jwtCookie);
+
+        PasswordResetResponse deleteResponse = PasswordResetResponse.builder()
+                .message("Votre compte et toutes les données associées ont été supprimés")
+                .build();
+        return ResponseEntity.ok(deleteResponse);
     }
 
     /**

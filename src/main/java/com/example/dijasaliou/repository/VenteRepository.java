@@ -37,4 +37,9 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
 
     // Comptage
     long countByNomProduit(String nomProduit);
+
+    /**
+     * Supprimer toutes les ventes d'un utilisateur
+     */
+    void deleteByUtilisateur(UserEntity utilisateur);
 }

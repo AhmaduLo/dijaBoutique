@@ -39,4 +39,9 @@ public interface AchatRepository extends JpaRepository<AchatEntity, Long> {
      */
     long countByNomProduit(String nomProduit);
 
+    /**
+     * Supprimer tous les achats d'un utilisateur
+     */
+    void deleteByUtilisateur(UserEntity utilisateur);
+
 }

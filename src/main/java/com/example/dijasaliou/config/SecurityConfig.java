@@ -56,6 +56,9 @@ public class SecurityConfig {
                         .requestMatchers("/auth/login", "/auth/register", "/auth/logout",
                                 "/auth/forgot-password", "/auth/reset-password").permitAll()
 
+                        // Route de suppression de compte - ADMIN uniquement
+                        .requestMatchers("/auth/delete-account").hasAuthority("ADMIN")
+
                         // Routes ADMIN uniquement (création de compte, gestion utilisateurs)
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/users/**").hasAuthority("ADMIN")

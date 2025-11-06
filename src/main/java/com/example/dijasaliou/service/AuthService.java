@@ -9,14 +9,18 @@ import com.example.dijasaliou.entity.PasswordResetToken;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.jwt.JwtService;
+import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.repository.DepenseRepository;
 import com.example.dijasaliou.repository.PasswordResetTokenRepository;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.repository.UserRepository;
+import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -35,19 +39,28 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+    private final AchatRepository achatRepository;
+    private final VenteRepository venteRepository;
+    private final DepenseRepository depenseRepository;
 
     public AuthService(UserRepository userRepository,
                        TenantRepository tenantRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        PasswordResetTokenRepository passwordResetTokenRepository,
-                       EmailService emailService) {
+                       EmailService emailService,
+                       AchatRepository achatRepository,
+                       VenteRepository venteRepository,
+                       DepenseRepository depenseRepository) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.emailService = emailService;
+        this.achatRepository = achatRepository;
+        this.venteRepository = venteRepository;
+        this.depenseRepository = depenseRepository;
     }
 
     /**
@@ -259,5 +272,68 @@ public class AuthService {
 
         // 7. Supprimer tous les autres tokens de cet utilisateur
         passwordResetTokenRepository.deleteByUser(user);
+    }
+
+    /**
+     * SUPPRESSION DU COMPTE ADMIN ET DE TOUTES LES DONNÉES ASSOCIÉES
+     *
+     * ATTENTION : Cette opération est IRRÉVERSIBLE !
+     *
+     * PROCESSUS :
+     * 1. Vérifier que l'utilisateur est un ADMIN
+     * 2. Récupérer le tenant de l'admin
+     * 3. Récupérer tous les utilisateurs du tenant
+     * 4. Pour chaque utilisateur, supprimer manuellement :
+     *    - Tous les achats
+     *    - Toutes les ventes
+     *    - Toutes les dépenses
+     *    - Tous les tokens de réinitialisation
+     * 5. Supprimer le tenant (la cascade supprimera les utilisateurs)
+     *
+     * SÉCURITÉ :
+     * - Seul l'admin peut supprimer son propre compte
+     * - Vérification du rôle ADMIN obligatoire
+     * - Suppression manuelle des données avant suppression du tenant
+     *
+     * @param emailAdmin Email de l'admin qui souhaite supprimer son compte
+     * @throws RuntimeException si l'utilisateur n'est pas un ADMIN ou n'existe pas
+     */
+    @Transactional
+    public void deleteAdminAccount(String emailAdmin) {
+        // 1. Trouver l'utilisateur par email
+        UserEntity user = userRepository.findByEmailAndDeletedFalse(emailAdmin)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // 2. Vérifier que l'utilisateur est bien un ADMIN
+        if (user.getRole() != UserEntity.Role.ADMIN) {
+            throw new RuntimeException("Seul un administrateur peut supprimer le compte de l'entreprise");
+        }
+
+        // 3. Récupérer le tenant
+        TenantEntity tenant = user.getTenant();
+        if (tenant == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        // 4. Récupérer tous les utilisateurs du tenant
+        List<UserEntity> utilisateurs = tenant.getUtilisateurs();
+
+        // 5. Pour chaque utilisateur, supprimer manuellement toutes les données associées
+        for (UserEntity utilisateur : utilisateurs) {
+            // Supprimer tous les achats
+            achatRepository.deleteByUtilisateur(utilisateur);
+
+            // Supprimer toutes les ventes
+            venteRepository.deleteByUtilisateur(utilisateur);
+
+            // Supprimer toutes les dépenses
+            depenseRepository.deleteByUtilisateur(utilisateur);
+
+            // Supprimer tous les tokens de réinitialisation
+            passwordResetTokenRepository.deleteByUser(utilisateur);
+        }
+
+        // 6. Supprimer le tenant (la cascade supprimera automatiquement tous les utilisateurs)
+        tenantRepository.delete(tenant);
     }
 }
