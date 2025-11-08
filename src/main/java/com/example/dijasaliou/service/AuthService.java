@@ -77,10 +77,11 @@ public class AuthService {
      *
      * PROCESSUS :
      * 1. Vérifier que l'email n'existe pas déjà
-     * 2. Créer le TENANT (entreprise)
-     * 3. Créer l'utilisateur ADMIN lié au tenant
-     * 4. Générer un token JWT avec tenant_id
-     * 5. Retourner la réponse avec le token
+     * 2. Vérifier l'acceptation des CGU et de la Politique de Confidentialité pour les ADMIN
+     * 3. Créer le TENANT (entreprise)
+     * 4. Créer l'utilisateur ADMIN lié au tenant
+     * 5. Générer un token JWT avec tenant_id
+     * 6. Retourner la réponse avec le token
      */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -94,6 +95,21 @@ public class AuthService {
             throw new RuntimeException("Une entreprise avec ce nom existe déjà");
         }
 
+        // 3. Déterminer le rôle de l'utilisateur
+        // Si aucun rôle n'est spécifié, utiliser ADMIN par défaut (premier utilisateur)
+        UserEntity.Role userRole = request.getRole() != null ? request.getRole() : UserEntity.Role.ADMIN;
+
+        // 4. VALIDATION DES DOCUMENTS LÉGAUX pour les ADMIN
+        // L'acceptation des CGU et de la Politique de Confidentialité est OBLIGATOIRE pour les ADMIN
+        if (userRole == UserEntity.Role.ADMIN) {
+            if (request.getAcceptationCGU() == null || !request.getAcceptationCGU()) {
+                throw new RuntimeException("Vous devez accepter les Conditions Générales d'Utilisation pour créer un compte administrateur");
+            }
+            if (request.getAcceptationPolitiqueConfidentialite() == null || !request.getAcceptationPolitiqueConfidentialite()) {
+                throw new RuntimeException("Vous devez accepter la Politique de Confidentialité pour créer un compte administrateur");
+            }
+        }
+
         // 3. Créer le TENANT (entreprise)
         TenantEntity tenant = TenantEntity.builder()
                 .nomEntreprise(request.getNomEntreprise())
@@ -105,10 +121,8 @@ public class AuthService {
 
         TenantEntity savedTenant = tenantRepository.save(tenant);
 
-        // 4. Créer l'utilisateur ADMIN pour ce tenant
-        // Si aucun rôle n'est spécifié, utiliser USER par défaut
-        // Lors de l'inscription, le premier utilisateur est toujours ADMIN
-        UserEntity.Role userRole = request.getRole() != null ? request.getRole() : UserEntity.Role.ADMIN;
+        // 5. Créer l'utilisateur ADMIN pour ce tenant avec les acceptations des documents légaux
+        LocalDateTime now = LocalDateTime.now();
 
         UserEntity user = UserEntity.builder()
                 .nom(request.getNom())
@@ -119,14 +133,18 @@ public class AuthService {
                 .numeroTelephone(request.getNumeroTelephone())
                 .tenant(savedTenant) // CRITIQUE : Lier au tenant
                 .role(userRole) // Utiliser le rôle spécifié ou ADMIN par défaut
+                .acceptationCGU(userRole == UserEntity.Role.ADMIN ? request.getAcceptationCGU() : false)
+                .dateAcceptationCGU(userRole == UserEntity.Role.ADMIN && request.getAcceptationCGU() ? now : null)
+                .acceptationPolitiqueConfidentialite(userRole == UserEntity.Role.ADMIN ? request.getAcceptationPolitiqueConfidentialite() : false)
+                .dateAcceptationPolitique(userRole == UserEntity.Role.ADMIN && request.getAcceptationPolitiqueConfidentialite() ? now : null)
                 .build();
 
         UserEntity savedUser = userRepository.save(user);
 
-        // 5. Générer le token JWT avec tenant_id
+        // 6. Générer le token JWT avec tenant_id
         String token = jwtService.generateToken(savedUser.getEmail(), savedTenant.getTenantUuid());
 
-        // 6. Retourner la réponse
+        // 7. Retourner la réponse
         return AuthResponse.builder()
                 .token(token)
                 .user(savedUser)
