@@ -104,7 +104,7 @@ public class TenantController {
      * @param authentication Informations de l'utilisateur authentifié
      * @return Informations mises à jour avec les informations du propriétaire
      */
-    @PutMapping
+    @PutMapping("/admin/entreprise")
     public ResponseEntity<TenantResponse> updateEntreprise(
             @Valid @RequestBody UpdateTenantRequest request,
             Authentication authentication
