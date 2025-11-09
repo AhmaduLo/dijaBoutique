@@ -52,6 +52,7 @@ public class TenantController {
                 tenant.getNomEntreprise(),
                 tenant.getNumeroTelephone(),
                 tenant.getAdresse(),
+                tenant.getNineaSiret(),
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
                 admin != null ? admin.getEmail() : null
@@ -81,6 +82,7 @@ public class TenantController {
                 tenant.getNomEntreprise(),
                 tenant.getNumeroTelephone(),
                 tenant.getAdresse(),
+                tenant.getNineaSiret(),
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
                 admin != null ? admin.getEmail() : null
@@ -120,6 +122,7 @@ public class TenantController {
                 tenantMisAJour.getNomEntreprise(),
                 tenantMisAJour.getNumeroTelephone(),
                 tenantMisAJour.getAdresse(),
+                tenantMisAJour.getNineaSiret(),
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
                 admin != null ? admin.getEmail() : null
@@ -136,6 +139,7 @@ public class TenantController {
             String nomEntreprise,
             String numeroTelephone,
             String adresse,
+            String nineaSiret,
             String nomProprietaire,
             String prenomProprietaire,
             String emailProprietaire

@@ -115,6 +115,7 @@ public class AuthService {
                 .nomEntreprise(request.getNomEntreprise())
                 .numeroTelephone(request.getNumeroTelephone())
                 .adresse(request.getAdresseEntreprise())
+                .nineaSiret(request.getNineaSiret()) // OPTIONNEL - peut être null
                 .actif(true)
                 .plan(TenantEntity.Plan.GRATUIT) // Par défaut, plan gratuit
                 .build();

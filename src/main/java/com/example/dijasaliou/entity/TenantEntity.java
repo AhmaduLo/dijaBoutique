@@ -73,6 +73,14 @@ public class TenantEntity {
     private String pays;
 
     /**
+     * Numéro NINEA (Sénégal) ou SIRET (France) ou autre identifiant fiscal
+     * Ce champ est OPTIONNEL car toutes les entreprises n'ont pas forcément ce numéro
+     * lors de leur inscription (en cours de création, micro-entreprise, etc.)
+     */
+    @Column(name = "ninea_siret", length = 50)
+    private String nineaSiret;
+
+    /**
      * Permet de désactiver un tenant (soft delete)
      * Si actif = false, l'entreprise ne peut plus se connecter
      */
