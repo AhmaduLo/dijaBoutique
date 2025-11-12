@@ -1,5 +1,6 @@
 package com.example.dijasaliou.config;
 
+import com.example.dijasaliou.filter.SubscriptionExpirationFilter;
 import com.example.dijasaliou.jwt.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -21,18 +23,19 @@ import java.util.Arrays;
 /**
  * Configuration de sécurité
  *
- * TEMPORAIRE : Désactive complètement la sécurité pour les tests
- *
- * À ACTIVER PLUS TARD avec JWT !
+ * Sécurise l'application avec JWT et vérifie l'expiration des abonnements
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final SubscriptionExpirationFilter subscriptionExpirationFilter;
 
-    public SecurityConfig(@Lazy JwtAuthenticationFilter jwtAuthFilter) {
+    public SecurityConfig(@Lazy JwtAuthenticationFilter jwtAuthFilter,
+                          SubscriptionExpirationFilter subscriptionExpirationFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.subscriptionExpirationFilter = subscriptionExpirationFilter;
     }
 
     @Bean
@@ -47,7 +50,6 @@ public class SecurityConfig {
                 // Pas de session (stateless avec JWT)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-
                 )
 
                 // Règles d'autorisation
@@ -58,6 +60,9 @@ public class SecurityConfig {
 
                         // Route de suppression de compte - ADMIN uniquement
                         .requestMatchers("/auth/delete-account").hasAuthority("ADMIN")
+
+                        // Routes de paiement - TOUTES publiques pour éviter les problèmes de filtre
+                        .requestMatchers("/payment/**").permitAll()
 
                         // Routes ADMIN uniquement (création de compte, gestion utilisateurs)
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
@@ -83,8 +88,11 @@ public class SecurityConfig {
                         // Toutes les autres routes nécessitent un token (par sécurité)
                         .anyRequest().authenticated()
                 )
-        // Ajouter le filtre JWT AVANT le filtre d'authentification standard
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        // Ajouter les filtres dans l'ordre :
+        // 1. JWT pour l'authentification (avant UsernamePasswordAuthenticationFilter)
+        // 2. SubscriptionExpiration pour bloquer si l'abonnement est expiré (après UsernamePasswordAuthenticationFilter)
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(subscriptionExpirationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

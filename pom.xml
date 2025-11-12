@@ -104,6 +104,12 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Stripe pour les paiements -->
+        <dependency>
+            <groupId>com.stripe</groupId>
+            <artifactId>stripe-java</artifactId>
+            <version>30.2.0</version>
+        </dependency>
     </dependencies>
 
     <build>

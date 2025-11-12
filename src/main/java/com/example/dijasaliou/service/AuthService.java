@@ -42,6 +42,7 @@ public class AuthService {
     private final AchatRepository achatRepository;
     private final VenteRepository venteRepository;
     private final DepenseRepository depenseRepository;
+    private final StripeService stripeService;
 
     public AuthService(UserRepository userRepository,
                        TenantRepository tenantRepository,
@@ -51,7 +52,8 @@ public class AuthService {
                        EmailService emailService,
                        AchatRepository achatRepository,
                        VenteRepository venteRepository,
-                       DepenseRepository depenseRepository) {
+                       DepenseRepository depenseRepository,
+                       StripeService stripeService) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
@@ -61,6 +63,7 @@ public class AuthService {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
         this.depenseRepository = depenseRepository;
+        this.stripeService = stripeService;
     }
 
     /**
@@ -75,10 +78,17 @@ public class AuthService {
      * - Le tenant_id est inclus dans le JWT
      * - Toutes les données futures seront isolées par tenant_id
      *
+     * FLUX D'INSCRIPTION ET PAIEMENT :
+     * 1. L'utilisateur s'inscrit → Compte créé avec plan GRATUIT (expiré)
+     * 2. L'utilisateur reçoit un JWT et est connecté
+     * 3. Le SubscriptionExpirationFilter bloque l'accès aux routes sauf /payment/**
+     * 4. L'utilisateur est redirigé vers la page de paiement
+     * 5. Après paiement réussi → L'abonnement est activé
+     *
      * PROCESSUS :
      * 1. Vérifier que l'email n'existe pas déjà
      * 2. Vérifier l'acceptation des CGU et de la Politique de Confidentialité pour les ADMIN
-     * 3. Créer le TENANT (entreprise)
+     * 3. Créer le TENANT (entreprise) avec plan GRATUIT et dateExpiration = now
      * 4. Créer l'utilisateur ADMIN lié au tenant
      * 5. Générer un token JWT avec tenant_id
      * 6. Retourner la réponse avec le token
@@ -110,20 +120,22 @@ public class AuthService {
             }
         }
 
-        // 3. Créer le TENANT (entreprise)
+        // 3. Créer le TENANT (entreprise) - PAIEMENT REQUIS APRÈS INSCRIPTION
+        LocalDateTime now = LocalDateTime.now();
+
         TenantEntity tenant = TenantEntity.builder()
                 .nomEntreprise(request.getNomEntreprise())
                 .numeroTelephone(request.getNumeroTelephone())
                 .adresse(request.getAdresseEntreprise())
                 .nineaSiret(request.getNineaSiret()) // OPTIONNEL - peut être null
                 .actif(true)
-                .plan(TenantEntity.Plan.GRATUIT) // Par défaut, plan gratuit
+                .plan(TenantEntity.Plan.GRATUIT) // Plan par défaut - doit payer pour accéder
+                .dateExpiration(now) // Expiré immédiatement - l'utilisateur doit payer
                 .build();
 
         TenantEntity savedTenant = tenantRepository.save(tenant);
 
         // 5. Créer l'utilisateur ADMIN pour ce tenant avec les acceptations des documents légaux
-        LocalDateTime now = LocalDateTime.now();
 
         UserEntity user = UserEntity.builder()
                 .nom(request.getNom())

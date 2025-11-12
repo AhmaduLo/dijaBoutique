@@ -113,24 +113,35 @@ public class TenantEntity {
     private List<UserEntity> utilisateurs = new ArrayList<>();
 
     /**
-     * Enum pour les plans (pour future monétisation)
+     * Enum pour les plans de paiement
+     *
+     * PLAN GRATUIT : État initial après inscription - PAIEMENT REQUIS pour accéder
+     * PLAN BASIC : 6555 CFA (9.99€) / mois
+     *   - Gérer ventes, stock, achats, dépenses, contact
+     *   - 3 utilisateurs (admin + 2 employés)
+     *   - Dashboard de base
+     *   - Rapports PDF mensuels
      */
     public enum Plan {
-        GRATUIT("Plan Gratuit", "Fonctionnalités limitées", 0, 3),
-        BASIC("Plan Basic", "Pour petites entreprises", 9.99, 10),
-        PREMIUM("Plan Premium", "Pour moyennes entreprises", 29.99, 50),
-        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 99.99, Integer.MAX_VALUE);
+        GRATUIT("Plan Gratuit", "Paiement requis - Aucun accès aux fonctionnalités", 0, 0, 0, false),
+        BASIC("Plan Basic", "Gestion complète boutique - 3 utilisateurs", 9.99, 6555, 3, true),
+        PREMIUM("Plan Premium", "Pour moyennes entreprises", 15.24, 10000, 10, true),
+        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 22.87, 15000, Integer.MAX_VALUE, true);
 
         private final String libelle;
         private final String description;
-        private final double prixMensuel;
+        private final double prixEuro;
+        private final double prixCFA;
         private final int maxUtilisateurs;
+        private final boolean accesFonctionnalites;
 
-        Plan(String libelle, String description, double prixMensuel, int maxUtilisateurs) {
+        Plan(String libelle, String description, double prixEuro, double prixCFA, int maxUtilisateurs, boolean accesFonctionnalites) {
             this.libelle = libelle;
             this.description = description;
-            this.prixMensuel = prixMensuel;
+            this.prixEuro = prixEuro;
+            this.prixCFA = prixCFA;
             this.maxUtilisateurs = maxUtilisateurs;
+            this.accesFonctionnalites = accesFonctionnalites;
         }
 
         public String getLibelle() {
@@ -141,12 +152,27 @@ public class TenantEntity {
             return description;
         }
 
-        public double getPrixMensuel() {
-            return prixMensuel;
+        public double getPrixEuro() {
+            return prixEuro;
+        }
+
+        public double getPrixCFA() {
+            return prixCFA;
         }
 
         public int getMaxUtilisateurs() {
             return maxUtilisateurs;
+        }
+
+        public boolean isAccesFonctionnalites() {
+            return accesFonctionnalites;
+        }
+
+        /**
+         * Vérifie si c'est un plan payant
+         */
+        public boolean isPayant() {
+            return this != GRATUIT;
         }
     }
 
