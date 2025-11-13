@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -203,8 +204,17 @@ public class StockService {
         // Déterminer le statut
         StockDto.StatutStock statut = StockDto.determinerStatut(stockDisponible);
 
+        // Récupérer la photo du dernier achat (le plus récent avec une photo)
+        String photoUrl = achats.stream()
+                .filter(achat -> achat.getPhotoUrl() != null && !achat.getPhotoUrl().isEmpty())
+                .sorted(Comparator.comparing(AchatEntity::getDateAchat).reversed())
+                .findFirst()
+                .map(AchatEntity::getPhotoUrl)
+                .orElse(null);
+
         return StockDto.builder()
                 .nomProduit(nomProduit)
+                .photoUrl(photoUrl)
                 .quantiteAchetee(quantiteAchetee)
                 .quantiteVendue(quantiteVendue)
                 .stockDisponible(stockDisponible)

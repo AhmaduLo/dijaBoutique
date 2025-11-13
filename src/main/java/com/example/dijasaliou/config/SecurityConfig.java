@@ -4,6 +4,7 @@ import com.example.dijasaliou.jwt.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -59,6 +60,11 @@ public class SecurityConfig {
                         // Route de suppression de compte - ADMIN uniquement
                         .requestMatchers("/auth/delete-account").hasAuthority("ADMIN")
 
+                        // Routes de gestion des fichiers
+                        .requestMatchers("/files/upload").hasAuthority("ADMIN") // Upload réservé aux ADMIN
+                        .requestMatchers("/files/photos/**").authenticated() // Récupération des photos pour tous les utilisateurs authentifiés
+                        .requestMatchers("/files/health").permitAll() // Health check public
+
                         // Routes ADMIN uniquement (création de compte, gestion utilisateurs)
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/users/**").hasAuthority("ADMIN")
@@ -68,8 +74,11 @@ public class SecurityConfig {
                         .requestMatchers("/tenant/info").authenticated() // Info entreprise pour factures
                         .requestMatchers("/contact").authenticated() // Formulaire de contact
 
-                        // Routes accessibles aux GERANT et ADMIN : achats, dépenses, tableaux de bord
-                        .requestMatchers("/achats/**").hasAnyAuthority("GERANT", "ADMIN")
+                        // Routes accessibles aux GERANT et ADMIN : achats (lecture accessible à USER pour voir les produits)
+                        .requestMatchers(HttpMethod.GET, "/achats/**").hasAnyAuthority("USER", "GERANT", "ADMIN") // USER peut lire les achats
+                        .requestMatchers(HttpMethod.POST, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent créer
+                        .requestMatchers(HttpMethod.PUT, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent modifier
+                        .requestMatchers(HttpMethod.DELETE, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent supprimer
                         .requestMatchers("/depenses/**").hasAnyAuthority("GERANT", "ADMIN")
                         .requestMatchers("/tenant/**").hasAnyAuthority("GERANT", "ADMIN")
 
@@ -95,7 +104,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:4200"));
+        // Autoriser plusieurs ports pour le développement
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:4200",
+                "http://localhost:64390"  // Port utilisé par votre frontend
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
