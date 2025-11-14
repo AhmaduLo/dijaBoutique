@@ -1,6 +1,7 @@
 package com.example.dijasaliou.dto;
 
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -43,11 +44,17 @@ public class AchatDto {
 
     /**
      * Convertit une entité Achat en DTO
+     *
+     * RESTRICTION : photoUrl n'est retourné que pour le plan ENTERPRISE
      */
     public static AchatDto fromEntity(AchatEntity achat) {
         if (achat == null) {
             return null;
         }
+
+        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        boolean canViewPhotos = achat.getTenant() != null &&
+                                achat.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE;
 
         return AchatDto.builder()
                 .id(achat.getId())
@@ -58,7 +65,7 @@ public class AchatDto {
                 .dateAchat(achat.getDateAchat())
                 .fournisseur(achat.getFournisseur())
                 .prixVenteSuggere(achat.getPrixVenteSuggere())
-                .photoUrl(achat.getPhotoUrl())
+                .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .utilisateur(UserDto.fromEntityMinimal(achat.getUtilisateur()))
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
@@ -68,11 +75,17 @@ public class AchatDto {
 
     /**
      * Version sans utilisateur (pour certains contextes)
+     *
+     * RESTRICTION : photoUrl n'est retourné que pour le plan ENTERPRISE
      */
     public static AchatDto fromEntityWithoutUser(AchatEntity achat) {
         if (achat == null) {
             return null;
         }
+
+        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        boolean canViewPhotos = achat.getTenant() != null &&
+                                achat.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE;
 
         return AchatDto.builder()
                 .id(achat.getId())
@@ -83,7 +96,7 @@ public class AchatDto {
                 .dateAchat(achat.getDateAchat())
                 .fournisseur(achat.getFournisseur())
                 .prixVenteSuggere(achat.getPrixVenteSuggere())
-                .photoUrl(achat.getPhotoUrl())
+                .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
                 .annee(achat.getAnnee())

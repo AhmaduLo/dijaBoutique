@@ -1,5 +1,6 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.FileStorageService;
 import com.example.dijasaliou.service.TenantService;
@@ -56,12 +57,15 @@ public class FileUploadController {
      *   "message": "Photo uploadée avec succès"
      * }
      *
+     * RESTRICTION : Fonctionnalité réservée au plan ENTERPRISE uniquement
+     *
      * @param file Le fichier image uploadé
      * @param type Type de photo : "achats", "ventes", "produits"
      * @return L'URL de la photo uploadée
      */
     @PostMapping("/upload")
     @PreAuthorize("hasAuthority('ADMIN')")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE}, message = "Les photos sont réservées au plan ENTERPRISE")
     public ResponseEntity<Map<String, Object>> uploadPhoto(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "type", defaultValue = "achats") String type) {
@@ -118,6 +122,7 @@ public class FileUploadController {
      * Le fichier image (Content-Type: image/jpeg ou image/png)
      *
      * SÉCURITÉ : Chaque tenant ne peut accéder qu'à ses propres photos
+     * RESTRICTION : Fonctionnalité réservée au plan ENTERPRISE uniquement
      *
      * @param tenantUuid UUID du tenant
      * @param type Type de photo (achats, ventes, produits)
@@ -125,6 +130,7 @@ public class FileUploadController {
      * @return Le fichier image
      */
     @GetMapping("/photos/{tenantUuid}/{type}/{filename:.+}")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE}, message = "Les photos sont réservées au plan ENTERPRISE")
     public ResponseEntity<byte[]> getPhoto(
             @PathVariable String tenantUuid,
             @PathVariable String type,
@@ -169,11 +175,14 @@ public class FileUploadController {
      *
      * DELETE /api/files/photos?url=/api/files/photos/{tenant_uuid}/achats/photo.jpg
      *
+     * RESTRICTION : Fonctionnalité réservée au plan ENTERPRISE uniquement
+     *
      * @param photoUrl URL de la photo à supprimer
      * @return Confirmation de suppression
      */
     @DeleteMapping("/photos")
     @PreAuthorize("hasAuthority('ADMIN')")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE}, message = "Les photos sont réservées au plan ENTERPRISE")
     public ResponseEntity<Map<String, Object>> deletePhoto(@RequestParam("url") String photoUrl) {
         try {
             TenantEntity tenant = tenantService.getCurrentTenant();

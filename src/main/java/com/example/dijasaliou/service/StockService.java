@@ -2,6 +2,7 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.repository.VenteRepository;
@@ -25,10 +26,12 @@ public class StockService {
 
     private final AchatRepository achatRepository;
     private final VenteRepository venteRepository;
+    private final TenantService tenantService;
 
-    public StockService(AchatRepository achatRepository, VenteRepository venteRepository) {
+    public StockService(AchatRepository achatRepository, VenteRepository venteRepository, TenantService tenantService) {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
+        this.tenantService = tenantService;
     }
 
     /**
@@ -204,13 +207,22 @@ public class StockService {
         // Déterminer le statut
         StockDto.StatutStock statut = StockDto.determinerStatut(stockDisponible);
 
+        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        boolean canViewPhotos = currentTenant != null &&
+                                currentTenant.getPlan() == TenantEntity.Plan.ENTREPRISE;
+
         // Récupérer la photo du dernier achat (le plus récent avec une photo)
-        String photoUrl = achats.stream()
-                .filter(achat -> achat.getPhotoUrl() != null && !achat.getPhotoUrl().isEmpty())
-                .sorted(Comparator.comparing(AchatEntity::getDateAchat).reversed())
-                .findFirst()
-                .map(AchatEntity::getPhotoUrl)
-                .orElse(null);
+        // RESTRICTION : null si le plan n'est pas ENTERPRISE
+        String photoUrl = null;
+        if (canViewPhotos) {
+            photoUrl = achats.stream()
+                    .filter(achat -> achat.getPhotoUrl() != null && !achat.getPhotoUrl().isEmpty())
+                    .sorted(Comparator.comparing(AchatEntity::getDateAchat).reversed())
+                    .findFirst()
+                    .map(AchatEntity::getPhotoUrl)
+                    .orElse(null);
+        }
 
         return StockDto.builder()
                 .nomProduit(nomProduit)
