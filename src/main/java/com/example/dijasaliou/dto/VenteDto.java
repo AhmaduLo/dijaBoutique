@@ -30,6 +30,7 @@ public class VenteDto {
     private BigDecimal prixTotal;
     private LocalDate dateVente;
     private String client;
+    private String photoUrl;
 
     // Informations sur l'utilisateur qui a créé la vente
     private UserDto utilisateur;
@@ -56,6 +57,7 @@ public class VenteDto {
                 .prixTotal(vente.getPrixTotal())
                 .dateVente(vente.getDateVente())
                 .client(vente.getClient())
+                .photoUrl(vente.getPhotoUrl())
                 .utilisateur(UserDto.fromEntityMinimal(vente.getUtilisateur()))
                 .estRecente(vente.estRecente())
                 .mois(vente.getMois())
@@ -80,6 +82,7 @@ public class VenteDto {
                 .prixTotal(vente.getPrixTotal())
                 .dateVente(vente.getDateVente())
                 .client(vente.getClient())
+                .photoUrl(vente.getPhotoUrl())
                 .estRecente(vente.estRecente())
                 .mois(vente.getMois())
                 .annee(vente.getAnnee())

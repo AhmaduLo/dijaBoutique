@@ -27,6 +27,11 @@ public class StockDto {
     private String nomProduit;
 
     /**
+     * URL de la photo du produit (provenant du dernier achat)
+     */
+    private String photoUrl;
+
+    /**
      * Quantité totale achetée
      */
     private Integer quantiteAchetee;
