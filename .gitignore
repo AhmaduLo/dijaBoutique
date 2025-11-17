@@ -37,3 +37,6 @@ docs/screenshots/
 
 ### Photos uploadées des produits ###
 uploads/
+
+### Variables d'environnement (secrets) ###
+.env

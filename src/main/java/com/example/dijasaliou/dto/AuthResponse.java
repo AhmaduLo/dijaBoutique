@@ -1,5 +1,6 @@
 package com.example.dijasaliou.dto;
 
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,7 +18,9 @@ import lombok.NoArgsConstructor;
  *   "email": "dija@boutique.com",
  *   "nom": "Saliou",
  *   "prenom": "Dija",
- *   "role": "ADMIN"
+ *   "role": "ADMIN",
+ *   "requiresPayment": true,  // Si true, rediriger vers page de paiement
+ *   "plan": "GRATUIT"
  * }
  */
 @Data
@@ -27,4 +30,15 @@ import lombok.NoArgsConstructor;
 public class AuthResponse {
     private String token;
     private UserEntity user;
+
+    /**
+     * Indique si l'utilisateur doit payer avant d'accéder à l'application
+     * true si plan = GRATUIT ou dateExpiration dépassée
+     */
+    private boolean requiresPayment;
+
+    /**
+     * Plan d'abonnement actuel du tenant
+     */
+    private TenantEntity.Plan plan;
 }

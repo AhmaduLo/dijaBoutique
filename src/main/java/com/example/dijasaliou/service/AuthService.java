@@ -157,10 +157,12 @@ public class AuthService {
         // 6. Générer le token JWT avec tenant_id
         String token = jwtService.generateToken(savedUser.getEmail(), savedTenant.getTenantUuid());
 
-        // 7. Retourner la réponse
+        // 7. Retourner la réponse avec requiresPayment = true pour plan GRATUIT
         return AuthResponse.builder()
                 .token(token)
                 .user(savedUser)
+                .requiresPayment(true) // Toujours true après inscription (plan GRATUIT)
+                .plan(savedTenant.getPlan()) // GRATUIT
                 .build();
     }
 
@@ -200,10 +202,16 @@ public class AuthService {
         // 4. Générer le token JWT avec tenant_id
         String token = jwtService.generateToken(user.getEmail(), tenant.getTenantUuid());
 
-        // 5. Retourner la réponse
+        // 5. Vérifier si un paiement est requis
+        boolean requiresPayment = tenant.getPlan() == TenantEntity.Plan.GRATUIT ||
+                                  (tenant.getDateExpiration() != null && tenant.getDateExpiration().isBefore(LocalDateTime.now()));
+
+        // 6. Retourner la réponse avec les informations de paiement
         return AuthResponse.builder()
                 .token(token)
                 .user(user)
+                .requiresPayment(requiresPayment)
+                .plan(tenant.getPlan())
                 .build();
     }
 
