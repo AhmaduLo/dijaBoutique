@@ -195,8 +195,11 @@ public class AuthService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
-        if (!tenant.estValide()) {
-            throw new RuntimeException("Votre compte entreprise est désactivé ou expiré. Contactez le support.");
+        // IMPORTANT : On permet la connexion même si l'abonnement est expiré
+        // Le SubscriptionExpirationFilter bloquera l'accès aux routes protégées
+        // Mais l'utilisateur doit pouvoir se connecter pour accéder à /payment/**
+        if (!tenant.getActif()) {
+            throw new RuntimeException("Votre compte entreprise est désactivé. Contactez le support.");
         }
 
         // 4. Générer le token JWT avec tenant_id
