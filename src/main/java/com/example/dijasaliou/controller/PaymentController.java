@@ -2,7 +2,10 @@ package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.*;
 import com.example.dijasaliou.entity.TenantEntity;
+import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.TenantRepository;
+import com.example.dijasaliou.repository.UserRepository;
+import com.example.dijasaliou.service.EmailService;
 import com.example.dijasaliou.service.StripeService;
 import com.example.dijasaliou.service.TenantService;
 import jakarta.validation.Valid;
@@ -35,13 +38,19 @@ public class PaymentController {
     private final StripeService stripeService;
     private final TenantService tenantService;
     private final TenantRepository tenantRepository;
+    private final UserRepository userRepository;
+    private final EmailService emailService;
 
     public PaymentController(StripeService stripeService,
                              TenantService tenantService,
-                             TenantRepository tenantRepository) {
+                             TenantRepository tenantRepository,
+                             UserRepository userRepository,
+                             EmailService emailService) {
         this.stripeService = stripeService;
         this.tenantService = tenantService;
         this.tenantRepository = tenantRepository;
+        this.userRepository = userRepository;
+        this.emailService = emailService;
     }
 
     /**
@@ -200,7 +209,35 @@ public class PaymentController {
         log.info("Abonnement {} activé pour le tenant {} jusqu'au {}",
                 request.getPlan(), tenant.getTenantUuid(), dateExpiration);
 
-        // 4. Retourner la confirmation
+        // 4. Récupérer les informations de l'utilisateur pour l'email
+        UserEntity user = userRepository.findByEmailAndDeletedFalse(emailAdmin)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // 5. Envoyer l'email de confirmation de paiement
+        String userName = user.getPrenom() + " " + user.getNom();
+        String nomEntreprise = tenant.getNomEntreprise();
+        String planLibelle = request.getPlan().getLibelle();
+        double montant = request.getPlan().getPrixEuro();
+        String devise = "EUR"; // Vous pouvez récupérer la devise réelle depuis les metadata du PaymentIntent
+        String dateExpirationFormatee = dateExpiration.toLocalDate().toString();
+
+        try {
+            emailService.sendPaymentConfirmationEmail(
+                    user.getEmail(),
+                    userName,
+                    nomEntreprise,
+                    planLibelle,
+                    montant,
+                    devise,
+                    dateExpirationFormatee
+            );
+            log.info("Email de confirmation de paiement envoyé à {}", user.getEmail());
+        } catch (Exception e) {
+            // On ne bloque pas le processus si l'email échoue
+            log.error("Erreur lors de l'envoi de l'email de confirmation : {}", e.getMessage());
+        }
+
+        // 6. Retourner la confirmation
         Map<String, String> response = new HashMap<>();
         response.put("message", "Paiement confirmé ! Votre abonnement " + request.getPlan().getLibelle() + " est maintenant actif.");
         response.put("plan", request.getPlan().name());
