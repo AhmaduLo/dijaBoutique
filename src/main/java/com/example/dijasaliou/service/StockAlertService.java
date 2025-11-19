@@ -83,41 +83,39 @@ public class StockAlertService {
         log.debug("Stock actuel pour {} : {} unités (tenant: {})",
                 nomProduit, stockActuel, tenant.getNomEntreprise());
 
-        // 2. Parcourir tous les seuils et envoyer une alerte pour chaque seuil non encore notifié
+        // 2. Vérifier si le stock actuel correspond EXACTEMENT à un seuil d'alerte
         // SEUILS_ALERTE = {15, 10, 5, 0}
-        // Si stock = 5, on vérifie les seuils 15, 10, 5, 0
-        // On envoie une alerte pour le seuil le plus bas franchi qui n'a pas encore été notifié
+        // On envoie une alerte UNIQUEMENT si stock == 15, stock == 10, stock == 5 ou stock == 0
+        // PAS si stock < ou > à ces valeurs
 
-        LocalDateTime ilYa24h = LocalDateTime.now().minusHours(24);
-
-        // Trouver le seuil le plus proche du stock actuel (le plus petit seuil >= stock)
-        Integer seuilAEnvoyer = null;
-
-        for (int i = SEUILS_ALERTE.length - 1; i >= 0; i--) {
-            int seuil = SEUILS_ALERTE[i];
-
-            // Si le stock est <= à ce seuil
-            if (stockActuel <= seuil) {
-                // Vérifier si une alerte a déjà été envoyée pour CE seuil spécifique
-                boolean alerteDejaEnvoyee = stockAlertHistoryRepository.existsRecentAlert(
-                        nomProduit, seuil, tenant, ilYa24h);
-
-                if (!alerteDejaEnvoyee) {
-                    // On a trouvé un seuil franchi sans alerte récente
-                    seuilAEnvoyer = seuil;
-                    break; // On prend le seuil le plus bas non notifié
-                }
+        boolean seuilExactTrouve = false;
+        for (int seuil : SEUILS_ALERTE) {
+            if (stockActuel == seuil) {
+                seuilExactTrouve = true;
+                break;
             }
         }
 
-        // Si aucun seuil n'a besoin d'alerte
-        if (seuilAEnvoyer == null) {
-            log.debug("Aucune nouvelle alerte nécessaire pour {} (stock: {})", nomProduit, stockActuel);
+        // Si le stock ne correspond à aucun seuil exact, pas d'alerte
+        if (!seuilExactTrouve) {
+            log.debug("Stock de {} ({} unités) ne correspond à aucun seuil d'alerte exact",
+                    nomProduit, stockActuel);
             return;
         }
 
-        log.info("Nouvelle alerte à envoyer pour {} - Stock: {} - Seuil: {}",
-                nomProduit, stockActuel, seuilAEnvoyer);
+        // Le stock correspond exactement à un seuil, vérifier si l'alerte a déjà été envoyée
+        LocalDateTime ilYa24h = LocalDateTime.now().minusHours(24);
+        boolean alerteDejaEnvoyee = stockAlertHistoryRepository.existsRecentAlert(
+                nomProduit, stockActuel, tenant, ilYa24h);
+
+        if (alerteDejaEnvoyee) {
+            log.debug("Alerte déjà envoyée pour {} au seuil exact {} dans les dernières 24h",
+                    nomProduit, stockActuel);
+            return;
+        }
+
+        log.info("Stock EXACTEMENT égal à un seuil ! Envoi d'alerte pour {} - Stock: {}",
+                nomProduit, stockActuel);
 
         // 3. Récupérer l'admin du tenant pour l'email
         UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN)
@@ -129,7 +127,7 @@ public class StockAlertService {
             return;
         }
 
-        // 4. Envoyer l'email d'alerte
+        // 4. Envoyer l'email d'alerte (le seuil = stock actuel car on vérifie l'égalité exacte)
         String userName = admin.getPrenom() + " " + admin.getNom();
         emailService.sendStockAlertEmail(
                 admin.getEmail(),
@@ -137,13 +135,13 @@ public class StockAlertService {
                 tenant.getNomEntreprise(),
                 nomProduit,
                 stockActuel,
-                seuilAEnvoyer
+                stockActuel  // Le seuil d'alerte = le stock actuel (car stock == seuil)
         );
 
         // 5. Enregistrer l'alerte dans l'historique
         StockAlertHistory history = StockAlertHistory.builder()
                 .nomProduit(nomProduit)
-                .seuilAlerte(seuilAEnvoyer)
+                .seuilAlerte(stockActuel)  // Le seuil = stock actuel
                 .stockActuel(stockActuel)
                 .emailDestinataire(admin.getEmail())
                 .tenant(tenant)
@@ -153,7 +151,7 @@ public class StockAlertService {
         stockAlertHistoryRepository.save(history);
 
         log.info("Alerte de stock envoyée pour {} (stock: {}, seuil: {}) à {} (entreprise: {})",
-                nomProduit, stockActuel, seuilAEnvoyer, admin.getEmail(), tenant.getNomEntreprise());
+                nomProduit, stockActuel, stockActuel, admin.getEmail(), tenant.getNomEntreprise());
     }
 
     /**
