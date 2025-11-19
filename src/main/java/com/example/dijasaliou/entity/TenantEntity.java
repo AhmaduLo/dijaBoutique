@@ -92,6 +92,21 @@ public class TenantEntity {
     @Column(name = "date_creation", nullable = false, updatable = false)
     private LocalDateTime dateCreation;
 
+    /**
+     * ESSAI GRATUIT : Date de début de l'essai gratuit de 14 jours
+     * Automatiquement définie lors de l'inscription
+     */
+    @Column(name = "date_debut_essai")
+    private LocalDateTime dateDebutEssai;
+
+    /**
+     * ESSAI GRATUIT : Indique si l'essai gratuit a été utilisé
+     * Une fois l'essai utilisé, l'utilisateur doit payer pour accéder au site
+     */
+    @Column(name = "essai_utilise", nullable = false)
+    @Builder.Default
+    private Boolean essaiUtilise = false;
+
     @Column(name = "date_expiration")
     private LocalDateTime dateExpiration;
 
@@ -207,6 +222,58 @@ public class TenantEntity {
         }
 
         return true;
+    }
+
+    /**
+     * Vérifie si l'essai gratuit de 14 jours est encore valide
+     *
+     * @return true si l'essai est encore valide, false sinon
+     */
+    public boolean essaiGratuitValide() {
+        // Si l'essai n'a jamais été démarré
+        if (dateDebutEssai == null) {
+            return false;
+        }
+
+        // Si l'essai a déjà été marqué comme utilisé
+        if (essaiUtilise != null && essaiUtilise) {
+            return false;
+        }
+
+        // Calculer la date de fin de l'essai (14 jours après le début)
+        LocalDateTime dateFinEssai = dateDebutEssai.plusDays(14);
+
+        // Vérifier si on est encore dans la période d'essai
+        return LocalDateTime.now().isBefore(dateFinEssai);
+    }
+
+    /**
+     * Vérifie si le tenant peut accéder au site
+     * Soit il a un abonnement payé valide, soit il est dans la période d'essai gratuit
+     *
+     * @return true si l'accès est autorisé, false sinon
+     */
+    public boolean peutAccederAuSite() {
+        if (!actif) {
+            return false;
+        }
+
+        // Si l'essai gratuit est encore valide, autoriser l'accès
+        if (essaiGratuitValide()) {
+            return true;
+        }
+
+        // Sinon, vérifier si un abonnement payé est actif
+        if (plan == Plan.GRATUIT) {
+            return false; // Plan gratuit sans essai valide = pas d'accès
+        }
+
+        // Pour les plans payants, vérifier la date d'expiration
+        if (dateExpiration != null) {
+            return LocalDateTime.now().isBefore(dateExpiration);
+        }
+
+        return false;
     }
 
     /**

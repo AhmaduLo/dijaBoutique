@@ -79,37 +79,50 @@ public class PaymentController {
 
         TenantEntity tenant = tenantService.getCurrentTenant();
 
-        // Calculer les jours restants
+        // Calculer les jours restants et la date d'expiration à afficher
         Long joursRestants = null;
         Boolean estExpire = false;
+        LocalDateTime dateExpirationAffichee = null;
+        Boolean essaiGratuit = tenant.essaiGratuitValide();
 
-        if (tenant.getDateExpiration() != null) {
+        if (essaiGratuit) {
+            // Si l'essai gratuit est actif, calculer la date de fin de l'essai
+            dateExpirationAffichee = tenant.getDateDebutEssai().plusDays(14);
+            LocalDateTime now = LocalDateTime.now();
+            Duration duration = Duration.between(now, dateExpirationAffichee);
+            joursRestants = duration.toDays();
+            estExpire = false;
+        } else if (tenant.getDateExpiration() != null) {
+            // Si abonnement payant, utiliser la date d'expiration de l'abonnement
+            dateExpirationAffichee = tenant.getDateExpiration();
             LocalDateTime now = LocalDateTime.now();
             Duration duration = Duration.between(now, tenant.getDateExpiration());
             joursRestants = duration.toDays();
             estExpire = joursRestants < 0;
+        } else {
+            // Pas d'essai gratuit et pas d'abonnement payant
+            estExpire = true;
         }
-
-        // Vérifier si le plan est GRATUIT (pas encore payé)
-        Boolean essaiGratuit = false; // Plus d'essai gratuit
 
         // Message personnalisé
         String message;
-        if (tenant.getPlan() == TenantEntity.Plan.GRATUIT) {
-            message = "Aucun abonnement actif - Veuillez souscrire à un plan pour accéder à l'application";
+        if (essaiGratuit) {
+            message = String.format("Essai gratuit actif - %d jours restants", joursRestants);
+        } else if (tenant.getPlan() == TenantEntity.Plan.GRATUIT) {
+            message = "Période d'essai terminée - Veuillez souscrire à un plan pour accéder à l'application";
         } else if (estExpire) {
             message = "Abonnement expiré - Veuillez renouveler votre abonnement";
         } else {
-            message = String.format("Abonnement %s actif", tenant.getPlan().getLibelle());
+            message = String.format("Abonnement %s actif - %d jours restants", tenant.getPlan().getLibelle(), joursRestants);
         }
 
         SubscriptionStatusResponse response = SubscriptionStatusResponse.builder()
                 .plan(tenant.getPlan().name())
                 .actif(tenant.getActif())
-                .dateExpiration(tenant.getDateExpiration())
+                .dateExpiration(dateExpirationAffichee)
                 .joursRestants(joursRestants)
                 .essaiGratuit(essaiGratuit)
-                .estExpire(estExpire || tenant.getPlan() == TenantEntity.Plan.GRATUIT)
+                .estExpire(estExpire)
                 .message(message)
                 .build();
 
@@ -203,6 +216,13 @@ public class PaymentController {
         tenant.setPlan(request.getPlan());
         tenant.setDateExpiration(dateExpiration);
         tenant.setActif(true);
+
+        // IMPORTANT : Marquer l'essai gratuit comme utilisé
+        // Une fois qu'un utilisateur paie, il ne peut plus bénéficier de l'essai gratuit
+        if (!tenant.getEssaiUtilise()) {
+            tenant.setEssaiUtilise(true);
+            log.info("Essai gratuit marqué comme utilisé pour le tenant {}", tenant.getTenantUuid());
+        }
 
         tenantRepository.save(tenant);
 

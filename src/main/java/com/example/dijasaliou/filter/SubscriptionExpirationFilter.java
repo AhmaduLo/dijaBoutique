@@ -82,8 +82,23 @@ public class SubscriptionExpirationFilter extends OncePerRequestFilter {
 
     /**
      * Vérifie si l'abonnement est expiré
+     *
+     * NOUVELLE LOGIQUE AVEC ESSAI GRATUIT :
+     * - Si le tenant a un essai gratuit valide (14 jours), l'accès est autorisé
+     * - Sinon, on vérifie la date d'expiration de l'abonnement payant
      */
     private boolean isSubscriptionExpired(TenantEntity tenant) {
+        // Si l'essai gratuit est encore valide, autoriser l'accès
+        if (tenant.essaiGratuitValide()) {
+            return false;
+        }
+
+        // Si plan gratuit sans essai valide, bloquer l'accès
+        if (tenant.getPlan() == TenantEntity.Plan.GRATUIT) {
+            return true; // L'essai est terminé et pas d'abonnement payant
+        }
+
+        // Pour les plans payants, vérifier la date d'expiration
         if (tenant.getDateExpiration() == null) {
             return false; // Pas de date d'expiration = pas de limite
         }
@@ -113,7 +128,7 @@ public class SubscriptionExpirationFilter extends OncePerRequestFilter {
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("error", "Paiement requis");
-        errorResponse.put("message", "Veuillez souscrire à un abonnement pour accéder à l'application. Choisissez un plan et effectuez votre paiement.");
+        errorResponse.put("message", "Votre période d'essai gratuit de 14 jours est terminée. Veuillez souscrire à un abonnement pour continuer à accéder à l'application.");
         errorResponse.put("code", "PAYMENT_REQUIRED");
 
         String jsonResponse = objectMapper.writeValueAsString(errorResponse);

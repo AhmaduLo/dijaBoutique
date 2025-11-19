@@ -120,7 +120,7 @@ public class AuthService {
             }
         }
 
-        // 3. Créer le TENANT (entreprise) - PAIEMENT REQUIS APRÈS INSCRIPTION
+        // 3. Créer le TENANT (entreprise) - ESSAI GRATUIT DE 14 JOURS
         LocalDateTime now = LocalDateTime.now();
 
         TenantEntity tenant = TenantEntity.builder()
@@ -129,8 +129,10 @@ public class AuthService {
                 .adresse(request.getAdresseEntreprise())
                 .nineaSiret(request.getNineaSiret()) // OPTIONNEL - peut être null
                 .actif(true)
-                .plan(TenantEntity.Plan.GRATUIT) // Plan par défaut - doit payer pour accéder
-                .dateExpiration(now) // Expiré immédiatement - l'utilisateur doit payer
+                .plan(TenantEntity.Plan.GRATUIT) // Plan par défaut - essai gratuit de 14 jours
+                .dateDebutEssai(now) // Début de l'essai gratuit de 14 jours
+                .essaiUtilise(false) // L'essai n'a pas encore été utilisé complètement
+                .dateExpiration(null) // Pas de date d'expiration pour l'instant (sera définie après paiement)
                 .build();
 
         TenantEntity savedTenant = tenantRepository.save(tenant);
@@ -157,11 +159,11 @@ public class AuthService {
         // 6. Générer le token JWT avec tenant_id
         String token = jwtService.generateToken(savedUser.getEmail(), savedTenant.getTenantUuid());
 
-        // 7. Retourner la réponse avec requiresPayment = true pour plan GRATUIT
+        // 8. Retourner la réponse - L'utilisateur a 14 jours d'essai gratuit
         return AuthResponse.builder()
                 .token(token)
                 .user(savedUser)
-                .requiresPayment(true) // Toujours true après inscription (plan GRATUIT)
+                .requiresPayment(false) // L'utilisateur est en essai gratuit, il peut accéder au site
                 .plan(savedTenant.getPlan()) // GRATUIT
                 .build();
     }
@@ -206,8 +208,19 @@ public class AuthService {
         String token = jwtService.generateToken(user.getEmail(), tenant.getTenantUuid());
 
         // 5. Vérifier si un paiement est requis
-        boolean requiresPayment = tenant.getPlan() == TenantEntity.Plan.GRATUIT ||
-                                  (tenant.getDateExpiration() != null && tenant.getDateExpiration().isBefore(LocalDateTime.now()));
+        // Un paiement est requis si :
+        // - Le tenant est en plan GRATUIT ET l'essai gratuit est terminé
+        // - OU le tenant a un plan payant mais l'abonnement est expiré
+        boolean requiresPayment = false;
+
+        if (tenant.getPlan() == TenantEntity.Plan.GRATUIT) {
+            // Si plan gratuit, vérifier si l'essai gratuit est encore valide
+            requiresPayment = !tenant.essaiGratuitValide();
+        } else {
+            // Si plan payant, vérifier si l'abonnement est expiré
+            requiresPayment = tenant.getDateExpiration() != null &&
+                             tenant.getDateExpiration().isBefore(LocalDateTime.now());
+        }
 
         // 6. Retourner la réponse avec les informations de paiement
         return AuthResponse.builder()
