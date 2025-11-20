@@ -14,7 +14,10 @@
       "Bash(cmd.exe /c \"netstat -ano | findstr :8080\")",
       "Bash(Select-Object -First 5)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
