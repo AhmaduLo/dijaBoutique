@@ -8,8 +8,10 @@ import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.service.EmailService;
 import com.example.dijasaliou.service.StripeService;
 import com.example.dijasaliou.service.TenantService;
+import com.example.dijasaliou.service.WaveService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -40,17 +42,20 @@ public class PaymentController {
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final WaveService waveService;
 
     public PaymentController(StripeService stripeService,
                              TenantService tenantService,
                              TenantRepository tenantRepository,
                              UserRepository userRepository,
-                             EmailService emailService) {
+                             EmailService emailService,
+                             WaveService waveService) {
         this.stripeService = stripeService;
         this.tenantService = tenantService;
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
+        this.waveService = waveService;
     }
 
     /**
@@ -264,6 +269,175 @@ public class PaymentController {
         response.put("dateExpiration", dateExpiration.toString());
 
         return ResponseEntity.ok(response);
+    }
+
+    // ==================== ENDPOINTS WAVE (MOBILE MONEY SÉNÉGAL) ====================
+
+    /**
+     * POST /api/payment/wave/initiate
+     * Initie un paiement via Wave (Mobile Money Sénégal)
+     *
+     * AUTHENTIFICATION REQUISE : L'utilisateur doit être connecté (ADMIN)
+     *
+     * Body :
+     * {
+     *   "plan": "BASIC",
+     *   "numeroTelephone": "+221771234567"
+     * }
+     *
+     * Retourne :
+     * {
+     *   "waveTransactionId": "wave_123456789",
+     *   "waveUrl": "https://pay.wave.com/checkout/wave_123456789",
+     *   "montant": 6555,
+     *   "devise": "XOF",
+     *   "plan": "BASIC",
+     *   "numeroTelephone": "+221****4567",
+     *   "statut": "PENDING"
+     * }
+     */
+    @PostMapping("/wave/initiate")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<WavePaymentResponse> initiateWavePayment(
+            @Valid @RequestBody WavePaymentRequest request,
+            Authentication authentication) {
+
+        String emailUser = authentication.getName();
+        TenantEntity tenant = tenantService.getCurrentTenant();
+
+        log.info("Admin {} (Tenant: {}) initie un paiement Wave pour le plan {}",
+                emailUser, tenant.getTenantUuid(), request.getPlan());
+
+        // Initier le paiement Wave
+        WavePaymentResponse response = waveService.initiatePayment(request, tenant.getTenantUuid());
+
+        log.info("Paiement Wave initié: Transaction ID = {}", response.getWaveTransactionId());
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/payment/wave/confirm
+     * Confirme un paiement Wave après que l'utilisateur ait validé sur son téléphone
+     *
+     * AUTHENTIFICATION REQUISE : L'utilisateur doit être connecté (ADMIN)
+     *
+     * Body :
+     * {
+     *   "waveTransactionId": "wave_123456789",
+     *   "plan": "BASIC"
+     * }
+     *
+     * Retourne :
+     * {
+     *   "message": "Paiement confirmé ! Votre abonnement Plan Basic est maintenant actif.",
+     *   "plan": "BASIC",
+     *   "dateExpiration": "2025-12-19T..."
+     * }
+     */
+    @PostMapping("/wave/confirm")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<Map<String, String>> confirmWavePayment(
+            @Valid @RequestBody WavePaymentConfirmRequest request,
+            Authentication authentication) {
+
+        String emailAdmin = authentication.getName();
+        log.info("Admin {} confirme le paiement Wave {} pour le plan {}",
+                emailAdmin, request.getWaveTransactionId(), request.getPlan());
+
+        // 1. Vérifier que le paiement Wave a bien été effectué
+        boolean isPaymentValid = waveService.verifyPayment(request.getWaveTransactionId());
+
+        if (!isPaymentValid) {
+            log.error("Paiement Wave {} non valide ou non confirmé", request.getWaveTransactionId());
+            throw new RuntimeException("Le paiement n'a pas été confirmé par Wave. Veuillez réessayer ou contacter le support.");
+        }
+
+        // 2. Récupérer le tenant actuel
+        TenantEntity tenant = tenantService.getCurrentTenant();
+
+        // 3. Activer l'abonnement pour 30 jours
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime dateExpiration = now.plusDays(30); // 1 mois
+
+        tenant.setPlan(request.getPlan());
+        tenant.setDateExpiration(dateExpiration);
+        tenant.setActif(true);
+
+        // IMPORTANT : Marquer l'essai gratuit comme utilisé
+        if (!tenant.getEssaiUtilise()) {
+            tenant.setEssaiUtilise(true);
+            log.info("Essai gratuit marqué comme utilisé pour le tenant {}", tenant.getTenantUuid());
+        }
+
+        tenantRepository.save(tenant);
+
+        log.info("Abonnement {} activé via Wave pour le tenant {} jusqu'au {}",
+                request.getPlan(), tenant.getTenantUuid(), dateExpiration);
+
+        // 4. Récupérer les informations de l'utilisateur pour l'email
+        UserEntity user = userRepository.findByEmailAndDeletedFalse(emailAdmin)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // 5. Envoyer l'email de confirmation de paiement
+        String userName = user.getPrenom() + " " + user.getNom();
+        String nomEntreprise = tenant.getNomEntreprise();
+        String planLibelle = request.getPlan().getLibelle();
+        double montant = request.getPlan().getPrixCFA(); // Prix en XOF pour Wave
+        String devise = "XOF"; // Francs CFA
+        String dateExpirationFormatee = dateExpiration.toLocalDate().toString();
+
+        try {
+            emailService.sendPaymentConfirmationEmail(
+                    user.getEmail(),
+                    userName,
+                    nomEntreprise,
+                    planLibelle,
+                    montant,
+                    devise,
+                    dateExpirationFormatee
+            );
+            log.info("Email de confirmation de paiement Wave envoyé à {}", user.getEmail());
+        } catch (Exception e) {
+            // On ne bloque pas le processus si l'email échoue
+            log.error("Erreur lors de l'envoi de l'email de confirmation : {}", e.getMessage());
+        }
+
+        // 6. Retourner la confirmation
+        Map<String, String> responseWave = new HashMap<>();
+        responseWave.put("message", "Paiement Wave confirmé ! Votre abonnement " + request.getPlan().getLibelle() + " est maintenant actif.");
+        responseWave.put("plan", request.getPlan().name());
+        responseWave.put("dateExpiration", dateExpiration.toString());
+
+        return ResponseEntity.ok(responseWave);
+    }
+
+    /**
+     * POST /api/payment/wave/webhook
+     * Webhook pour recevoir les notifications de paiement Wave
+     *
+     * Ce endpoint est PUBLIC (pas d'authentification) car appelé par Wave
+     * La sécurité est assurée par la vérification de la signature Wave
+     */
+    @PostMapping("/wave/webhook")
+    public ResponseEntity<String> handleWaveWebhook(@RequestBody Map<String, Object> payload) {
+        log.info("Réception webhook Wave: {}", payload);
+
+        try {
+            boolean success = waveService.handleWebhook(payload);
+
+            if (success) {
+                log.info("✅ Webhook Wave traité avec succès");
+                return ResponseEntity.ok("Webhook traité");
+            } else {
+                log.warn("⚠️ Webhook Wave non traité (statut non 'completed')");
+                return ResponseEntity.ok("Webhook reçu mais non traité");
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Erreur lors du traitement du webhook Wave: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur");
+        }
     }
 
     /**
