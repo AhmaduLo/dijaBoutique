@@ -4,9 +4,12 @@ import com.example.dijasaliou.dto.CreatePaymentIntentRequest;
 import com.example.dijasaliou.dto.PaymentIntentResponse;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.stripe.Stripe;
+import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
+import com.stripe.model.Event;
 import com.stripe.model.PaymentIntent;
+import com.stripe.net.Webhook;
 import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.CustomerListParams;
 import com.stripe.param.PaymentIntentCreateParams;
@@ -42,6 +45,9 @@ public class StripeService {
 
     @Value("${stripe.public.key}")
     private String stripePublicKey;
+
+    @Value("${stripe.webhook.secret}")
+    private String webhookSecret;
 
     /**
      * Initialise Stripe avec la clé secrète
@@ -215,6 +221,92 @@ public class StripeService {
         } else {
             // Pour l'EUR, convertir en centimes (9.99€ = 999 centimes)
             return (long) (plan.getPrixEuro() * 100);
+        }
+    }
+
+    /**
+     * Vérifie la signature d'un webhook Stripe et retourne l'événement
+     *
+     * SÉCURITÉ CRITIQUE : Vérification de la signature Stripe
+     * Cela garantit que le webhook provient bien de Stripe et n'a pas été falsifié
+     *
+     * @param payload Le corps de la requête webhook (raw JSON)
+     * @param sigHeader L'en-tête Stripe-Signature
+     * @return L'événement Stripe vérifié
+     * @throws SignatureVerificationException Si la signature est invalide
+     */
+    public Event verifyWebhookSignature(String payload, String sigHeader) throws SignatureVerificationException {
+        if (webhookSecret == null || webhookSecret.isEmpty()) {
+            log.error("❌ SÉCURITÉ: Webhook secret non configuré ! Les webhooks Stripe ne peuvent pas être vérifiés.");
+            throw new IllegalStateException("Webhook secret non configuré");
+        }
+
+        try {
+            // Stripe.net.Webhook.constructEvent vérifie automatiquement la signature
+            Event event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
+
+            log.info("✅ Webhook Stripe vérifié avec succès - Type: {} - ID: {}",
+                    event.getType(), event.getId());
+
+            return event;
+
+        } catch (SignatureVerificationException e) {
+            log.error("❌ SÉCURITÉ: Signature webhook Stripe invalide ! Possible tentative d'attaque.");
+            throw e;
+        }
+    }
+
+    /**
+     * Traite un événement webhook Stripe
+     *
+     * Pour l'instant, on log seulement les événements.
+     * Dans le futur, on pourrait :
+     * - Activer automatiquement l'abonnement sur payment_intent.succeeded
+     * - Envoyer un email de confirmation
+     * - Gérer les échecs de paiement
+     *
+     * @param event L'événement Stripe vérifié
+     * @return true si l'événement a été traité avec succès
+     */
+    public boolean handleWebhookEvent(Event event) {
+        String eventType = event.getType();
+
+        switch (eventType) {
+            case "payment_intent.succeeded":
+                PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer()
+                        .getObject()
+                        .orElse(null);
+
+                if (paymentIntent != null) {
+                    log.info("✅ Paiement réussi - PaymentIntent: {} - Montant: {} {} - Customer: {}",
+                            paymentIntent.getId(),
+                            paymentIntent.getAmount(),
+                            paymentIntent.getCurrency(),
+                            paymentIntent.getCustomer());
+
+                    // TODO: Activer automatiquement l'abonnement ici
+                    // Pour l'instant, l'activation se fait via /api/payment/success
+                }
+                return true;
+
+            case "payment_intent.payment_failed":
+                PaymentIntent failedIntent = (PaymentIntent) event.getDataObjectDeserializer()
+                        .getObject()
+                        .orElse(null);
+
+                if (failedIntent != null) {
+                    log.warn("❌ Paiement échoué - PaymentIntent: {} - Raison: {}",
+                            failedIntent.getId(),
+                            failedIntent.getLastPaymentError() != null ?
+                                    failedIntent.getLastPaymentError().getMessage() : "Inconnue");
+
+                    // TODO: Envoyer un email à l'utilisateur pour l'informer
+                }
+                return true;
+
+            default:
+                log.info("ℹ️ Webhook Stripe reçu - Type: {} - ID: {}", eventType, event.getId());
+                return true;
         }
     }
 }

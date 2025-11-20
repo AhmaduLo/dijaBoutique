@@ -8,7 +8,13 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 
@@ -206,7 +212,78 @@ public class WaveService {
     }
 
     /**
+     * Vérifie la signature d'un webhook Wave
+     *
+     * SÉCURITÉ CRITIQUE : Vérification de la signature HMAC SHA-256
+     * Cela garantit que le webhook provient bien de Wave et n'a pas été falsifié
+     *
+     * @param payload Le corps du webhook en JSON
+     * @param signature La signature fournie par Wave dans l'en-tête X-Wave-Signature
+     * @return true si la signature est valide
+     */
+    public boolean verifyWebhookSignature(String payload, String signature) {
+        // En mode développement sans clés API, autoriser tous les webhooks
+        if (waveApiSecret == null || waveApiSecret.isEmpty()) {
+            log.warn("⚠️ MODE DÉVELOPPEMENT : Webhook Wave accepté sans vérification de signature");
+            return true;
+        }
+
+        if (signature == null || signature.isEmpty()) {
+            log.error("❌ SÉCURITÉ: Aucune signature fournie dans le webhook Wave");
+            return false;
+        }
+
+        try {
+            // Calculer le HMAC SHA-256 du payload avec le secret Wave
+            Mac hmac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(
+                    waveApiSecret.getBytes(StandardCharsets.UTF_8),
+                    "HmacSHA256"
+            );
+            hmac.init(secretKey);
+
+            byte[] hash = hmac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+
+            // Convertir en hexadécimal
+            String calculatedSignature = HexFormat.of().formatHex(hash);
+
+            // Comparer avec la signature fournie (comparaison sécurisée)
+            boolean isValid = constantTimeEquals(calculatedSignature, signature);
+
+            if (isValid) {
+                log.info("✅ Signature webhook Wave valide");
+            } else {
+                log.error("❌ SÉCURITÉ: Signature webhook Wave invalide ! Possible tentative d'attaque.");
+            }
+
+            return isValid;
+
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            log.error("❌ Erreur lors de la vérification de signature Wave: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Comparaison de chaînes en temps constant (protection contre timing attacks)
+     */
+    private boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null || a.length() != b.length()) {
+            return false;
+        }
+
+        int result = 0;
+        for (int i = 0; i < a.length(); i++) {
+            result |= a.charAt(i) ^ b.charAt(i);
+        }
+        return result == 0;
+    }
+
+    /**
      * Traite un webhook Wave (notification de paiement)
+     *
+     * NOTE: La vérification de la signature doit être faite AVANT d'appeler cette méthode
+     * (dans le controller)
      *
      * @param payload Données envoyées par Wave
      * @return true si le webhook est valide et traité
@@ -215,9 +292,6 @@ public class WaveService {
         log.info("Réception webhook Wave: {}", payload);
 
         try {
-            // Vérifier la signature du webhook (sécurité)
-            // TODO: Implémenter la vérification de signature Wave
-
             String status = (String) payload.get("status");
             String transactionId = (String) payload.get("id");
 

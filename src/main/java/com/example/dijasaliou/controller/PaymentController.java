@@ -271,6 +271,48 @@ public class PaymentController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * POST /api/payment/webhook
+     * Webhook pour recevoir les notifications de paiement Stripe
+     *
+     * Ce endpoint est PUBLIC (pas d'authentification) car appelé par Stripe
+     * La sécurité est assurée par la vérification de la signature Stripe
+     *
+     * IMPORTANT : Ce endpoint reçoit le raw body (pas de parsing JSON automatique)
+     * pour permettre la vérification de la signature
+     */
+    @PostMapping("/webhook")
+    public ResponseEntity<String> handleStripeWebhook(
+            @RequestBody String payload,
+            @RequestHeader("Stripe-Signature") String sigHeader) {
+
+        log.info("Réception webhook Stripe");
+
+        try {
+            // 1. Vérifier la signature du webhook (SÉCURITÉ CRITIQUE)
+            com.stripe.model.Event event = stripeService.verifyWebhookSignature(payload, sigHeader);
+
+            // 2. Traiter l'événement
+            boolean success = stripeService.handleWebhookEvent(event);
+
+            if (success) {
+                log.info("✅ Webhook Stripe traité avec succès - Type: {}", event.getType());
+                return ResponseEntity.ok("Webhook traité");
+            } else {
+                log.warn("⚠️ Webhook Stripe non traité - Type: {}", event.getType());
+                return ResponseEntity.ok("Webhook reçu mais non traité");
+            }
+
+        } catch (com.stripe.exception.SignatureVerificationException e) {
+            log.error("❌ SÉCURITÉ: Signature webhook Stripe invalide ! Possible tentative d'attaque.");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Signature invalide");
+
+        } catch (Exception e) {
+            log.error("❌ Erreur lors du traitement du webhook Stripe: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur");
+        }
+    }
+
     // ==================== ENDPOINTS WAVE (MOBILE MONEY SÉNÉGAL) ====================
 
     /**
@@ -418,13 +460,33 @@ public class PaymentController {
      *
      * Ce endpoint est PUBLIC (pas d'authentification) car appelé par Wave
      * La sécurité est assurée par la vérification de la signature Wave
+     *
+     * IMPORTANT : Ce endpoint reçoit le raw body (pas de parsing JSON automatique)
+     * pour permettre la vérification de la signature
      */
     @PostMapping("/wave/webhook")
-    public ResponseEntity<String> handleWaveWebhook(@RequestBody Map<String, Object> payload) {
-        log.info("Réception webhook Wave: {}", payload);
+    public ResponseEntity<String> handleWaveWebhook(
+            @RequestBody String payload,
+            @RequestHeader(value = "X-Wave-Signature", required = false) String signature) {
+
+        log.info("Réception webhook Wave");
 
         try {
-            boolean success = waveService.handleWebhook(payload);
+            // 1. Vérifier la signature du webhook (SÉCURITÉ CRITIQUE)
+            boolean isSignatureValid = waveService.verifyWebhookSignature(payload, signature);
+
+            if (!isSignatureValid) {
+                log.error("❌ SÉCURITÉ: Signature webhook Wave invalide ! Possible tentative d'attaque.");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Signature invalide");
+            }
+
+            // 2. Parser le payload JSON
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadMap = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(payload, Map.class);
+
+            // 3. Traiter l'événement
+            boolean success = waveService.handleWebhook(payloadMap);
 
             if (success) {
                 log.info("✅ Webhook Wave traité avec succès");

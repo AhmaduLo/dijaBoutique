@@ -2,6 +2,7 @@ package com.example.dijasaliou.config;
 
 import com.example.dijasaliou.filter.SubscriptionExpirationFilter;
 import com.example.dijasaliou.jwt.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
@@ -20,6 +21,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.Collections;
 
 /**
  * Configuration de sécurité
@@ -62,8 +64,13 @@ public class SecurityConfig {
                         // Route de suppression de compte - ADMIN uniquement
                         .requestMatchers("/auth/delete-account").hasAuthority("ADMIN")
 
-                        // Routes de paiement - TOUTES publiques pour éviter les problèmes de filtre
-                        .requestMatchers("/payment/**").permitAll()
+                        // Routes de paiement publiques (webhooks Stripe et Wave)
+                        .requestMatchers("/payment/webhook").permitAll() // Webhook Stripe
+                        .requestMatchers("/payment/wave/webhook").permitAll() // Webhook Wave
+                        // Autres routes de paiement publiques
+                        .requestMatchers("/payment/config", "/payment/plans").permitAll()
+                        // Routes de paiement nécessitant l'authentification
+                        .requestMatchers("/payment/**").authenticated()
 
                         // Routes de gestion des fichiers
                         .requestMatchers("/files/upload").hasAuthority("ADMIN") // Upload réservé aux ADMIN
@@ -108,18 +115,53 @@ public class SecurityConfig {
 
     /**
      * Configuration CORS pour autoriser Angular
+     *
+     * SÉCURITÉ : Configuration stricte en production
+     * - Autoriser uniquement les domaines de confiance
+     * - Limiter les méthodes HTTP
+     * - Spécifier les headers autorisés
+     *
+     * En production, remplacer localhost par votre domaine réel
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Autoriser plusieurs ports pour le développement
+
+        // DÉVELOPPEMENT : Autoriser localhost pour le développement local
+        // PRODUCTION : Remplacer par votre domaine (ex: https://votredomaine.com)
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:4200",
-                "http://localhost:64390"  // Port utilisé par votre frontend
+                "http://localhost:64390"
+                // En production, ajouter votre domaine ici :
+                // "https://votredomaine.com",
+                // "https://www.votredomaine.com"
         ));
+
+        // Méthodes HTTP autorisées (strictement nécessaires)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+
+        // Headers autorisés (spécifiques au lieu de "*" pour plus de sécurité)
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "X-Requested-With",
+                "Accept",
+                "Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
+
+        // Headers exposés au client
+        configuration.setExposedHeaders(Arrays.asList(
+                "Access-Control-Allow-Origin",
+                "Access-Control-Allow-Credentials"
+        ));
+
+        // Autoriser les cookies (JWT HttpOnly)
         configuration.setAllowCredentials(true);
+
+        // Cache des preflight requests (OPTIONS) pendant 1 heure
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
