@@ -114,6 +114,13 @@ public class TenantService {
             log.info("Mise à jour adresse: {} -> {}", tenantActuel.getAdresse(), request.getAdresse());
         }
 
+        // Mise à jour du NINEA/SIRET (optionnel - peut être null ou vide)
+        if (request.getNineaSiret() != null) {
+            String nineaSiret = request.getNineaSiret().trim().isEmpty() ? null : request.getNineaSiret().trim();
+            tenant.setNineaSiret(nineaSiret);
+            log.info("Mise à jour NINEA/SIRET: {} -> {}", tenantActuel.getNineaSiret(), nineaSiret);
+        }
+
         // Forcer la sauvegarde du tenant
         TenantEntity tenantSauvegarde = tenantRepository.saveAndFlush(tenant);
         log.info("Tenant mis à jour avec succès : {} - {} - {} - {}",

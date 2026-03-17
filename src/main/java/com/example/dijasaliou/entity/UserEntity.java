@@ -59,6 +59,24 @@ public class UserEntity extends BaseEntity {
     private LocalDateTime dateCreation;
 
     /**
+     * DOCUMENTS LÉGAUX : Acceptation des CGU et Politique de Confidentialité
+     * Obligatoire pour les ADMIN lors de la création de compte
+     */
+    @Column(name = "acceptation_cgu", nullable = false)
+    @Builder.Default
+    private Boolean acceptationCGU = false;
+
+    @Column(name = "date_acceptation_cgu")
+    private LocalDateTime dateAcceptationCGU;
+
+    @Column(name = "acceptation_politique_confidentialite", nullable = false)
+    @Builder.Default
+    private Boolean acceptationPolitiqueConfidentialite = false;
+
+    @Column(name = "date_acceptation_politique")
+    private LocalDateTime dateAcceptationPolitique;
+
+    /**
      * SUPPRESSION LOGIQUE : Champs pour soft delete
      * Permet de conserver l'historique des ventes, achats et dépenses
      * même après la suppression d'un utilisateur

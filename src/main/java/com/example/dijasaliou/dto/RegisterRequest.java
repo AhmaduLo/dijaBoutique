@@ -17,7 +17,10 @@ import lombok.NoArgsConstructor;
  *   "nomEntreprise": "Boutique DijaSaliou",
  *   "numeroTelephone": "+221771234567",
  *   "adresseEntreprise": "123 Rue de la République, Dakar",
- *   "role": "USER"
+ *   "nineaSiret": "123456789" (optionnel),
+ *   "role": "USER",
+ *   "acceptationCGU": true,
+ *   "acceptationPolitiqueConfidentialite": true
  * }
  */
 @Data
@@ -31,5 +34,24 @@ public class RegisterRequest {
     private String nomEntreprise;
     private String numeroTelephone;
     private String adresseEntreprise;
+
+    /**
+     * Numéro NINEA (Sénégal) ou SIRET (France) - OPTIONNEL
+     * L'entreprise peut ne pas avoir ce numéro lors de l'inscription
+     */
+    private String nineaSiret;
+
     private UserEntity.Role role;
+
+    /**
+     * Acceptation des CGU (Conditions Générales d'Utilisation)
+     * Obligatoire pour les ADMIN lors de la création de compte
+     */
+    private Boolean acceptationCGU;
+
+    /**
+     * Acceptation de la Politique de Confidentialité
+     * Obligatoire pour les ADMIN lors de la création de compte
+     */
+    private Boolean acceptationPolitiqueConfidentialite;
 }

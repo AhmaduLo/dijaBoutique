@@ -69,6 +69,29 @@ public class AchatEntity extends BaseEntity{
     private BigDecimal prixVenteSuggere;
 
     /**
+     * URL de la photo du produit (optionnel)
+     * <p>
+     * Format : /api/files/photos/{tenant_uuid}/achats/2024-01-15_produit_abc123.jpg
+     * <p>
+     * La photo aide à :
+     * - Identifier visuellement le produit rapidement
+     * - Faciliter l'inventaire physique
+     * - Améliorer l'expérience utilisateur
+     * - Former les nouveaux vendeurs
+     * <p>
+     * IMPORTANT : La photo est OPTIONNELLE
+     * Le nom du produit reste OBLIGATOIRE pour la recherche et les exports
+     */
+    @Size(max = 500, message = "L'URL de la photo ne peut dépasser 500 caractères")
+    @Column(name = "photo_url", length = 500)
+    private String photoUrl;
+
+    @Size(max = 20, message = "L'unité ne peut dépasser 20 caractères")
+    @Column(name = "unite", length = 20)
+    @Builder.Default
+    private String unite = "pièce";
+
+    /**
      * Relation Many-to-One avec Utilisateur
      * <p>
      * PLUSIEURS achats → UN utilisateur

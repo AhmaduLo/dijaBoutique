@@ -31,3 +31,13 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Fichiers temporaires et documentation ###
+docs/screenshots/
+
+### Photos uploadées des produits ###
+uploads/
+
+### Variables d'environnement (secrets) ###
+.env
+src/main/resources/application-local.properties

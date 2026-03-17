@@ -70,4 +70,10 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
      * Vérifier si un email existe parmi les utilisateurs actifs
      */
     boolean existsByEmailAndDeletedFalse(String email);
+
+    /**
+     * Trouver le premier utilisateur d'un tenant avec un rôle spécifique
+     * Utilisé pour trouver l'admin d'un tenant pour les notifications
+     */
+    Optional<UserEntity> findFirstByTenantAndRole(TenantEntity tenant, UserEntity.Role role);
 }

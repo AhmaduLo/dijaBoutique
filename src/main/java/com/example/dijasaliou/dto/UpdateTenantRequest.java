@@ -11,12 +11,14 @@ import lombok.NoArgsConstructor;
  * - Le nom de l'entreprise
  * - Le numéro de téléphone de l'entreprise
  * - L'adresse de l'entreprise
+ * - Le numéro NINEA/SIRET (optionnel)
  *
  * Angular envoie :
  * {
  *   "nomEntreprise": "Nouveau Nom Entreprise",
  *   "numeroTelephone": "+221771234567",
- *   "adresse": "123 Rue de la République, Dakar"
+ *   "adresse": "123 Rue de la République, Dakar",
+ *   "nineaSiret": "123456789" (optionnel)
  * }
  */
 @Data
@@ -26,4 +28,9 @@ public class UpdateTenantRequest {
     private String nomEntreprise;
     private String numeroTelephone;
     private String adresse;
+
+    /**
+     * Numéro NINEA (Sénégal) ou SIRET (France) - OPTIONNEL
+     */
+    private String nineaSiret;
 }

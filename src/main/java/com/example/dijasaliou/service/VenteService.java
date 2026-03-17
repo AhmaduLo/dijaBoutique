@@ -21,11 +21,16 @@ public class VenteService {
     private final VenteRepository venteRepository;
     private final StockService stockService;
     private final TenantService tenantService;
+    private final StockAlertService stockAlertService;
 
-    public VenteService(VenteRepository venteRepository, @Lazy StockService stockService, TenantService tenantService) {
+    public VenteService(VenteRepository venteRepository,
+                        @Lazy StockService stockService,
+                        TenantService tenantService,
+                        StockAlertService stockAlertService) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
         this.tenantService = tenantService;
+        this.stockAlertService = stockAlertService;
     }
 
     /**
@@ -59,12 +64,35 @@ public class VenteService {
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         vente.setTenant(tenantService.getCurrentTenant());
 
+        // Récupérer automatiquement la photo du produit depuis le stock si non fournie
+        if (vente.getPhotoUrl() == null || vente.getPhotoUrl().trim().isEmpty()) {
+            try {
+                StockDto stock = stockService.obtenirStockParNomProduit(vente.getNomProduit());
+                vente.setPhotoUrl(stock.getPhotoUrl());
+            } catch (RuntimeException e) {
+                // Si le produit n'existe pas dans le stock, laisser photoUrl null
+                // La vente peut quand même être créée sans photo
+            }
+        }
+
         // Calculer le prix total
         if (vente.getPrixTotal() == null) {
             vente.calculerPrixTotal();
         }
 
-        return venteRepository.save(vente);
+        // Sauvegarder la vente
+        VenteEntity venteSauvegardee = venteRepository.save(vente);
+
+        // ALERTE DE STOCK : Vérifier le stock après la vente et envoyer une alerte si nécessaire
+        // (uniquement pour le plan ENTREPRISE)
+        try {
+            stockAlertService.verifierEtEnvoyerAlerte(vente.getNomProduit());
+        } catch (Exception e) {
+            // Ne pas bloquer la vente si l'envoi d'alerte échoue
+            // L'erreur est déjà loguée dans StockAlertService
+        }
+
+        return venteSauvegardee;
     }
 
     /**
@@ -81,12 +109,30 @@ public class VenteService {
 
         validerVente(venteModifiee);
 
+        // Vérifier si le nom du produit a changé
+        boolean produitChange = !venteExistante.getNomProduit().equalsIgnoreCase(venteModifiee.getNomProduit());
+
         venteExistante.setQuantite(venteModifiee.getQuantite());
         venteExistante.setNomProduit(venteModifiee.getNomProduit());
         venteExistante.setPrixUnitaire(venteModifiee.getPrixUnitaire());
         venteExistante.setDateVente(venteModifiee.getDateVente());
         venteExistante.setClient(venteModifiee.getClient());
         venteExistante.setUtilisateur(venteModifiee.getUtilisateur());
+        venteExistante.setUnite(venteModifiee.getUnite());
+
+        // Si le produit a changé, récupérer automatiquement la photo du nouveau produit depuis le stock
+        if (produitChange) {
+            try {
+                StockDto stock = stockService.obtenirStockParNomProduit(venteModifiee.getNomProduit());
+                venteExistante.setPhotoUrl(stock.getPhotoUrl());
+            } catch (RuntimeException e) {
+                // Si le produit n'existe pas dans le stock, garder la photo fournie ou null
+                venteExistante.setPhotoUrl(venteModifiee.getPhotoUrl());
+            }
+        } else {
+            // Si le produit n'a pas changé, utiliser la photo fournie (permet de mettre à jour manuellement)
+            venteExistante.setPhotoUrl(venteModifiee.getPhotoUrl());
+        }
 
         venteExistante.calculerPrixTotal();
 

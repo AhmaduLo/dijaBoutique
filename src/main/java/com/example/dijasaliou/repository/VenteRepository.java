@@ -1,8 +1,11 @@
 package com.example.dijasaliou.repository;
 
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -42,4 +45,11 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
      * Supprimer toutes les ventes d'un utilisateur
      */
     void deleteByUtilisateur(UserEntity utilisateur);
+
+    /**
+     * Calculer le total des quantités vendues pour un produit et un tenant
+     * Utilisé pour le calcul de stock
+     */
+    @Query("SELECT SUM(v.quantite) FROM VenteEntity v WHERE v.nomProduit = :nomProduit AND v.tenant = :tenant")
+    Integer sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
 }

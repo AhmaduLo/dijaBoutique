@@ -73,6 +73,14 @@ public class TenantEntity {
     private String pays;
 
     /**
+     * Numéro NINEA (Sénégal) ou SIRET (France) ou autre identifiant fiscal
+     * Ce champ est OPTIONNEL car toutes les entreprises n'ont pas forcément ce numéro
+     * lors de leur inscription (en cours de création, micro-entreprise, etc.)
+     */
+    @Column(name = "ninea_siret", length = 50)
+    private String nineaSiret;
+
+    /**
      * Permet de désactiver un tenant (soft delete)
      * Si actif = false, l'entreprise ne peut plus se connecter
      */
@@ -83,6 +91,21 @@ public class TenantEntity {
     @CreationTimestamp
     @Column(name = "date_creation", nullable = false, updatable = false)
     private LocalDateTime dateCreation;
+
+    /**
+     * ESSAI GRATUIT : Date de début de l'essai gratuit de 14 jours
+     * Automatiquement définie lors de l'inscription
+     */
+    @Column(name = "date_debut_essai")
+    private LocalDateTime dateDebutEssai;
+
+    /**
+     * ESSAI GRATUIT : Indique si l'essai gratuit a été utilisé
+     * Une fois l'essai utilisé, l'utilisateur doit payer pour accéder au site
+     */
+    @Column(name = "essai_utilise", nullable = false)
+    @Builder.Default
+    private Boolean essaiUtilise = false;
 
     @Column(name = "date_expiration")
     private LocalDateTime dateExpiration;
@@ -105,24 +128,35 @@ public class TenantEntity {
     private List<UserEntity> utilisateurs = new ArrayList<>();
 
     /**
-     * Enum pour les plans (pour future monétisation)
+     * Enum pour les plans de paiement
+     *
+     * PLAN GRATUIT : État initial après inscription - PAIEMENT REQUIS pour accéder
+     * PLAN BASIC : 6555 CFA (9.99€) / mois
+     *   - Gérer ventes, stock, achats, dépenses, contact
+     *   - 3 utilisateurs (admin + 2 employés)
+     *   - Dashboard de base
+     *   - Rapports PDF mensuels
      */
     public enum Plan {
-        GRATUIT("Plan Gratuit", "Fonctionnalités limitées", 0, 3),
-        BASIC("Plan Basic", "Pour petites entreprises", 9.99, 10),
-        PREMIUM("Plan Premium", "Pour moyennes entreprises", 29.99, 50),
-        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 99.99, Integer.MAX_VALUE);
+        GRATUIT("Plan Gratuit", "Paiement requis - Aucun accès aux fonctionnalités", 0, 0, 0, false),
+        BASIC("Plan Basic", "Gestion complète boutique - 3 utilisateurs", 9.99, 6555, 3, true),
+        PREMIUM("Plan Premium", "Pour moyennes entreprises", 15.24, 10000, 10, true),
+        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 22.87, 15000, Integer.MAX_VALUE, true);
 
         private final String libelle;
         private final String description;
-        private final double prixMensuel;
+        private final double prixEuro;
+        private final double prixCFA;
         private final int maxUtilisateurs;
+        private final boolean accesFonctionnalites;
 
-        Plan(String libelle, String description, double prixMensuel, int maxUtilisateurs) {
+        Plan(String libelle, String description, double prixEuro, double prixCFA, int maxUtilisateurs, boolean accesFonctionnalites) {
             this.libelle = libelle;
             this.description = description;
-            this.prixMensuel = prixMensuel;
+            this.prixEuro = prixEuro;
+            this.prixCFA = prixCFA;
             this.maxUtilisateurs = maxUtilisateurs;
+            this.accesFonctionnalites = accesFonctionnalites;
         }
 
         public String getLibelle() {
@@ -133,12 +167,27 @@ public class TenantEntity {
             return description;
         }
 
-        public double getPrixMensuel() {
-            return prixMensuel;
+        public double getPrixEuro() {
+            return prixEuro;
+        }
+
+        public double getPrixCFA() {
+            return prixCFA;
         }
 
         public int getMaxUtilisateurs() {
             return maxUtilisateurs;
+        }
+
+        public boolean isAccesFonctionnalites() {
+            return accesFonctionnalites;
+        }
+
+        /**
+         * Vérifie si c'est un plan payant
+         */
+        public boolean isPayant() {
+            return this != GRATUIT;
         }
     }
 
@@ -173,6 +222,58 @@ public class TenantEntity {
         }
 
         return true;
+    }
+
+    /**
+     * Vérifie si l'essai gratuit de 14 jours est encore valide
+     *
+     * @return true si l'essai est encore valide, false sinon
+     */
+    public boolean essaiGratuitValide() {
+        // Si l'essai n'a jamais été démarré
+        if (dateDebutEssai == null) {
+            return false;
+        }
+
+        // Si l'essai a déjà été marqué comme utilisé
+        if (essaiUtilise != null && essaiUtilise) {
+            return false;
+        }
+
+        // Calculer la date de fin de l'essai (14 jours après le début)
+        LocalDateTime dateFinEssai = dateDebutEssai.plusDays(14);
+
+        // Vérifier si on est encore dans la période d'essai
+        return LocalDateTime.now().isBefore(dateFinEssai);
+    }
+
+    /**
+     * Vérifie si le tenant peut accéder au site
+     * Soit il a un abonnement payé valide, soit il est dans la période d'essai gratuit
+     *
+     * @return true si l'accès est autorisé, false sinon
+     */
+    public boolean peutAccederAuSite() {
+        if (!actif) {
+            return false;
+        }
+
+        // Si l'essai gratuit est encore valide, autoriser l'accès
+        if (essaiGratuitValide()) {
+            return true;
+        }
+
+        // Sinon, vérifier si un abonnement payé est actif
+        if (plan == Plan.GRATUIT) {
+            return false; // Plan gratuit sans essai valide = pas d'accès
+        }
+
+        // Pour les plans payants, vérifier la date d'expiration
+        if (dateExpiration != null) {
+            return LocalDateTime.now().isBefore(dateExpiration);
+        }
+
+        return false;
     }
 
     /**

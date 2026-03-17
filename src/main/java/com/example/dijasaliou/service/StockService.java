@@ -2,6 +2,7 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.repository.VenteRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,10 +26,12 @@ public class StockService {
 
     private final AchatRepository achatRepository;
     private final VenteRepository venteRepository;
+    private final TenantService tenantService;
 
-    public StockService(AchatRepository achatRepository, VenteRepository venteRepository) {
+    public StockService(AchatRepository achatRepository, VenteRepository venteRepository, TenantService tenantService) {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
+        this.tenantService = tenantService;
     }
 
     /**
@@ -203,8 +207,36 @@ public class StockService {
         // Déterminer le statut
         StockDto.StatutStock statut = StockDto.determinerStatut(stockDisponible);
 
+        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        boolean canViewPhotos = currentTenant != null &&
+                                currentTenant.getPlan() == TenantEntity.Plan.ENTREPRISE;
+
+        // Récupérer le dernier achat (le plus récent) pour la photo et l'unité
+        AchatEntity dernierAchat = achats.stream()
+                .sorted(Comparator.comparing(AchatEntity::getDateAchat).reversed())
+                .findFirst()
+                .orElse(null);
+
+        // Récupérer la photo du dernier achat (le plus récent avec une photo)
+        // RESTRICTION : null si le plan n'est pas ENTERPRISE
+        String photoUrl = null;
+        if (canViewPhotos) {
+            photoUrl = achats.stream()
+                    .filter(achat -> achat.getPhotoUrl() != null && !achat.getPhotoUrl().isEmpty())
+                    .sorted(Comparator.comparing(AchatEntity::getDateAchat).reversed())
+                    .findFirst()
+                    .map(AchatEntity::getPhotoUrl)
+                    .orElse(null);
+        }
+
+        // Récupérer l'unité depuis le dernier achat
+        String unite = dernierAchat != null ? dernierAchat.getUnite() : "pièce";
+
         return StockDto.builder()
                 .nomProduit(nomProduit)
+                .photoUrl(photoUrl)
+                .unite(unite)
                 .quantiteAchetee(quantiteAchetee)
                 .quantiteVendue(quantiteVendue)
                 .stockDisponible(stockDisponible)

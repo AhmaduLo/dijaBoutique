@@ -75,12 +75,20 @@ public class AuthService {
      * - Le tenant_id est inclus dans le JWT
      * - Toutes les données futures seront isolées par tenant_id
      *
+     * FLUX D'INSCRIPTION ET PAIEMENT :
+     * 1. L'utilisateur s'inscrit → Compte créé avec plan GRATUIT (expiré)
+     * 2. L'utilisateur reçoit un JWT et est connecté
+     * 3. Le SubscriptionExpirationFilter bloque l'accès aux routes sauf /payment/**
+     * 4. L'utilisateur est redirigé vers la page de paiement
+     * 5. Après paiement réussi → L'abonnement est activé
+     *
      * PROCESSUS :
      * 1. Vérifier que l'email n'existe pas déjà
-     * 2. Créer le TENANT (entreprise)
-     * 3. Créer l'utilisateur ADMIN lié au tenant
-     * 4. Générer un token JWT avec tenant_id
-     * 5. Retourner la réponse avec le token
+     * 2. Vérifier l'acceptation des CGU et de la Politique de Confidentialité pour les ADMIN
+     * 3. Créer le TENANT (entreprise) avec plan GRATUIT et dateExpiration = now
+     * 4. Créer l'utilisateur ADMIN lié au tenant
+     * 5. Générer un token JWT avec tenant_id
+     * 6. Retourner la réponse avec le token
      */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -94,21 +102,39 @@ public class AuthService {
             throw new RuntimeException("Une entreprise avec ce nom existe déjà");
         }
 
-        // 3. Créer le TENANT (entreprise)
+        // 3. Déterminer le rôle de l'utilisateur
+        // Si aucun rôle n'est spécifié, utiliser ADMIN par défaut (premier utilisateur)
+        UserEntity.Role userRole = request.getRole() != null ? request.getRole() : UserEntity.Role.ADMIN;
+
+        // 4. VALIDATION DES DOCUMENTS LÉGAUX pour les ADMIN
+        // L'acceptation des CGU et de la Politique de Confidentialité est OBLIGATOIRE pour les ADMIN
+        if (userRole == UserEntity.Role.ADMIN) {
+            if (request.getAcceptationCGU() == null || !request.getAcceptationCGU()) {
+                throw new RuntimeException("Vous devez accepter les Conditions Générales d'Utilisation pour créer un compte administrateur");
+            }
+            if (request.getAcceptationPolitiqueConfidentialite() == null || !request.getAcceptationPolitiqueConfidentialite()) {
+                throw new RuntimeException("Vous devez accepter la Politique de Confidentialité pour créer un compte administrateur");
+            }
+        }
+
+        // 3. Créer le TENANT (entreprise) - ESSAI GRATUIT DE 14 JOURS
+        LocalDateTime now = LocalDateTime.now();
+
         TenantEntity tenant = TenantEntity.builder()
                 .nomEntreprise(request.getNomEntreprise())
                 .numeroTelephone(request.getNumeroTelephone())
                 .adresse(request.getAdresseEntreprise())
+                .nineaSiret(request.getNineaSiret()) // OPTIONNEL - peut être null
                 .actif(true)
-                .plan(TenantEntity.Plan.GRATUIT) // Par défaut, plan gratuit
+                .plan(TenantEntity.Plan.GRATUIT) // Plan par défaut - essai gratuit de 14 jours
+                .dateDebutEssai(now) // Début de l'essai gratuit de 14 jours
+                .essaiUtilise(false) // L'essai n'a pas encore été utilisé complètement
+                .dateExpiration(null) // Pas de date d'expiration pour l'instant (sera définie après paiement)
                 .build();
 
         TenantEntity savedTenant = tenantRepository.save(tenant);
 
-        // 4. Créer l'utilisateur ADMIN pour ce tenant
-        // Si aucun rôle n'est spécifié, utiliser USER par défaut
-        // Lors de l'inscription, le premier utilisateur est toujours ADMIN
-        UserEntity.Role userRole = request.getRole() != null ? request.getRole() : UserEntity.Role.ADMIN;
+        // 5. Créer l'utilisateur ADMIN pour ce tenant avec les acceptations des documents légaux
 
         UserEntity user = UserEntity.builder()
                 .nom(request.getNom())
@@ -119,17 +145,23 @@ public class AuthService {
                 .numeroTelephone(request.getNumeroTelephone())
                 .tenant(savedTenant) // CRITIQUE : Lier au tenant
                 .role(userRole) // Utiliser le rôle spécifié ou ADMIN par défaut
+                .acceptationCGU(userRole == UserEntity.Role.ADMIN ? request.getAcceptationCGU() : false)
+                .dateAcceptationCGU(userRole == UserEntity.Role.ADMIN && request.getAcceptationCGU() ? now : null)
+                .acceptationPolitiqueConfidentialite(userRole == UserEntity.Role.ADMIN ? request.getAcceptationPolitiqueConfidentialite() : false)
+                .dateAcceptationPolitique(userRole == UserEntity.Role.ADMIN && request.getAcceptationPolitiqueConfidentialite() ? now : null)
                 .build();
 
         UserEntity savedUser = userRepository.save(user);
 
-        // 5. Générer le token JWT avec tenant_id
+        // 6. Générer le token JWT avec tenant_id
         String token = jwtService.generateToken(savedUser.getEmail(), savedTenant.getTenantUuid());
 
-        // 6. Retourner la réponse
+        // 8. Retourner la réponse - L'utilisateur a 14 jours d'essai gratuit
         return AuthResponse.builder()
                 .token(token)
                 .user(savedUser)
+                .requiresPayment(false) // L'utilisateur est en essai gratuit, il peut accéder au site
+                .plan(savedTenant.getPlan()) // GRATUIT
                 .build();
     }
 
@@ -162,17 +194,37 @@ public class AuthService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
-        if (!tenant.estValide()) {
-            throw new RuntimeException("Votre compte entreprise est désactivé ou expiré. Contactez le support.");
+        // IMPORTANT : On permet la connexion même si l'abonnement est expiré
+        // Le SubscriptionExpirationFilter bloquera l'accès aux routes protégées
+        // Mais l'utilisateur doit pouvoir se connecter pour accéder à /payment/**
+        if (!tenant.getActif()) {
+            throw new RuntimeException("Votre compte entreprise est désactivé. Contactez le support.");
         }
 
         // 4. Générer le token JWT avec tenant_id
         String token = jwtService.generateToken(user.getEmail(), tenant.getTenantUuid());
 
-        // 5. Retourner la réponse
+        // 5. Vérifier si un paiement est requis
+        // Un paiement est requis si :
+        // - Le tenant est en plan GRATUIT ET l'essai gratuit est terminé
+        // - OU le tenant a un plan payant mais l'abonnement est expiré
+        boolean requiresPayment = false;
+
+        if (tenant.getPlan() == TenantEntity.Plan.GRATUIT) {
+            // Si plan gratuit, vérifier si l'essai gratuit est encore valide
+            requiresPayment = !tenant.essaiGratuitValide();
+        } else {
+            // Si plan payant, vérifier si l'abonnement est expiré
+            requiresPayment = tenant.getDateExpiration() != null &&
+                             tenant.getDateExpiration().isBefore(LocalDateTime.now());
+        }
+
+        // 6. Retourner la réponse avec les informations de paiement
         return AuthResponse.builder()
                 .token(token)
                 .user(user)
+                .requiresPayment(requiresPayment)
+                .plan(tenant.getPlan())
                 .build();
     }
 

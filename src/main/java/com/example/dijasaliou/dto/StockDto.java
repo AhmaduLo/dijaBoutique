@@ -27,6 +27,16 @@ public class StockDto {
     private String nomProduit;
 
     /**
+     * URL de la photo du produit (provenant du dernier achat)
+     */
+    private String photoUrl;
+
+    /**
+     * Unité de mesure du produit (pièce, kg, litre, mètre, etc.)
+     */
+    private String unite;
+
+    /**
      * Quantité totale achetée
      */
     private Integer quantiteAchetee;
