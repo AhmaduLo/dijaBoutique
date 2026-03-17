@@ -238,8 +238,8 @@ public class FileStorageService {
         String baseName = originalFilename
                 .replaceAll("\\.[^.]*$", "") // Enlever l'extension
                 .replaceAll("[^a-zA-Z0-9-]", "-") // Remplacer caractères spéciaux par -
-                .toLowerCase()
-                .substring(0, Math.min(20, originalFilename.length())); // Max 20 caractères
+                .toLowerCase();
+        baseName = baseName.substring(0, Math.min(20, baseName.length())); // Max 20 caractères
 
         return String.format("%s_%s_%s.%s", timestamp, baseName, uniqueId, extension);
     }
