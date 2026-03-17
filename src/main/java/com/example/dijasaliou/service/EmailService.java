@@ -315,6 +315,541 @@ public class EmailService {
     }
 
     /**
+     * Envoie un email de confirmation de paiement
+     *
+     * @param toEmail Email du client
+     * @param userName Nom complet de l'utilisateur
+     * @param nomEntreprise Nom de l'entreprise
+     * @param plan Plan souscrit
+     * @param montant Montant payé
+     * @param devise Devise (EUR ou CFA)
+     * @param dateExpiration Date d'expiration de l'abonnement
+     */
+    public void sendPaymentConfirmationEmail(String toEmail, String userName, String nomEntreprise,
+                                             String plan, double montant, String devise,
+                                             String dateExpiration) {
+        try {
+            String subject = "Confirmation de paiement - Abonnement " + plan + " activé";
+
+            String htmlContent = buildPaymentConfirmationEmailContent(
+                    userName, nomEntreprise, plan, montant, devise, dateExpiration);
+
+            sendHtmlEmail(toEmail, subject, htmlContent);
+
+            log.info("Email de confirmation de paiement envoyé à : {} pour le plan {}", toEmail, plan);
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi de l'email de confirmation de paiement à {}: {}",
+                    toEmail, e.getMessage());
+            // On ne throw pas pour ne pas bloquer le processus de paiement
+        }
+    }
+
+    /**
+     * Construit le contenu HTML de l'email de confirmation de paiement
+     */
+    private String buildPaymentConfirmationEmailContent(String userName, String nomEntreprise,
+                                                        String plan, double montant, String devise,
+                                                        String dateExpiration) {
+        String montantFormate = String.format("%.2f %s", montant, devise);
+
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                        color: #333;
+                        max-width: 700px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }
+                    .container {
+                        background-color: #f9f9f9;
+                        border-radius: 8px;
+                        padding: 30px;
+                        border: 1px solid #ddd;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        background: linear-gradient(135deg, #10b981 0%%, #059669 100%%);
+                        color: white;
+                        padding: 30px;
+                        border-radius: 6px;
+                    }
+                    .header h1 {
+                        margin: 0;
+                        font-size: 28px;
+                    }
+                    .success-icon {
+                        font-size: 60px;
+                        margin-bottom: 10px;
+                    }
+                    .content {
+                        background-color: white;
+                        padding: 30px;
+                        border-radius: 6px;
+                        margin-bottom: 20px;
+                    }
+                    .info-box {
+                        background: linear-gradient(135deg, #f0f9ff 0%%, #e0f2fe 100%%);
+                        border-left: 4px solid #2563eb;
+                        padding: 20px;
+                        margin: 20px 0;
+                        border-radius: 6px;
+                    }
+                    .info-row {
+                        display: flex;
+                        justify-content: space-between;
+                        padding: 10px 0;
+                        border-bottom: 1px solid #e5e7eb;
+                    }
+                    .info-row:last-child {
+                        border-bottom: none;
+                    }
+                    .label {
+                        font-weight: bold;
+                        color: #1e40af;
+                    }
+                    .value {
+                        color: #333;
+                        text-align: right;
+                    }
+                    .plan-details {
+                        background-color: #fef3c7;
+                        border: 2px solid #f59e0b;
+                        padding: 20px;
+                        border-radius: 8px;
+                        margin: 25px 0;
+                    }
+                    .plan-details h3 {
+                        color: #d97706;
+                        margin-top: 0;
+                    }
+                    .plan-features {
+                        list-style: none;
+                        padding: 0;
+                    }
+                    .plan-features li {
+                        padding: 8px 0;
+                        padding-left: 25px;
+                        position: relative;
+                    }
+                    .plan-features li:before {
+                        content: "✓";
+                        position: absolute;
+                        left: 0;
+                        color: #059669;
+                        font-weight: bold;
+                        font-size: 18px;
+                    }
+                    .button {
+                        display: inline-block;
+                        padding: 15px 40px;
+                        background: linear-gradient(135deg, #2563eb 0%%, #1d4ed8 100%%);
+                        color: white !important;
+                        text-decoration: none;
+                        border-radius: 6px;
+                        margin: 20px 0;
+                        font-weight: bold;
+                        font-size: 16px;
+                        text-align: center;
+                    }
+                    .button:hover {
+                        background: linear-gradient(135deg, #1d4ed8 0%%, #1e40af 100%%);
+                    }
+                    .footer {
+                        text-align: center;
+                        color: #666;
+                        font-size: 12px;
+                        margin-top: 30px;
+                        padding-top: 20px;
+                        border-top: 2px solid #e5e7eb;
+                    }
+                    .support-box {
+                        background-color: #f3f4f6;
+                        padding: 15px;
+                        border-radius: 6px;
+                        margin-top: 20px;
+                        text-align: center;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="success-icon">✓</div>
+                        <h1>Paiement Confirmé !</h1>
+                        <p style="margin: 5px 0; font-size: 16px;">Votre abonnement est maintenant actif</p>
+                    </div>
+
+                    <div class="content">
+                        <h2 style="color: #1e40af;">Bonjour %s,</h2>
+
+                        <p style="font-size: 16px;">
+                            Nous avons bien reçu votre paiement. Votre abonnement <strong>%s</strong>
+                            est maintenant actif et vous pouvez profiter pleinement de toutes les fonctionnalités
+                            de Dija Saliou !
+                        </p>
+
+                        <div class="info-box">
+                            <h3 style="margin-top: 0; color: #1e40af;">📋 Détails de la transaction</h3>
+                            <div class="info-row">
+                                <span class="label">Entreprise :</span>
+                                <span class="value">%s</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Plan souscrit :</span>
+                                <span class="value">%s</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Montant payé :</span>
+                                <span class="value"><strong>%s</strong></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Date d'expiration :</span>
+                                <span class="value">%s</span>
+                            </div>
+                        </div>
+
+                        <div class="plan-details">
+                            <h3>🎉 Votre plan %s inclut :</h3>
+                            <ul class="plan-features">
+                                <li>Gestion complète des ventes, achats et stock</li>
+                                <li>Gestion des dépenses et des contacts</li>
+                                <li>Dashboard de suivi en temps réel</li>
+                                <li>Rapports et statistiques détaillés</li>
+                                <li>Export PDF des données</li>
+                                <li>Support technique prioritaire</li>
+                                <li>Sauvegardes automatiques quotidiennes</li>
+                            </ul>
+                        </div>
+
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="%s/dashboard" class="button">Accéder à mon espace</a>
+                        </div>
+
+                        <div class="support-box">
+                            <p style="margin: 5px 0;">
+                                <strong>Besoin d'aide ?</strong><br>
+                                Notre équipe support est à votre disposition :
+                                <a href="mailto:%s">%s</a>
+                            </p>
+                        </div>
+
+                        <p style="margin-top: 25px; font-size: 14px; color: #666;">
+                            💡 <strong>Astuce :</strong> Pensez à compléter les informations de votre entreprise
+                            dans les paramètres pour profiter pleinement de toutes les fonctionnalités.
+                        </p>
+                    </div>
+
+                    <div class="footer">
+                        <p><strong>Merci de votre confiance !</strong></p>
+                        <p>Cet email a été envoyé automatiquement suite à votre paiement.</p>
+                        <p>&copy; 2025 Dija Saliou - Gestion de Boutique - Tous droits réservés</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(
+                    userName,
+                    plan,
+                    nomEntreprise,
+                    plan,
+                    montantFormate,
+                    dateExpiration,
+                    plan,
+                    frontendUrl,
+                    supportEmail,
+                    supportEmail
+            );
+    }
+
+    /**
+     * Envoie un email d'alerte de stock faible
+     *
+     * @param toEmail Email de l'admin
+     * @param userName Nom de l'admin
+     * @param nomEntreprise Nom de l'entreprise
+     * @param nomProduit Nom du produit en rupture/stock faible
+     * @param stockActuel Stock actuel
+     * @param seuilAlerte Seuil qui a déclenché l'alerte (15, 10, 5, ou 0)
+     */
+    public void sendStockAlertEmail(String toEmail, String userName, String nomEntreprise,
+                                    String nomProduit, int stockActuel, int seuilAlerte) {
+        try {
+            String subject = getStockAlertSubject(stockActuel, nomProduit);
+
+            String htmlContent = buildStockAlertEmailContent(
+                    userName, nomEntreprise, nomProduit, stockActuel, seuilAlerte);
+
+            sendHtmlEmail(toEmail, subject, htmlContent);
+
+            log.info("Email d'alerte de stock envoyé à : {} pour le produit {} (stock: {})",
+                    toEmail, nomProduit, stockActuel);
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi de l'email d'alerte de stock à {}: {}",
+                    toEmail, e.getMessage());
+            // On ne throw pas pour ne pas bloquer le processus de vente
+        }
+    }
+
+    /**
+     * Génère le sujet de l'email selon le niveau de stock
+     */
+    private String getStockAlertSubject(int stockActuel, String nomProduit) {
+        if (stockActuel == 0) {
+            return "RUPTURE DE STOCK - " + nomProduit;
+        } else if (stockActuel <= 5) {
+            return "STOCK CRITIQUE - " + nomProduit + " (" + stockActuel + " restants)";
+        } else if (stockActuel <= 10) {
+            return "Stock faible - " + nomProduit + " (" + stockActuel + " restants)";
+        } else {
+            return "Alerte stock - " + nomProduit + " (" + stockActuel + " restants)";
+        }
+    }
+
+    /**
+     * Construit le contenu HTML de l'email d'alerte de stock
+     */
+    private String buildStockAlertEmailContent(String userName, String nomEntreprise,
+                                               String nomProduit, int stockActuel, int seuilAlerte) {
+        // Déterminer le niveau de criticité et le message
+        String criticite;
+        String couleurAlerte;
+        String icone;
+        String message;
+        String actionRecommandee;
+
+        if (stockActuel == 0) {
+            criticite = "RUPTURE DE STOCK";
+            couleurAlerte = "#dc2626"; // Rouge
+            icone = "ALERTE";
+            message = "Le produit <strong>" + nomProduit + "</strong> est en <strong>RUPTURE DE STOCK</strong>.";
+            actionRecommandee = "Réapprovisionner <strong>IMMÉDIATEMENT</strong> ce produit pour éviter de perdre des ventes.";
+        } else if (stockActuel <= 5) {
+            criticite = "STOCK CRITIQUE";
+            couleurAlerte = "#ea580c"; // Orange foncé
+            icone = "ATTENTION";
+            message = "Le produit <strong>" + nomProduit + "</strong> est en <strong>STOCK CRITIQUE</strong>.";
+            actionRecommandee = "Réapprovisionner ce produit <strong>dès que possible</strong> avant la rupture.";
+        } else if (stockActuel <= 10) {
+            criticite = "STOCK FAIBLE";
+            couleurAlerte = "#f59e0b"; // Orange
+            icone = "ATTENTION";
+            message = "Le produit <strong>" + nomProduit + "</strong> a un <strong>stock faible</strong>.";
+            actionRecommandee = "Prévoir un réapprovisionnement dans les prochains jours.";
+        } else {
+            criticite = "ALERTE STOCK";
+            couleurAlerte = "#3b82f6"; // Bleu
+            icone = "INFO";
+            message = "Le produit <strong>" + nomProduit + "</strong> approche du seuil de stock minimal.";
+            actionRecommandee = "Surveiller le stock et prévoir un réapprovisionnement.";
+        }
+
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                        color: #333;
+                        max-width: 700px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }
+                    .container {
+                        background-color: #f9f9f9;
+                        border-radius: 8px;
+                        padding: 30px;
+                        border: 1px solid #ddd;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        background: %s;
+                        color: white;
+                        padding: 30px;
+                        border-radius: 6px;
+                    }
+                    .header h1 {
+                        margin: 0;
+                        font-size: 28px;
+                    }
+                    .alert-icon {
+                        font-size: 20px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    }
+                    .content {
+                        background-color: white;
+                        padding: 30px;
+                        border-radius: 6px;
+                        margin-bottom: 20px;
+                    }
+                    .alert-box {
+                        background: linear-gradient(135deg, #fef2f2 0%%, #fee2e2 100%%);
+                        border-left: 4px solid %s;
+                        padding: 20px;
+                        margin: 20px 0;
+                        border-radius: 6px;
+                    }
+                    .stock-info {
+                        background-color: #f3f4f6;
+                        padding: 20px;
+                        border-radius: 6px;
+                        margin: 20px 0;
+                    }
+                    .info-row {
+                        display: flex;
+                        justify-content: space-between;
+                        padding: 10px 0;
+                        border-bottom: 1px solid #e5e7eb;
+                    }
+                    .info-row:last-child {
+                        border-bottom: none;
+                    }
+                    .label {
+                        font-weight: bold;
+                        color: #374151;
+                    }
+                    .value {
+                        color: #111827;
+                        text-align: right;
+                    }
+                    .stock-value {
+                        font-size: 36px;
+                        font-weight: bold;
+                        color: %s;
+                        text-align: center;
+                        margin: 20px 0;
+                    }
+                    .action-box {
+                        background: linear-gradient(135deg, #dbeafe 0%%, #bfdbfe 100%%);
+                        border-left: 4px solid #2563eb;
+                        padding: 20px;
+                        border-radius: 6px;
+                        margin: 25px 0;
+                    }
+                    .action-box h3 {
+                        color: #1e40af;
+                        margin-top: 0;
+                    }
+                    .button {
+                        display: inline-block;
+                        padding: 15px 40px;
+                        background: linear-gradient(135deg, #2563eb 0%%, #1d4ed8 100%%);
+                        color: white !important;
+                        text-decoration: none;
+                        border-radius: 6px;
+                        margin: 20px 0;
+                        font-weight: bold;
+                        font-size: 16px;
+                        text-align: center;
+                    }
+                    .footer {
+                        text-align: center;
+                        color: #666;
+                        font-size: 12px;
+                        margin-top: 30px;
+                        padding-top: 20px;
+                        border-top: 2px solid #e5e7eb;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="alert-icon">%s</div>
+                        <h1>%s</h1>
+                        <p style="margin: 5px 0; font-size: 16px;">%s</p>
+                    </div>
+
+                    <div class="content">
+                        <h2 style="color: #1e40af;">Bonjour %s,</h2>
+
+                        <p style="font-size: 16px;">
+                            %s
+                        </p>
+
+                        <div class="stock-value">
+                            %d unité%s en stock
+                        </div>
+
+                        <div class="stock-info">
+                            <h3 style="margin-top: 0; color: #374151;">Informations du produit</h3>
+                            <div class="info-row">
+                                <span class="label">Entreprise :</span>
+                                <span class="value">%s</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Produit :</span>
+                                <span class="value">%s</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Stock actuel :</span>
+                                <span class="value" style="color: %s; font-weight: bold;">%d unité%s</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Seuil d'alerte :</span>
+                                <span class="value">%d unités</span>
+                            </div>
+                        </div>
+
+                        <div class="alert-box">
+                            <p style="margin: 0; font-size: 15px;">
+                                <strong>Attention :</strong> Les ventes de ce produit risquent d'être bloquées
+                                si le stock n'est pas réapprovisionné rapidement.
+                            </p>
+                        </div>
+
+                        <div class="action-box">
+                            <h3>Action recommandée</h3>
+                            <p style="margin: 10px 0;">%s</p>
+                        </div>
+
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="%s/achats" class="button">Créer un achat</a>
+                        </div>
+
+                        <p style="margin-top: 25px; font-size: 14px; color: #666; text-align: center;">
+                            Cette alerte a été générée automatiquement par le système de gestion de stock.
+                        </p>
+                    </div>
+
+                    <div class="footer">
+                        <p>Cet email a été envoyé automatiquement par le système d'alerte de stock.</p>
+                        <p>&copy; 2025 Dija Saliou - Gestion de Boutique - Tous droits réservés</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(
+                    couleurAlerte,  // Header background
+                    couleurAlerte,  // Border alert-box
+                    couleurAlerte,  // Stock value color
+                    icone,  // Icône
+                    criticite,  // Titre
+                    nomEntreprise,  // Sous-titre
+                    userName,  // Bonjour
+                    message,  // Message principal
+                    stockActuel, stockActuel > 1 ? "s" : "",  // Stock actuel (avec pluriel)
+                    nomEntreprise,  // Info entreprise
+                    nomProduit,  // Info produit
+                    couleurAlerte, stockActuel, stockActuel > 1 ? "s" : "",  // Stock actuel dans le tableau
+                    seuilAlerte,  // Seuil d'alerte
+                    actionRecommandee,  // Action recommandée
+                    frontendUrl  // Lien vers achats
+            );
+    }
+
+    /**
      * Méthode générique pour envoyer un email HTML
      */
     private void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {

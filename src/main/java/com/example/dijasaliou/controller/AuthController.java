@@ -7,10 +7,13 @@ import com.example.dijasaliou.dto.PasswordResetResponse;
 import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.dto.ResetPasswordRequest;
 import com.example.dijasaliou.service.AuthService;
+import com.example.dijasaliou.service.RateLimitService;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -28,12 +31,14 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final RateLimitService rateLimitService;
 
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, RateLimitService rateLimitService) {
         this.authService = authService;
+        this.rateLimitService = rateLimitService;
     }
 
     /**
@@ -62,9 +67,18 @@ public class AuthController {
      * Le token JWT est maintenant stocké dans un cookie HttpOnly pour plus de sécurité
      */
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(
+    public ResponseEntity<?> register(
             @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) {
+
+        // SÉCURITÉ : Rate limiting pour éviter le spam de création de comptes
+        String ipAddress = getClientIpAddress(httpRequest);
+        if (!rateLimitService.allowRegister(ipAddress)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(java.util.Map.of("error", "Trop de tentatives de création de compte. Veuillez réessayer dans 1 heure."));
+        }
+
         AuthResponse authResponse = authService.register(request);
 
         // Créer un cookie HttpOnly sécurisé avec le JWT
@@ -100,10 +114,22 @@ public class AuthController {
      * Le token JWT est maintenant stocké dans un cookie HttpOnly pour plus de sécurité
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(
+    public ResponseEntity<?> login(
             @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) {
+
+        // SÉCURITÉ : Rate limiting pour éviter les attaques par force brute
+        String ipAddress = getClientIpAddress(httpRequest);
+        if (!rateLimitService.allowLogin(ipAddress)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(java.util.Map.of("error", "Trop de tentatives de connexion. Veuillez réessayer dans 1 minute."));
+        }
+
         AuthResponse authResponse = authService.login(request);
+
+        // SÉCURITÉ : Réinitialiser le compteur après un login réussi
+        rateLimitService.resetLoginAttempts(ipAddress);
 
         // Créer un cookie HttpOnly sécurisé avec le JWT
         Cookie jwtCookie = createJwtCookie(authResponse.getToken());
@@ -248,5 +274,29 @@ public class AuthController {
         // Note: SameSite=Strict est géré par le navigateur moderne par défaut
 
         return cookie;
+    }
+
+    /**
+     * Récupère l'adresse IP réelle du client
+     *
+     * IMPORTANT : Prend en compte les proxies et load balancers
+     * En production derrière un proxy (Heroku, CloudFlare, etc.),
+     * l'IP réelle est dans les headers X-Forwarded-For ou X-Real-IP
+     */
+    private String getClientIpAddress(HttpServletRequest request) {
+        String ipAddress = request.getHeader("X-Forwarded-For");
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("X-Real-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getRemoteAddr();
+        }
+
+        // Si plusieurs IPs dans X-Forwarded-For, prendre la première (client réel)
+        if (ipAddress != null && ipAddress.contains(",")) {
+            ipAddress = ipAddress.split(",")[0].trim();
+        }
+
+        return ipAddress != null ? ipAddress : "unknown";
     }
 }

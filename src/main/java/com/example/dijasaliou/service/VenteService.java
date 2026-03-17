@@ -21,11 +21,16 @@ public class VenteService {
     private final VenteRepository venteRepository;
     private final StockService stockService;
     private final TenantService tenantService;
+    private final StockAlertService stockAlertService;
 
-    public VenteService(VenteRepository venteRepository, @Lazy StockService stockService, TenantService tenantService) {
+    public VenteService(VenteRepository venteRepository,
+                        @Lazy StockService stockService,
+                        TenantService tenantService,
+                        StockAlertService stockAlertService) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
         this.tenantService = tenantService;
+        this.stockAlertService = stockAlertService;
     }
 
     /**
@@ -75,7 +80,19 @@ public class VenteService {
             vente.calculerPrixTotal();
         }
 
-        return venteRepository.save(vente);
+        // Sauvegarder la vente
+        VenteEntity venteSauvegardee = venteRepository.save(vente);
+
+        // ALERTE DE STOCK : Vérifier le stock après la vente et envoyer une alerte si nécessaire
+        // (uniquement pour le plan ENTREPRISE)
+        try {
+            stockAlertService.verifierEtEnvoyerAlerte(vente.getNomProduit());
+        } catch (Exception e) {
+            // Ne pas bloquer la vente si l'envoi d'alerte échoue
+            // L'erreur est déjà loguée dans StockAlertService
+        }
+
+        return venteSauvegardee;
     }
 
     /**
@@ -101,6 +118,7 @@ public class VenteService {
         venteExistante.setDateVente(venteModifiee.getDateVente());
         venteExistante.setClient(venteModifiee.getClient());
         venteExistante.setUtilisateur(venteModifiee.getUtilisateur());
+        venteExistante.setUnite(venteModifiee.getUnite());
 
         // Si le produit a changé, récupérer automatiquement la photo du nouveau produit depuis le stock
         if (produitChange) {

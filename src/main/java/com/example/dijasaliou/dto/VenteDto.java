@@ -1,5 +1,6 @@
 package com.example.dijasaliou.dto;
 
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,6 +32,7 @@ public class VenteDto {
     private LocalDate dateVente;
     private String client;
     private String photoUrl;
+    private String unite;
 
     // Informations sur l'utilisateur qui a créé la vente
     private UserDto utilisateur;
@@ -43,11 +45,17 @@ public class VenteDto {
 
     /**
      * Convertit une entité Vente en DTO
+     *
+     * RESTRICTION : photoUrl n'est retourné que pour le plan ENTERPRISE
      */
     public static VenteDto fromEntity(VenteEntity vente) {
         if (vente == null) {
             return null;
         }
+
+        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        boolean canViewPhotos = vente.getTenant() != null &&
+                                vente.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE;
 
         return VenteDto.builder()
                 .id(vente.getId())
@@ -57,7 +65,8 @@ public class VenteDto {
                 .prixTotal(vente.getPrixTotal())
                 .dateVente(vente.getDateVente())
                 .client(vente.getClient())
-                .photoUrl(vente.getPhotoUrl())
+                .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
+                .unite(vente.getUnite())
                 .utilisateur(UserDto.fromEntityMinimal(vente.getUtilisateur()))
                 .estRecente(vente.estRecente())
                 .mois(vente.getMois())
@@ -68,11 +77,17 @@ public class VenteDto {
 
     /**
      * Version sans utilisateur (pour certains contextes)
+     *
+     * RESTRICTION : photoUrl n'est retourné que pour le plan ENTERPRISE
      */
     public static VenteDto fromEntityWithoutUser(VenteEntity vente) {
         if (vente == null) {
             return null;
         }
+
+        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        boolean canViewPhotos = vente.getTenant() != null &&
+                                vente.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE;
 
         return VenteDto.builder()
                 .id(vente.getId())
@@ -82,7 +97,8 @@ public class VenteDto {
                 .prixTotal(vente.getPrixTotal())
                 .dateVente(vente.getDateVente())
                 .client(vente.getClient())
-                .photoUrl(vente.getPhotoUrl())
+                .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
+                .unite(vente.getUnite())
                 .estRecente(vente.estRecente())
                 .mois(vente.getMois())
                 .annee(vente.getAnnee())

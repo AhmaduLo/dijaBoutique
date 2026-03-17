@@ -1,8 +1,11 @@
 package com.example.dijasaliou.repository;
 
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -43,5 +46,12 @@ public interface AchatRepository extends JpaRepository<AchatEntity, Long> {
      * Supprimer tous les achats d'un utilisateur
      */
     void deleteByUtilisateur(UserEntity utilisateur);
+
+    /**
+     * Calculer le total des quantités achetées pour un produit et un tenant
+     * Utilisé pour le calcul de stock
+     */
+    @Query("SELECT SUM(a.quantite) FROM AchatEntity a WHERE a.nomProduit = :nomProduit AND a.tenant = :tenant")
+    Integer sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
 
 }
