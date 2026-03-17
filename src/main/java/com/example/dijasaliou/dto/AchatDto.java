@@ -33,6 +33,7 @@ public class AchatDto {
     private String fournisseur;
     private BigDecimal prixVenteSuggere;
     private String photoUrl;
+    private String unite;
 
     // Informations sur l'utilisateur qui a créé l'achat
     private UserDto utilisateur;
@@ -66,6 +67,7 @@ public class AchatDto {
                 .fournisseur(achat.getFournisseur())
                 .prixVenteSuggere(achat.getPrixVenteSuggere())
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
+                .unite(achat.getUnite())
                 .utilisateur(UserDto.fromEntityMinimal(achat.getUtilisateur()))
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
@@ -97,6 +99,7 @@ public class AchatDto {
                 .fournisseur(achat.getFournisseur())
                 .prixVenteSuggere(achat.getPrixVenteSuggere())
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
+                .unite(achat.getUnite())
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
                 .annee(achat.getAnnee())

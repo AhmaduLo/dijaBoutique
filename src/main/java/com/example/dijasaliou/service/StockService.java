@@ -212,6 +212,12 @@ public class StockService {
         boolean canViewPhotos = currentTenant != null &&
                                 currentTenant.getPlan() == TenantEntity.Plan.ENTREPRISE;
 
+        // Récupérer le dernier achat (le plus récent) pour la photo et l'unité
+        AchatEntity dernierAchat = achats.stream()
+                .sorted(Comparator.comparing(AchatEntity::getDateAchat).reversed())
+                .findFirst()
+                .orElse(null);
+
         // Récupérer la photo du dernier achat (le plus récent avec une photo)
         // RESTRICTION : null si le plan n'est pas ENTERPRISE
         String photoUrl = null;
@@ -224,9 +230,13 @@ public class StockService {
                     .orElse(null);
         }
 
+        // Récupérer l'unité depuis le dernier achat
+        String unite = dernierAchat != null ? dernierAchat.getUnite() : "pièce";
+
         return StockDto.builder()
                 .nomProduit(nomProduit)
                 .photoUrl(photoUrl)
+                .unite(unite)
                 .quantiteAchetee(quantiteAchetee)
                 .quantiteVendue(quantiteVendue)
                 .stockDisponible(stockDisponible)

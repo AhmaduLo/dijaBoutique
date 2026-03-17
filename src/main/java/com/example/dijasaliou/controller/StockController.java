@@ -235,6 +235,7 @@ public class StockController {
                     produit.put("stockDisponible", stock.getStockDisponible());
                     produit.put("prixMoyenVente", stock.getPrixMoyenVente());
                     produit.put("statut", stock.getStatut());
+                    produit.put("unite", stock.getUnite());
                     return produit;
                 })
                 .toList();

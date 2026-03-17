@@ -126,6 +126,7 @@ public class AchatService {
         achatExistant.setFournisseur(achatModifie.getFournisseur());
         achatExistant.setUtilisateur(achatModifie.getUtilisateur());
         achatExistant.setPhotoUrl(achatModifie.getPhotoUrl());
+        achatExistant.setUnite(achatModifie.getUnite());
 
         // NOTE : On ne modifie PAS le tenant pour des raisons de sécurité
         // Le tenant est défini à la création et ne change jamais

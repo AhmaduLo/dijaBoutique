@@ -118,6 +118,7 @@ public class VenteService {
         venteExistante.setDateVente(venteModifiee.getDateVente());
         venteExistante.setClient(venteModifiee.getClient());
         venteExistante.setUtilisateur(venteModifiee.getUtilisateur());
+        venteExistante.setUnite(venteModifiee.getUnite());
 
         // Si le produit a changé, récupérer automatiquement la photo du nouveau produit depuis le stock
         if (produitChange) {

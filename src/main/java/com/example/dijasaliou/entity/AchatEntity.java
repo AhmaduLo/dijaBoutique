@@ -86,6 +86,11 @@ public class AchatEntity extends BaseEntity{
     @Column(name = "photo_url", length = 500)
     private String photoUrl;
 
+    @Size(max = 20, message = "L'unité ne peut dépasser 20 caractères")
+    @Column(name = "unite", length = 20)
+    @Builder.Default
+    private String unite = "pièce";
+
     /**
      * Relation Many-to-One avec Utilisateur
      * <p>
