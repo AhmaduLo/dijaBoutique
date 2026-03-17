@@ -43,21 +43,13 @@ public class SecurityHeadersConfig implements Filter {
         }
 
         // Content-Security-Policy : Prévient les attaques XSS
-        // default-src 'self' : Par défaut, autorise uniquement les ressources du même domaine
-        // script-src 'self' 'unsafe-inline' : Scripts du même domaine + inline (Angular nécessite unsafe-inline)
-        // style-src 'self' 'unsafe-inline' : CSS du même domaine + inline
-        // img-src 'self' data: blob: : Images du même domaine + data URLs + blob URLs
-        // font-src 'self' data: : Polices du même domaine + data URLs
-        // connect-src 'self' https://api.stripe.com : API du même domaine + Stripe
-        // frame-ancestors 'none' : Empêche l'iframe (clickjacking)
         httpResponse.setHeader("Content-Security-Policy",
                 "default-src 'self'; " +
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; " +
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
                 "style-src 'self' 'unsafe-inline'; " +
                 "img-src 'self' data: blob: https:; " +
                 "font-src 'self' data:; " +
-                "connect-src 'self' https://api.stripe.com; " +
-                "frame-src https://js.stripe.com https://hooks.stripe.com; " +
+                "connect-src 'self'; " +
                 "frame-ancestors 'none'; " +
                 "base-uri 'self'; " +
                 "form-action 'self'");
@@ -85,7 +77,7 @@ public class SecurityHeadersConfig implements Filter {
                 "geolocation=(), " +
                 "microphone=(), " +
                 "camera=(), " +
-                "payment=(), " +  // Stripe gère les paiements côté serveur
+                "payment=(), " +
                 "usb=(), " +
                 "magnetometer=(), " +
                 "gyroscope=(), " +

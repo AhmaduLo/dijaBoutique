@@ -64,11 +64,10 @@ public class SecurityConfig {
                         // Route de suppression de compte - ADMIN uniquement
                         .requestMatchers("/auth/delete-account").hasAuthority("ADMIN")
 
-                        // Routes de paiement publiques (webhooks Stripe et Wave)
-                        .requestMatchers("/payment/webhook").permitAll() // Webhook Stripe
+                        // Routes de paiement publiques (webhook Wave)
                         .requestMatchers("/payment/wave/webhook").permitAll() // Webhook Wave
                         // Autres routes de paiement publiques
-                        .requestMatchers("/payment/config", "/payment/plans").permitAll()
+                        .requestMatchers("/payment/plans").permitAll()
                         // Routes de paiement nécessitant l'authentification
                         .requestMatchers("/payment/**").authenticated()
 

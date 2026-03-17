@@ -42,7 +42,6 @@ public class AuthService {
     private final AchatRepository achatRepository;
     private final VenteRepository venteRepository;
     private final DepenseRepository depenseRepository;
-    private final StripeService stripeService;
 
     public AuthService(UserRepository userRepository,
                        TenantRepository tenantRepository,
@@ -52,8 +51,7 @@ public class AuthService {
                        EmailService emailService,
                        AchatRepository achatRepository,
                        VenteRepository venteRepository,
-                       DepenseRepository depenseRepository,
-                       StripeService stripeService) {
+                       DepenseRepository depenseRepository) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
@@ -63,7 +61,6 @@ public class AuthService {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
         this.depenseRepository = depenseRepository;
-        this.stripeService = stripeService;
     }
 
     /**
