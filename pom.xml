@@ -104,6 +104,12 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Cloudinary pour le stockage cloud des images -->
+        <dependency>
+            <groupId>com.cloudinary</groupId>
+            <artifactId>cloudinary-http44</artifactId>
+            <version>1.38.0</version>
+        </dependency>
         <!-- Bucket4j pour le rate limiting (protection contre brute force) -->
         <dependency>
             <groupId>com.bucket4j</groupId>

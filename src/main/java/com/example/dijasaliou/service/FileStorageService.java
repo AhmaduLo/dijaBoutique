@@ -1,221 +1,166 @@
 package com.example.dijasaliou.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.example.dijasaliou.entity.TenantEntity;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * Service de gestion des fichiers uploadés (photos de produits)
+ * Service de gestion des photos via Cloudinary (stockage cloud)
  *
- * Fonctionnalités :
- * - Upload de photos avec validation
- * - Redimensionnement automatique des images
- * - Stockage organisé par tenant
- * - Suppression sécurisée
- * - Génération d'URLs relatives
+ * Les photos sont stockées sur Cloudinary dans la structure :
+ * dijasaliou/{tenant_uuid}/{type}/{public_id}
  *
- * Structure de stockage :
- * uploads/photos/{tenant_uuid}/achats/2024-01-15_sac-riz_abc123.jpg
- * uploads/photos/{tenant_uuid}/ventes/2024-01-16_huile-5l_def456.jpg
+ * Les URLs retournées sont des URLs Cloudinary CDN :
+ * https://res.cloudinary.com/dkgvinoos/image/upload/...
  */
 @Service
 @Slf4j
 public class FileStorageService {
 
-    @Value("${file.upload.dir:uploads/photos}")
-    private String uploadDir;
-
-    @Value("${file.max-size:5242880}") // 5 MB par défaut
+    @Value("${file.max-size:5242880}")
     private long maxFileSize;
 
-    @Value("${image.max-width:800}")
-    private int maxWidth;
+    private final Cloudinary cloudinary;
 
-    @Value("${image.max-height:800}")
-    private int maxHeight;
-
-    // Extensions autorisées pour les photos
     private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "webp");
-
-    // Types MIME autorisés
     private static final List<String> ALLOWED_MIME_TYPES = Arrays.asList(
             "image/jpeg", "image/png", "image/webp"
     );
 
-    /**
-     * Initialise le répertoire de stockage au démarrage
-     */
-    @PostConstruct
-    public void init() {
-        try {
-            Path uploadPath = Paths.get(uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-                log.info("Répertoire de stockage créé : {}", uploadPath.toAbsolutePath());
-            } else {
-                log.info("Répertoire de stockage existant : {}", uploadPath.toAbsolutePath());
-            }
-        } catch (IOException e) {
-            log.error("Impossible de créer le répertoire de stockage : {}", e.getMessage());
-            throw new RuntimeException("Erreur lors de l'initialisation du stockage de fichiers", e);
-        }
+    public FileStorageService(
+            @Value("${cloudinary.cloud-name}") String cloudName,
+            @Value("${cloudinary.api-key}") String apiKey,
+            @Value("${cloudinary.api-secret}") String apiSecret) {
+        this.cloudinary = new Cloudinary(ObjectUtils.asMap(
+                "cloud_name", cloudName,
+                "api_key", apiKey,
+                "api_secret", apiSecret,
+                "secure", true
+        ));
+        log.info("Cloudinary initialisé (cloud: {})", cloudName);
     }
 
     /**
-     * Upload une photo de produit
+     * Upload une photo sur Cloudinary
      *
-     * @param file    Le fichier uploadé
-     * @param tenant  Le tenant propriétaire
-     * @param type    Type de photo (achats, ventes, produits)
-     * @return URL relative de la photo : /api/files/photos/{tenant_uuid}/achats/photo.jpg
+     * @param file   Le fichier image
+     * @param tenant Le tenant propriétaire
+     * @param type   Type : achats, ventes, produits
+     * @return URL Cloudinary CDN de la photo
      */
     public String uploadPhoto(MultipartFile file, TenantEntity tenant, String type) {
-        // 1. Validations
         validateFile(file);
 
-        // 2. Créer le répertoire du tenant si nécessaire
         String tenantUuid = tenant.getTenantUuid();
-        Path tenantPath = Paths.get(uploadDir, tenantUuid, type);
-        try {
-            Files.createDirectories(tenantPath);
-        } catch (IOException e) {
-            log.error("Erreur lors de la création du répertoire tenant : {}", e.getMessage());
-            throw new RuntimeException("Erreur lors de la création du répertoire", e);
-        }
-
-        // 3. Générer un nom de fichier unique
-        String fileName = generateFileName(file.getOriginalFilename());
-
-        // 4. Chemin complet du fichier
-        Path filePath = tenantPath.resolve(fileName);
+        String folder = "dijasaliou/" + tenantUuid + "/" + type;
+        String publicId = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
 
         try {
-            // 5. Optimiser l'image (redimensionnement si trop grande)
-            BufferedImage optimizedImage = optimizeImage(file);
+            Map<String, Object> params = ObjectUtils.asMap(
+                    "folder", folder,
+                    "public_id", publicId,
+                    "resource_type", "image",
+                    "quality", "auto:good",
+                    "fetch_format", "auto",
+                    "width", 800,
+                    "height", 800,
+                    "crop", "limit"
+            );
 
-            // 6. Sauvegarder l'image optimisée
-            String extension = getFileExtension(file.getOriginalFilename());
-            ImageIO.write(optimizedImage, extension.equals("png") ? "PNG" : "JPEG", filePath.toFile());
+            Map result = cloudinary.uploader().upload(file.getBytes(), params);
+            String url = (String) result.get("secure_url");
 
-            log.info("Photo uploadée avec succès : {} (Tenant: {}, Type: {})",
-                    fileName, tenantUuid, type);
+            log.info("Photo uploadée sur Cloudinary : {} (Tenant: {}, Type: {})", url, tenantUuid, type);
 
-            // 7. Retourner l'URL relative
-            return String.format("/api/files/photos/%s/%s/%s", tenantUuid, type, fileName);
+            return url;
 
         } catch (IOException e) {
-            log.error("Erreur lors de l'upload de la photo : {}", e.getMessage());
+            log.error("Erreur lors de l'upload sur Cloudinary : {}", e.getMessage());
             throw new RuntimeException("Erreur lors de l'upload de la photo", e);
         }
     }
 
     /**
-     * Supprime une photo
+     * Supprime une photo de Cloudinary
      *
-     * @param photoUrl URL de la photo à supprimer
-     * @param tenant   Le tenant propriétaire (pour vérification de sécurité)
+     * @param photoUrl URL Cloudinary de la photo
+     * @param tenant   Le tenant propriétaire (vérification de sécurité)
      */
     public void deletePhoto(String photoUrl, TenantEntity tenant) {
         if (photoUrl == null || photoUrl.isEmpty()) {
             return;
         }
 
+        if (!photoUrl.contains(tenant.getTenantUuid())) {
+            throw new SecurityException("Vous ne pouvez pas supprimer la photo d'un autre tenant");
+        }
+
         try {
-            // Extraire le chemin relatif depuis l'URL
-            // Format : /api/files/photos/{tenant_uuid}/achats/photo.jpg
-            String[] parts = photoUrl.split("/photos/");
-            if (parts.length != 2) {
-                log.warn("Format d'URL invalide : {}", photoUrl);
-                return;
+            String publicId = extractPublicId(photoUrl);
+            if (publicId != null) {
+                cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+                log.info("Photo supprimée de Cloudinary : {} (Tenant: {})", publicId, tenant.getTenantUuid());
             }
-
-            // Vérifier que le tenant correspond (sécurité)
-            if (!photoUrl.contains(tenant.getTenantUuid())) {
-                log.error("Tentative de suppression d'une photo d'un autre tenant ! Tenant: {}, URL: {}",
-                        tenant.getTenantUuid(), photoUrl);
-                throw new SecurityException("Vous ne pouvez pas supprimer la photo d'un autre tenant");
-            }
-
-            // Construire le chemin complet
-            Path filePath = Paths.get(uploadDir, parts[1]);
-
-            // Supprimer le fichier
-            Files.deleteIfExists(filePath);
-
-            log.info("Photo supprimée : {} (Tenant: {})", photoUrl, tenant.getTenantUuid());
-
         } catch (IOException e) {
             log.error("Erreur lors de la suppression de la photo : {}", e.getMessage());
-            // Ne pas lever d'exception, la suppression de fichier n'est pas critique
         }
     }
 
     /**
-     * Récupère une photo (pour la servir via HTTP)
-     *
-     * @param tenantUuid UUID du tenant
-     * @param type       Type de photo (achats, ventes, produits)
-     * @param fileName   Nom du fichier
-     * @return Le fichier sous forme de byte[]
+     * Extrait le public_id depuis une URL Cloudinary
+     * URL format : https://res.cloudinary.com/{cloud}/image/upload/v123/{folder}/{id}.jpg
+     * → dijasaliou/{tenant_uuid}/{type}/{id}
      */
-    public byte[] getPhoto(String tenantUuid, String type, String fileName) throws IOException {
-        Path filePath = Paths.get(uploadDir, tenantUuid, type, fileName);
-
-        if (!Files.exists(filePath)) {
-            throw new IOException("Photo introuvable : " + fileName);
+    private String extractPublicId(String cloudinaryUrl) {
+        try {
+            String[] parts = cloudinaryUrl.split("/upload/");
+            if (parts.length < 2) return null;
+            String path = parts[1].replaceFirst("^v\\d+/", "");
+            int lastDot = path.lastIndexOf('.');
+            if (lastDot > 0) {
+                path = path.substring(0, lastDot);
+            }
+            return path;
+        } catch (Exception e) {
+            log.warn("Impossible d'extraire le public_id de l'URL : {}", cloudinaryUrl);
+            return null;
         }
-
-        return Files.readAllBytes(filePath);
     }
 
-    /**
-     * Valide le fichier uploadé
-     */
     private void validateFile(MultipartFile file) {
-        // 1. Vérifier que le fichier n'est pas vide
         if (file.isEmpty()) {
             throw new IllegalArgumentException("Le fichier est vide");
         }
 
-        // 2. Vérifier la taille
         if (file.getSize() > maxFileSize) {
             throw new IllegalArgumentException(
                     String.format("Le fichier est trop volumineux (max %d MB)", maxFileSize / 1024 / 1024)
             );
         }
 
-        // 3. Vérifier l'extension
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
             throw new IllegalArgumentException("Le nom du fichier est invalide");
         }
-        String fileName = StringUtils.cleanPath(originalFilename);
-        String extension = getFileExtension(fileName);
+
+        String extension = getFileExtension(StringUtils.cleanPath(originalFilename));
         if (!ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
             throw new IllegalArgumentException(
-                    "Extension de fichier non autorisée. Extensions acceptées : " + ALLOWED_EXTENSIONS
+                    "Extension non autorisée. Extensions acceptées : " + ALLOWED_EXTENSIONS
             );
         }
 
-        // 4. Vérifier le type MIME (sécurité renforcée)
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType.toLowerCase())) {
             throw new IllegalArgumentException(
@@ -224,85 +169,9 @@ public class FileStorageService {
         }
     }
 
-    /**
-     * Génère un nom de fichier unique
-     *
-     * Format : 2024-01-15_produit-nom_abc123.jpg
-     */
-    private String generateFileName(String originalFilename) {
-        String extension = getFileExtension(originalFilename);
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss"));
-        String uniqueId = UUID.randomUUID().toString().substring(0, 8);
-
-        // Nettoyer le nom original (garder seulement les caractères alphanumériques)
-        String baseName = originalFilename
-                .replaceAll("\\.[^.]*$", "") // Enlever l'extension
-                .replaceAll("[^a-zA-Z0-9-]", "-") // Remplacer caractères spéciaux par -
-                .toLowerCase();
-        baseName = baseName.substring(0, Math.min(20, baseName.length())); // Max 20 caractères
-
-        return String.format("%s_%s_%s.%s", timestamp, baseName, uniqueId, extension);
-    }
-
-    /**
-     * Extrait l'extension d'un nom de fichier
-     */
     private String getFileExtension(String fileName) {
         int lastDot = fileName.lastIndexOf('.');
-        if (lastDot == -1) {
-            return "";
-        }
+        if (lastDot == -1) return "";
         return fileName.substring(lastDot + 1).toLowerCase();
-    }
-
-    /**
-     * Optimise une image (redimensionnement si trop grande)
-     *
-     * @param file Le fichier image
-     * @return L'image optimisée
-     */
-    private BufferedImage optimizeImage(MultipartFile file) throws IOException {
-        // 1. Lire l'image originale
-        BufferedImage originalImage;
-        try (InputStream inputStream = file.getInputStream()) {
-            originalImage = ImageIO.read(inputStream);
-        }
-
-        if (originalImage == null) {
-            throw new IOException("Impossible de lire l'image. Fichier corrompu ?");
-        }
-
-        // 2. Calculer les nouvelles dimensions si nécessaire
-        int originalWidth = originalImage.getWidth();
-        int originalHeight = originalImage.getHeight();
-
-        // Si l'image est déjà petite, pas besoin de redimensionner
-        if (originalWidth <= maxWidth && originalHeight <= maxHeight) {
-            return originalImage;
-        }
-
-        // 3. Calculer le ratio pour garder les proportions
-        double widthRatio = (double) maxWidth / originalWidth;
-        double heightRatio = (double) maxHeight / originalHeight;
-        double ratio = Math.min(widthRatio, heightRatio);
-
-        int newWidth = (int) (originalWidth * ratio);
-        int newHeight = (int) (originalHeight * ratio);
-
-        // 4. Redimensionner l'image avec une bonne qualité
-        BufferedImage resizedImage = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB);
-        Graphics2D graphics = resizedImage.createGraphics();
-
-        // Configuration pour une bonne qualité de redimensionnement
-        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        graphics.drawImage(originalImage, 0, 0, newWidth, newHeight, null);
-        graphics.dispose();
-
-        log.debug("Image redimensionnée : {}x{} → {}x{}", originalWidth, originalHeight, newWidth, newHeight);
-
-        return resizedImage;
     }
 }

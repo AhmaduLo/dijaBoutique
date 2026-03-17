@@ -40,3 +40,4 @@ uploads/
 
 ### Variables d'environnement (secrets) ###
 .env
+src/main/resources/application-local.properties
