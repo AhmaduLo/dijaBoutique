@@ -2,6 +2,7 @@ package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.BonLivraisonDto;
 import com.example.dijasaliou.dto.CreateBonLivraisonRequest;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.service.BonLivraisonService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
 import java.util.Map;
 
 /**
@@ -37,9 +40,16 @@ public class BonLivraisonController {
     }
 
     @GetMapping
-    public ResponseEntity<List<BonLivraisonDto>> getTous(Authentication auth) {
+    public ResponseEntity<PagedResponse<BonLivraisonDto>> getTous(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "TOUS") String statut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+            Authentication auth) {
         log.info("[BL] {} consulte les bons de livraison", auth.getName());
-        return ResponseEntity.ok(bonLivraisonService.getTous());
+        return ResponseEntity.ok(bonLivraisonService.getTousPagines(page, size, search, statut, dateDebut, dateFin));
     }
 
     @GetMapping("/{id}")

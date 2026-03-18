@@ -81,16 +81,20 @@ public class StockService {
      * @return Stock du produit
      */
     public StockDto obtenirStockParNomProduit(String nomProduit) {
-        String nomProduitNormalise = nomProduit.toLowerCase().trim();
+        // Requêtes ciblées au lieu de findAll() + filter en mémoire
+        List<AchatEntity> achats = achatRepository.findByNomProduit(nomProduit);
+        List<VenteEntity> ventes = venteRepository.findByNomProduit(nomProduit);
 
-        // Récupérer les achats et ventes pour ce produit
-        List<AchatEntity> achats = achatRepository.findAll().stream()
-                .filter(a -> a.getNomProduit().toLowerCase().trim().equals(nomProduitNormalise))
-                .collect(Collectors.toList());
-
-        List<VenteEntity> ventes = venteRepository.findAll().stream()
-                .filter(v -> v.getNomProduit().toLowerCase().trim().equals(nomProduitNormalise))
-                .collect(Collectors.toList());
+        // Fallback insensible à la casse si rien trouvé avec le nom exact
+        if (achats.isEmpty() && ventes.isEmpty()) {
+            String nomNormalise = nomProduit.toLowerCase().trim();
+            achats = achatRepository.findByNomProduitContaining(nomProduit).stream()
+                    .filter(a -> a.getNomProduit().toLowerCase().trim().equals(nomNormalise))
+                    .collect(Collectors.toList());
+            ventes = venteRepository.findByNomProduitContaining(nomProduit).stream()
+                    .filter(v -> v.getNomProduit().toLowerCase().trim().equals(nomNormalise))
+                    .collect(Collectors.toList());
+        }
 
         if (achats.isEmpty() && ventes.isEmpty()) {
             throw new RuntimeException("Produit non trouvé : " + nomProduit);

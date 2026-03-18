@@ -1,5 +1,6 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
@@ -35,15 +36,16 @@ public class VenteController {
     }
 
     /**
-     * GET /api/ventes
+     * GET /api/ventes?page=0&size=20&search=xxx&dateDebut=2025-01-01&dateFin=2025-12-31
      */
     @GetMapping
-    public ResponseEntity<List<VenteDto>> obtenirTous() {
-        List<VenteEntity> ventes = venteService.obtenirToutesLesVentes();
-        List<VenteDto> ventesDto = ventes.stream()
-                .map(VenteDto::fromEntity)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(ventesDto);
+    public ResponseEntity<PagedResponse<VenteDto>> obtenirTous(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin) {
+        return ResponseEntity.ok(venteService.obtenirVentesPaginees(page, size, search, dateDebut, dateFin));
     }
 
     /**
@@ -99,27 +101,19 @@ public class VenteController {
     }
 
     /**
-     * GET /api/ventes/utilisateur/{utilisateurId}
-     * Récupérer toutes les ventes d'un utilisateur spécifique
-     *
-     * Exemple : GET /api/ventes/utilisateur/1
+     * GET /api/ventes/utilisateur/{utilisateurId}?page=0&size=20&search=xxx&dateDebut=...&dateFin=...
      */
     @GetMapping("/utilisateur/{utilisateurId}")
-    public ResponseEntity<List<VenteDto>> obtenirVentesParUtilisateur(
-            @PathVariable Long utilisateurId) {
+    public ResponseEntity<PagedResponse<VenteDto>> obtenirVentesParUtilisateur(
+            @PathVariable Long utilisateurId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin) {
 
-        // Récupérer l'utilisateur
         UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
-
-        // Récupérer ses ventes
-        List<VenteEntity> ventes = venteService.obtenirVentesParUtilisateur(utilisateur);
-
-        // Convertir en DTOs
-        List<VenteDto> ventesDto = ventes.stream()
-                .map(VenteDto::fromEntity)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(ventesDto);
+        return ResponseEntity.ok(venteService.obtenirVentesParUtilisateurPaginees(utilisateur, page, size, search, dateDebut, dateFin));
     }
 
     /**

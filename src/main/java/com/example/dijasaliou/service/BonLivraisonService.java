@@ -2,16 +2,21 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.BonLivraisonDto;
 import com.example.dijasaliou.dto.CreateBonLivraisonRequest;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.BonLivraisonEntity;
 import com.example.dijasaliou.entity.LigneBLEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.BonLivraisonRepository;
 import com.example.dijasaliou.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -41,6 +46,23 @@ public class BonLivraisonService {
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Retourne les bons de livraison paginés avec filtre statut, recherche et plage de dates optionnels
+     */
+    public PagedResponse<BonLivraisonDto> getTousPagines(int page, int size, String search, String statut, LocalDate dateDebut, LocalDate dateFin) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
+        String searchParam = (search != null && !search.isBlank()) ? search : null;
+        BonLivraisonEntity.Statut statutParam = null;
+        if (statut != null && !statut.isBlank() && !statut.equals("TOUS")) {
+            try { statutParam = BonLivraisonEntity.Statut.valueOf(statut); } catch (IllegalArgumentException ignored) { /* valeur inconnue → pas de filtre statut */ }
+        }
+        LocalDateTime debutDT = (dateDebut != null) ? dateDebut.atStartOfDay() : null;
+        LocalDateTime finDT = (dateFin != null) ? dateFin.atTime(23, 59, 59) : null;
+        Page<BonLivraisonEntity> blPage = bonLivraisonRepository.findAllWithSearch(statutParam, searchParam, debutDT, finDT, pageable);
+        Page<BonLivraisonDto> dtoPage = blPage.map(this::toDto);
+        return PagedResponse.from(dtoPage);
     }
 
     /**

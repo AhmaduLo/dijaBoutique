@@ -1,9 +1,14 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.DepenseDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.DepenseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.DepenseRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -26,10 +31,29 @@ public class DepenseService {
 
 
     /**
-     * Récupérer toutes les dépenses
+     * Récupérer toutes les dépenses (pour rapports/export)
      */
     public List<DepenseEntity> obtenirToutesLesDepenses() {
         return depenseRepository.findAll();
+    }
+
+    /**
+     * Récupérer les dépenses paginées avec recherche et filtre catégorie optionnels
+     */
+    public PagedResponse<DepenseDto> obtenirDepensesPaginees(int page, int size, String search, String categorie) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateDepense"));
+        String searchParam = (search != null && !search.isBlank()) ? search : null;
+        DepenseEntity.CategorieDepense categorieParam = null;
+        if (categorie != null && !categorie.isBlank()) {
+            try {
+                categorieParam = DepenseEntity.CategorieDepense.valueOf(categorie);
+            } catch (IllegalArgumentException e) {
+                // Valeur inconnue : pas de filtre catégorie
+            }
+        }
+        Page<DepenseEntity> depensesPage = depenseRepository.findAllWithSearch(searchParam, categorieParam, pageable);
+        Page<DepenseDto> dtoPage = depensesPage.map(DepenseDto::fromEntity);
+        return PagedResponse.from(dtoPage);
     }
 
     /**

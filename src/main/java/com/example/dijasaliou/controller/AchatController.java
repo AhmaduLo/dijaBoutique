@@ -1,6 +1,7 @@
 package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.AchatDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.ProduitPourVenteDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.UserEntity;
@@ -40,20 +41,16 @@ public class AchatController {
     }
 
     /**
-     * ROUTE 1 : Récupérer tous les achats
-     *
-     * URL : GET http://localhost:8080/api/achats
-     *
-     * @GetMapping : Dit que c'est une route GET (lecture)
-     * @return Liste de tous les achats en JSON avec informations utilisateur
+     * GET /api/achats?page=0&size=20&search=xxx&dateDebut=2025-01-01&dateFin=2025-12-31
      */
     @GetMapping
-    public ResponseEntity<List<AchatDto>> obtenirTous() {
-        List<AchatEntity> achats = achatService.obtenirTousLesAchats();
-        List<AchatDto> achatsDto = achats.stream()
-                .map(AchatDto::fromEntity)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(achatsDto);
+    public ResponseEntity<PagedResponse<AchatDto>> obtenirTous(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin) {
+        return ResponseEntity.ok(achatService.obtenirAchatsPagines(page, size, search, dateDebut, dateFin));
     }
 
     /**

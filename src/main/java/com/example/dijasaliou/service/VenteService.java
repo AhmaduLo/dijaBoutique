@@ -1,11 +1,16 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.StockDto;
+import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -34,10 +39,32 @@ public class VenteService {
     }
 
     /**
-     * Récupérer toutes les ventes
+     * Récupérer toutes les ventes (utilisé pour rapports/export)
      */
     public List<VenteEntity> obtenirToutesLesVentes() {
         return venteRepository.findAll();
+    }
+
+    /**
+     * Récupérer les ventes paginées avec recherche optionnelle et filtre de dates
+     */
+    public PagedResponse<VenteDto> obtenirVentesPaginees(int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateVente", "id"));
+        String searchParam = (search != null && !search.isBlank()) ? search : null;
+        Page<VenteEntity> ventesPage = venteRepository.findAllWithSearch(searchParam, dateDebut, dateFin, pageable);
+        Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
+        return PagedResponse.from(dtoPage);
+    }
+
+    /**
+     * Récupérer les ventes d'un utilisateur paginées avec recherche optionnelle et filtre de dates
+     */
+    public PagedResponse<VenteDto> obtenirVentesParUtilisateurPaginees(UserEntity utilisateur, int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateVente", "id"));
+        String searchParam = (search != null && !search.isBlank()) ? search : null;
+        Page<VenteEntity> ventesPage = venteRepository.findByUtilisateurWithSearch(utilisateur, searchParam, dateDebut, dateFin, pageable);
+        Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
+        return PagedResponse.from(dtoPage);
     }
 
     /**

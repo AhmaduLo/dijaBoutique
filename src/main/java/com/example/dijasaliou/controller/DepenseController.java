@@ -1,6 +1,7 @@
 package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.DepenseDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.DepenseEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.DepenseService;
@@ -35,15 +36,15 @@ public class DepenseController {
     }
 
     /**
-     * GET /api/depenses
+     * GET /api/depenses?page=0&size=10&search=xxx&categorie=LOYER
      */
     @GetMapping
-    public ResponseEntity<List<DepenseDto>> obtenirTous() {
-        List<DepenseEntity> depenses = depenseService.obtenirToutesLesDepenses();
-        List<DepenseDto> depensesDto = depenses.stream()
-                .map(DepenseDto::fromEntity)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(depensesDto);
+    public ResponseEntity<PagedResponse<DepenseDto>> obtenirTous(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String categorie) {
+        return ResponseEntity.ok(depenseService.obtenirDepensesPaginees(page, size, search, categorie));
     }
 
     /**

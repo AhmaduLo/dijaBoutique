@@ -1,9 +1,14 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.AchatDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.AchatRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -42,6 +47,17 @@ public class AchatService {
      */
     public List<AchatEntity> obtenirTousLesAchats() {
         return achatRepository.findAll();
+    }
+
+    /**
+     * Récupérer les achats paginés avec recherche optionnelle et filtre de dates
+     */
+    public PagedResponse<AchatDto> obtenirAchatsPagines(int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateAchat"));
+        String searchParam = (search != null && !search.isBlank()) ? search : null;
+        Page<AchatEntity> achatsPage = achatRepository.findAllWithSearch(searchParam, dateDebut, dateFin, pageable);
+        Page<AchatDto> dtoPage = achatsPage.map(AchatDto::fromEntity);
+        return PagedResponse.from(dtoPage);
     }
 
     /**
