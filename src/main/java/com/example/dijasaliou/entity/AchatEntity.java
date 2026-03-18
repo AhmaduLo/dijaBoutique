@@ -91,6 +91,7 @@ public class AchatEntity extends BaseEntity{
     @Builder.Default
     private String unite = "pièce";
 
+
     /**
      * Relation Many-to-One avec Utilisateur
      * <p>

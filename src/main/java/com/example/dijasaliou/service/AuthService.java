@@ -188,7 +188,18 @@ public class AuthService {
             throw new RuntimeException("Email ou mot de passe incorrect");
         }
 
-        // 3. Vérifier que le tenant existe et est actif
+        // 3. SUPER_ADMIN : pas de tenant, accès direct
+        if (user.getRole() == UserEntity.Role.SUPER_ADMIN) {
+            String token = jwtService.generateToken(user.getEmail(), null);
+            return AuthResponse.builder()
+                    .token(token)
+                    .user(user)
+                    .requiresPayment(false)
+                    .plan(null)
+                    .build();
+        }
+
+        // 4. Vérifier que le tenant existe et est actif
         TenantEntity tenant = user.getTenant();
         if (tenant == null) {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");

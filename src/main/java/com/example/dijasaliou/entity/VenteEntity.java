@@ -88,6 +88,7 @@ public class VenteEntity  extends BaseEntity{
     @Builder.Default
     private String unite = "pièce";
 
+
     /**
      * Relation avec Utilisateur
      * Qui a enregistré cette vente ?

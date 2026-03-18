@@ -64,12 +64,16 @@ public class SecurityConfig {
                         // Route de suppression de compte - ADMIN uniquement
                         .requestMatchers("/auth/delete-account").hasAuthority("ADMIN")
 
+                        // Routes Super Admin - SUPER_ADMIN uniquement
+                        .requestMatchers("/superadmin/**").hasAuthority("SUPER_ADMIN")
+
                         // Routes de paiement publiques (webhook Wave)
                         .requestMatchers("/payment/wave/webhook").permitAll() // Webhook Wave
                         // Autres routes de paiement publiques
                         .requestMatchers("/payment/plans").permitAll()
                         // Routes de paiement nécessitant l'authentification
                         .requestMatchers("/payment/**").authenticated()
+
 
                         // Routes de gestion des fichiers
                         .requestMatchers("/files/upload").hasAuthority("ADMIN") // Upload réservé aux ADMIN
@@ -93,9 +97,10 @@ public class SecurityConfig {
                         .requestMatchers("/depenses/**").hasAnyAuthority("GERANT", "ADMIN")
                         .requestMatchers("/tenant/**").hasAnyAuthority("GERANT", "ADMIN")
 
-                        // Routes accessibles aux USER, GERANT et ADMIN : ventes et stock
+                        // Routes accessibles aux USER, GERANT et ADMIN : ventes, stock, bons de livraison
                         .requestMatchers("/ventes/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
                         .requestMatchers("/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers("/bons-de-livraison/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
 
                         // Routes devises : lecture accessible à tous, modification ADMIN uniquement
                         .requestMatchers("/devises/**").authenticated()

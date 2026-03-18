@@ -80,7 +80,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         TenantContext.setCurrentTenant(tenantId);
                         log.debug("Tenant défini dans le contexte: {}", tenantId);
                     } else {
-                        log.warn("SÉCURITÉ : Token sans tenant_id pour l'utilisateur: {}", email);
+                        log.debug("Token sans tenant_id pour l'utilisateur: {} (SUPER_ADMIN ou token legacy)", email);
                     }
 
                     // 9. Créer l'objet d'authentification
