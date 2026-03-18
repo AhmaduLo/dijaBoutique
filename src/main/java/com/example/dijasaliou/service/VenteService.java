@@ -117,6 +117,8 @@ public class VenteService {
         venteExistante.setPrixUnitaire(venteModifiee.getPrixUnitaire());
         venteExistante.setDateVente(venteModifiee.getDateVente());
         venteExistante.setClient(venteModifiee.getClient());
+        venteExistante.setTelephoneClient(venteModifiee.getTelephoneClient());
+        venteExistante.setAdresseClient(venteModifiee.getAdresseClient());
         venteExistante.setUtilisateur(venteModifiee.getUtilisateur());
         venteExistante.setUnite(venteModifiee.getUnite());
 

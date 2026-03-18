@@ -66,6 +66,14 @@ public class VenteEntity  extends BaseEntity{
     @Column(name = "client", length = 100)
     private String client;
 
+    @Size(max = 20, message = "Le téléphone client ne peut dépasser 20 caractères")
+    @Column(name = "telephone_client", length = 20)
+    private String telephoneClient;
+
+    @Size(max = 255, message = "L'adresse client ne peut dépasser 255 caractères")
+    @Column(name = "adresse_client", length = 255)
+    private String adresseClient;
+
     /**
      * URL de la photo du produit (optionnel)
      * <p>

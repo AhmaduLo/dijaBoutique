@@ -31,6 +31,8 @@ public class VenteDto {
     private BigDecimal prixTotal;
     private LocalDate dateVente;
     private String client;
+    private String telephoneClient;
+    private String adresseClient;
     private String photoUrl;
     private String unite;
 
@@ -65,6 +67,8 @@ public class VenteDto {
                 .prixTotal(vente.getPrixTotal())
                 .dateVente(vente.getDateVente())
                 .client(vente.getClient())
+                .telephoneClient(vente.getTelephoneClient())
+                .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
                 .utilisateur(UserDto.fromEntityMinimal(vente.getUtilisateur()))
@@ -97,6 +101,8 @@ public class VenteDto {
                 .prixTotal(vente.getPrixTotal())
                 .dateVente(vente.getDateVente())
                 .client(vente.getClient())
+                .telephoneClient(vente.getTelephoneClient())
+                .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
                 .estRecente(vente.estRecente())
