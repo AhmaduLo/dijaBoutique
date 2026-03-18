@@ -98,8 +98,8 @@ public class UserEntity extends BaseEntity {
      * CRITIQUE : Chaque utilisateur appartient à UN SEUL tenant
      * Cette relation garantit l'isolation des données
      */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tenant_id", nullable = false, foreignKey = @ForeignKey(name = "fk_user_tenant"))
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "tenant_id", nullable = true, foreignKey = @ForeignKey(name = "fk_user_tenant"))
     @JsonIgnore
     private TenantEntity tenant;
 
@@ -184,6 +184,7 @@ public class UserEntity extends BaseEntity {
      * USER : Accès limité (ventes et stock uniquement)
      */
     public enum Role {
+        SUPER_ADMIN("Super Admin", "Accès global à toutes les entreprises de la plateforme"),
         ADMIN("Administrateur", "Accès complet à toutes les fonctionnalités"),
         GERANT("Gérant", "Accès complet sauf gestion des utilisateurs"),
         USER("Utilisateur", "Accès aux ventes et stock uniquement");

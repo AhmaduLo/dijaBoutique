@@ -1,6 +1,7 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.ContactRequest;
+import com.example.dijasaliou.entity.FactureEntity;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+
+import java.time.format.DateTimeFormatter;
 
 /**
  * Service pour l'envoi d'emails
@@ -847,6 +850,144 @@ public class EmailService {
                     actionRecommandee,  // Action recommandée
                     frontendUrl  // Lien vers achats
             );
+    }
+
+    /**
+     * Envoie une facture d'abonnement par email au client
+     *
+     * @param facture La facture à envoyer
+     */
+    public void sendFactureEmail(FactureEntity facture) {
+        try {
+            String subject = "Facture " + facture.getNumeroFacture() + " - Abonnement HeasyStock";
+            String htmlContent = buildFactureEmailContent(facture);
+            sendHtmlEmail(facture.getAdminEmail(), subject, htmlContent);
+            log.info("Facture {} envoyée par email à {}", facture.getNumeroFacture(), facture.getAdminEmail());
+        } catch (Exception e) {
+            log.error("Erreur envoi facture {} à {}: {}", facture.getNumeroFacture(), facture.getAdminEmail(), e.getMessage());
+            throw new RuntimeException("Impossible d'envoyer la facture par email", e);
+        }
+    }
+
+    /**
+     * Construit le contenu HTML de la facture
+     */
+    private String buildFactureEmailContent(FactureEntity facture) {
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String dateFacture = facture.getDateFacture() != null ? facture.getDateFacture().format(fmt) : "—";
+        String dateDebut   = facture.getDateDebutPeriode() != null ? facture.getDateDebutPeriode().format(fmt) : "—";
+        String dateFin     = facture.getDateFinPeriode() != null ? facture.getDateFinPeriode().format(fmt) : "—";
+        String montantCFA  = facture.getMontantCFA() != null ? String.format("%.0f FCFA", facture.getMontantCFA()) : "—";
+        String montantEur  = facture.getMontantEuro() != null ? String.format("%.2f €", facture.getMontantEuro()) : "—";
+        String adminNomComplet = ((facture.getAdminPrenom() != null ? facture.getAdminPrenom() : "") + " "
+                + (facture.getAdminNom() != null ? facture.getAdminNom() : "")).trim();
+        String statutLabel = "PAYEE".equals(facture.getStatut() != null ? facture.getStatut().name() : "") ? "Payée" : "Réglée manuellement";
+
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8">
+            <style>
+              body { font-family: Arial, sans-serif; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #1a1a2e 0%%, #16213e 100%%); color: white; padding: 30px; border-radius: 8px 8px 0 0; }
+              .header h1 { margin: 0; font-size: 24px; }
+              .header p { margin: 5px 0 0; opacity: 0.8; font-size: 14px; }
+              .badge { background: #e74c3c; color: white; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; margin-bottom: 8px; }
+              .body { background: white; border: 1px solid #ddd; border-top: none; padding: 30px; }
+              .facture-num { font-size: 20px; font-weight: bold; color: #1a1a2e; margin-bottom: 5px; }
+              .facture-date { color: #666; font-size: 14px; margin-bottom: 25px; }
+              .two-col { display: flex; gap: 20px; margin-bottom: 25px; }
+              .col { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 6px; }
+              .col h3 { margin: 0 0 10px; font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+              .col p { margin: 4px 0; font-size: 14px; }
+              .col .company { font-size: 16px; font-weight: bold; color: #1a1a2e; }
+              table.detail { width: 100%%; border-collapse: collapse; margin: 20px 0; }
+              table.detail th { background: #1a1a2e; color: white; padding: 10px 15px; text-align: left; font-size: 13px; }
+              table.detail td { padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 14px; }
+              table.detail tr:last-child td { border-bottom: none; }
+              .total-row td { font-weight: bold; font-size: 16px; background: #f0f9ff; color: #1a1a2e; }
+              .statut-badge { background: #d4edda; color: #155724; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+              .footer { background: #f8f9fa; padding: 15px 30px; border-radius: 0 0 8px 8px; border: 1px solid #ddd; border-top: none; font-size: 12px; color: #888; text-align: center; }
+            </style>
+            </head>
+            <body>
+              <div class="header">
+                <div class="badge">SUPER ADMIN</div>
+                <h1>HeasyStock</h1>
+                <p>Plateforme de gestion de boutique</p>
+              </div>
+              <div class="body">
+                <div class="facture-num">FACTURE N° %s</div>
+                <div class="facture-date">Date : %s &nbsp;|&nbsp; Statut : <span class="statut-badge">%s</span></div>
+
+                <div class="two-col">
+                  <div class="col">
+                    <h3>Émetteur</h3>
+                    <p class="company">HeasyStock</p>
+                    <p>Plateforme SaaS de gestion de boutique</p>
+                    <p>support@heasystock.com</p>
+                  </div>
+                  <div class="col">
+                    <h3>Client</h3>
+                    <p class="company">%s</p>
+                    <p>%s</p>
+                    <p>%s%s</p>
+                    %s
+                    <p>%s</p>
+                  </div>
+                </div>
+
+                <table class="detail">
+                  <thead>
+                    <tr>
+                      <th>Description</th>
+                      <th>Période</th>
+                      <th>Montant CFA</th>
+                      <th>Montant EUR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Abonnement <strong>%s</strong></td>
+                      <td>%s → %s</td>
+                      <td>%s</td>
+                      <td>%s</td>
+                    </tr>
+                    <tr class="total-row">
+                      <td colspan="2">TOTAL</td>
+                      <td>%s</td>
+                      <td>%s</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p style="font-size:13px;color:#666;margin-top:20px;">
+                  Merci pour votre confiance. Pour toute question concernant cette facture,
+                  contactez-nous à <a href="mailto:support@heasystock.com">support@heasystock.com</a>
+                </p>
+              </div>
+              <div class="footer">
+                &copy; 2025 HeasyStock · Tous droits réservés · Cette facture a été générée automatiquement
+              </div>
+            </body>
+            </html>
+            """.formatted(
+                facture.getNumeroFacture(),
+                dateFacture,
+                statutLabel,
+                // Client
+                facture.getNomEntreprise() != null ? facture.getNomEntreprise() : "—",
+                adminNomComplet.isBlank() ? "—" : adminNomComplet,
+                facture.getVille() != null ? facture.getVille() : "",
+                facture.getPays() != null ? (", " + facture.getPays()) : "",
+                facture.getNineaSiret() != null ? "<p>NINEA/SIRET : " + facture.getNineaSiret() + "</p>" : "",
+                facture.getAdminEmail() != null ? facture.getAdminEmail() : "—",
+                // Tableau
+                facture.getPlan() != null ? facture.getPlan() : "—",
+                dateDebut, dateFin,
+                montantCFA, montantEur,
+                montantCFA, montantEur
+        );
     }
 
     /**

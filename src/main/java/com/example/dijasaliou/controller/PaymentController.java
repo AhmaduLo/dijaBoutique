@@ -6,6 +6,8 @@ import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.service.EmailService;
+import com.example.dijasaliou.entity.FactureEntity;
+import com.example.dijasaliou.service.FactureService;
 import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.WaveService;
 import jakarta.validation.Valid;
@@ -42,17 +44,20 @@ public class PaymentController {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final WaveService waveService;
+    private final FactureService factureService;
 
     public PaymentController(TenantService tenantService,
                              TenantRepository tenantRepository,
                              UserRepository userRepository,
                              EmailService emailService,
-                             WaveService waveService) {
+                             WaveService waveService,
+                             FactureService factureService) {
         this.tenantService = tenantService;
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
         this.waveService = waveService;
+        this.factureService = factureService;
     }
 
     /**
@@ -65,6 +70,19 @@ public class PaymentController {
     public ResponseEntity<SubscriptionStatusResponse> getSubscriptionStatus(Authentication authentication) {
         String email = authentication.getName();
         log.info("Utilisateur {} consulte son abonnement", email);
+
+        // SUPER_ADMIN n'a pas de tenant - retourner un statut actif permanent
+        boolean isSuperAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("SUPER_ADMIN"));
+        if (isSuperAdmin) {
+            return ResponseEntity.ok(SubscriptionStatusResponse.builder()
+                    .plan("SUPER_ADMIN")
+                    .actif(true)
+                    .essaiGratuit(false)
+                    .estExpire(false)
+                    .message("Accès Super Admin - Plateforme")
+                    .build());
+        }
 
         TenantEntity tenant = tenantService.getCurrentTenant();
 
@@ -177,6 +195,10 @@ public class PaymentController {
 
         log.info("Abonnement {} activé via Wave pour le tenant {} jusqu'au {}",
                 request.getPlan(), tenant.getTenantUuid(), dateExpiration);
+
+        // Créer une facture PAYEE (paiement Wave du client lui-même)
+        factureService.creerFacture(tenant, request.getPlan(), 30,
+                FactureEntity.StatutFacture.PAYEE, request.getWaveTransactionId());
 
         UserEntity user = userRepository.findByEmailAndDeletedFalse(emailAdmin)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
