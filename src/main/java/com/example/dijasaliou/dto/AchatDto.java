@@ -53,9 +53,10 @@ public class AchatDto {
             return null;
         }
 
-        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        // Vérifier si le plan PREMIUM ou ENTREPRISE est actif pour afficher les photos
         boolean canViewPhotos = achat.getTenant() != null &&
-                                achat.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE;
+                                (achat.getTenant().getPlan() == TenantEntity.Plan.PREMIUM ||
+                                 achat.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE);
 
         return AchatDto.builder()
                 .id(achat.getId())
@@ -85,9 +86,10 @@ public class AchatDto {
             return null;
         }
 
-        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        // Vérifier si le plan PREMIUM ou ENTREPRISE est actif pour afficher les photos
         boolean canViewPhotos = achat.getTenant() != null &&
-                                achat.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE;
+                                (achat.getTenant().getPlan() == TenantEntity.Plan.PREMIUM ||
+                                 achat.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE);
 
         return AchatDto.builder()
                 .id(achat.getId())

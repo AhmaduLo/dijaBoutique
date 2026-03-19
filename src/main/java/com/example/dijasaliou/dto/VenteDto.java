@@ -55,9 +55,10 @@ public class VenteDto {
             return null;
         }
 
-        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        // Vérifier si le plan PREMIUM ou ENTREPRISE est actif pour afficher les photos
         boolean canViewPhotos = vente.getTenant() != null &&
-                                vente.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE;
+                                (vente.getTenant().getPlan() == TenantEntity.Plan.PREMIUM ||
+                                 vente.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE);
 
         return VenteDto.builder()
                 .id(vente.getId())
@@ -89,9 +90,10 @@ public class VenteDto {
             return null;
         }
 
-        // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
+        // Vérifier si le plan PREMIUM ou ENTREPRISE est actif pour afficher les photos
         boolean canViewPhotos = vente.getTenant() != null &&
-                                vente.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE;
+                                (vente.getTenant().getPlan() == TenantEntity.Plan.PREMIUM ||
+                                 vente.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE);
 
         return VenteDto.builder()
                 .id(vente.getId())

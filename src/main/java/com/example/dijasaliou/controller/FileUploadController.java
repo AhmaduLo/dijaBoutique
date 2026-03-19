@@ -42,7 +42,7 @@ public class FileUploadController {
      */
     @PostMapping("/upload")
     @PreAuthorize("hasAuthority('ADMIN')")
-    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE}, message = "Les photos sont réservées au plan ENTERPRISE")
+    @RequiresPlan(plans = {TenantEntity.Plan.PREMIUM, TenantEntity.Plan.ENTREPRISE}, message = "Les photos sont réservées aux plans PREMIUM et ENTREPRISE")
     public ResponseEntity<Map<String, Object>> uploadPhoto(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "type", defaultValue = "achats") String type) {
@@ -89,7 +89,7 @@ public class FileUploadController {
      */
     @DeleteMapping("/photos")
     @PreAuthorize("hasAuthority('ADMIN')")
-    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE}, message = "Les photos sont réservées au plan ENTERPRISE")
+    @RequiresPlan(plans = {TenantEntity.Plan.PREMIUM, TenantEntity.Plan.ENTREPRISE}, message = "Les photos sont réservées aux plans PREMIUM et ENTREPRISE")
     public ResponseEntity<Map<String, Object>> deletePhoto(@RequestParam("url") String photoUrl) {
         try {
             TenantEntity tenant = tenantService.getCurrentTenant();

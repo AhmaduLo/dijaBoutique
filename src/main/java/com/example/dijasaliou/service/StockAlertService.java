@@ -70,8 +70,8 @@ public class StockAlertService {
     public void verifierEtEnvoyerAlerte(String nomProduit) {
         TenantEntity tenant = tenantService.getCurrentTenant();
 
-        // IMPORTANT : Les alertes de stock ne sont disponibles que pour le plan ENTREPRISE
-        if (tenant.getPlan() != TenantEntity.Plan.ENTREPRISE) {
+        // IMPORTANT : Les alertes de stock sont disponibles pour les plans PREMIUM et ENTREPRISE
+        if (tenant.getPlan() != TenantEntity.Plan.PREMIUM && tenant.getPlan() != TenantEntity.Plan.ENTREPRISE) {
             log.debug("Alertes de stock désactivées pour le plan {} (entreprise: {})",
                     tenant.getPlan(), tenant.getNomEntreprise());
             return;

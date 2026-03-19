@@ -131,7 +131,7 @@ public class TenantEntity {
      * Enum pour les plans de paiement
      *
      * PLAN GRATUIT : État initial après inscription - PAIEMENT REQUIS pour accéder
-     * PLAN BASIC : 6555 CFA (9.99€) / mois
+     * PLAN BASIC : 5000 CFA / mois
      *   - Gérer ventes, stock, achats, dépenses, contact
      *   - 3 utilisateurs (admin + 2 employés)
      *   - Dashboard de base
@@ -139,9 +139,9 @@ public class TenantEntity {
      */
     public enum Plan {
         GRATUIT("Plan Gratuit", "Paiement requis - Aucun accès aux fonctionnalités", 0, 0, 0, false),
-        BASIC("Plan Basic", "Gestion complète boutique - 3 utilisateurs", 9.99, 6555, 3, true),
-        PREMIUM("Plan Premium", "Pour moyennes entreprises", 15.24, 10000, 10, true),
-        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 22.87, 15000, Integer.MAX_VALUE, true);
+        BASIC("Plan Basic", "Gestion complète boutique - 3 utilisateurs", 9.99, 5000, 3, true),
+        PREMIUM("Plan Premium", "Pour moyennes entreprises", 29.99, 15000, 10, true),
+        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 99.99, 25000, Integer.MAX_VALUE, true);
 
         private final String libelle;
         private final String description;
