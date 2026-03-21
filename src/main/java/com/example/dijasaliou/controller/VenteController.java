@@ -10,7 +10,10 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import org.springframework.security.core.Authentication;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -59,13 +62,15 @@ public class VenteController {
 
     /**
      * POST /api/ventes
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PostMapping
     public ResponseEntity<VenteDto> creer(
             @Valid @RequestBody VenteEntity vente,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
         VenteEntity venteCree = venteService.creerVente(vente, utilisateur);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(VenteDto.fromEntity(venteCree));
@@ -73,15 +78,17 @@ public class VenteController {
 
     /**
      * PUT /api/ventes/{id}
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PutMapping("/{id}")
     public ResponseEntity<VenteDto> modifier(
             @PathVariable Long id,
             @Valid @RequestBody VenteEntity venteModifiee,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        // Récupérer l'utilisateur qui modifie
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        // Récupérer l'utilisateur authentifié (depuis le JWT, pas d'un paramètre client)
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
 
         // Mettre à jour l'utilisateur de la vente
         venteModifiee.setUtilisateur(utilisateur);
@@ -104,6 +111,7 @@ public class VenteController {
      * GET /api/ventes/utilisateur/{utilisateurId}?page=0&size=20&search=xxx&dateDebut=...&dateFin=...
      */
     @GetMapping("/utilisateur/{utilisateurId}")
+    @PreAuthorize("hasAnyAuthority('USER', 'GERANT', 'ADMIN')")
     public ResponseEntity<PagedResponse<VenteDto>> obtenirVentesParUtilisateur(
             @PathVariable Long utilisateurId,
             @RequestParam(defaultValue = "0") int page,
@@ -123,12 +131,30 @@ public class VenteController {
      * Exemple : GET /api/ventes/chiffre-affaires?debut=2025-10-01&fin=2025-10-31
      */
     @GetMapping("/chiffre-affaires")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<BigDecimal> calculerChiffreAffaires(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
         return ResponseEntity.ok(ca);
+    }
+
+    /**
+     * GET /api/ventes/rapport-modes-paiement?debut=2025-01-01&fin=2025-12-31
+     *
+     * Retourne la répartition du CA par mode de paiement en tenant compte
+     * des remboursements de crédits (table paiements_credit).
+     *
+     * - ESPECES / WAVE / ORANGE_MONEY = ventes directes + remboursements crédits du même mode
+     * - CREDIT = somme des montants restants non soldés (ventes crédit créées dans la période)
+     */
+    @GetMapping("/rapport-modes-paiement")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    public ResponseEntity<Map<String, Object>> rapportModePaiement(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        return ResponseEntity.ok(venteService.calculerRapportModePaiement(debut, fin));
     }
 
     /**
@@ -139,6 +165,7 @@ public class VenteController {
      * Exemple : GET /api/ventes/statistiques?debut=2025-10-01&fin=2025-10-31
      */
     @GetMapping("/statistiques")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> obtenirStatistiques(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {

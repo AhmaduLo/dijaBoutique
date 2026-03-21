@@ -1,0 +1,86 @@
+package com.example.dijasaliou.controller;
+
+import com.example.dijasaliou.annotation.RequiresPlan;
+import com.example.dijasaliou.dto.CreditClientDto;
+import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.PaiementCreditDto;
+import com.example.dijasaliou.dto.PaiementCreditRequest;
+import com.example.dijasaliou.entity.PaiementCreditEntity;
+import com.example.dijasaliou.entity.TenantEntity;
+import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.service.CreditClientService;
+import com.example.dijasaliou.service.UserService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/credits")
+@CrossOrigin(origins = "http://localhost:4200")
+@Slf4j
+@RequiredArgsConstructor
+public class CreditController {
+
+    private final CreditClientService creditClientService;
+    private final UserService userService;
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
+    public ResponseEntity<PagedResponse<CreditClientDto>> obtenirCredits(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String statut) {
+        return ResponseEntity.ok(creditClientService.obtenirCredits(page, size, search, statut));
+    }
+
+    @GetMapping("/client/{id}")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
+    public ResponseEntity<List<CreditClientDto>> obtenirHistoriqueClient(
+            @PathVariable Long id, Authentication auth) {
+        log.info("Historique crédits client #{} demandé par {}", id, auth.getName());
+        return ResponseEntity.ok(creditClientService.obtenirHistoriqueClient(id));
+    }
+
+    @PostMapping("/{id}/payer")
+    @PreAuthorize("isAuthenticated()")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
+    public ResponseEntity<CreditClientDto> enregistrerPaiement(
+            @PathVariable Long id,
+            @Valid @RequestBody PaiementCreditRequest request,
+            Authentication auth) {
+        UserEntity employe = userService.obtenirUtilisateurParEmail(auth.getName());
+        log.info("Paiement de {} {} sur crédit #{} par {}",
+                request.getMontant(), request.getModePaiement(), id, auth.getName());
+        CreditClientDto result = creditClientService.enregistrerPaiement(
+                id,
+                request.getMontant(),
+                request.getModePaiement(),
+                request.getNote(),
+                employe);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{id}/paiements")
+    @PreAuthorize("isAuthenticated()")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
+    public ResponseEntity<List<PaiementCreditDto>> obtenirPaiements(@PathVariable Long id) {
+        return ResponseEntity.ok(creditClientService.obtenirPaiements(id));
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
+    public ResponseEntity<Map<String, Object>> obtenirStats() {
+        return ResponseEntity.ok(creditClientService.obtenirStats());
+    }
+}

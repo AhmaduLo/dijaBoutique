@@ -8,9 +8,10 @@ import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.dto.ResetPasswordRequest;
 import com.example.dijasaliou.service.AuthService;
 import com.example.dijasaliou.service.RateLimitService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -82,8 +83,7 @@ public class AuthController {
         AuthResponse authResponse = authService.register(request);
 
         // Créer un cookie HttpOnly sécurisé avec le JWT
-        Cookie jwtCookie = createJwtCookie(authResponse.getToken());
-        response.addCookie(jwtCookie);
+        addJwtCookie(response, authResponse.getToken());
 
         // Ne pas renvoyer le token dans le body (sécurité)
         authResponse.setToken(null);
@@ -132,8 +132,7 @@ public class AuthController {
         rateLimitService.resetLoginAttempts(ipAddress);
 
         // Créer un cookie HttpOnly sécurisé avec le JWT
-        Cookie jwtCookie = createJwtCookie(authResponse.getToken());
-        response.addCookie(jwtCookie);
+        addJwtCookie(response, authResponse.getToken());
 
         // Ne pas renvoyer le token dans le body (sécurité)
         authResponse.setToken(null);
@@ -147,14 +146,8 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public ResponseEntity<String> logout(HttpServletResponse response) {
-        // Créer un cookie expiré pour supprimer le JWT
-        Cookie jwtCookie = new Cookie("jwt", null);
-        jwtCookie.setPath("/");
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setMaxAge(0); // Expiration immédiate
-        jwtCookie.setSecure(cookieSecure); // Lit depuis application.properties
-
-        response.addCookie(jwtCookie);
+        // Supprimer le cookie JWT (maxAge=0 + SameSite=Strict)
+        removeJwtCookie(response);
 
         return ResponseEntity.ok("Déconnexion réussie");
     }
@@ -242,12 +235,7 @@ public class AuthController {
         authService.deleteAdminAccount(emailAdmin);
 
         // Supprimer le cookie JWT
-        Cookie jwtCookie = new Cookie("jwt", null);
-        jwtCookie.setPath("/");
-        jwtCookie.setHttpOnly(true);
-        jwtCookie.setMaxAge(0); // Expiration immédiate
-        jwtCookie.setSecure(cookieSecure);
-        response.addCookie(jwtCookie);
+        removeJwtCookie(response);
 
         PasswordResetResponse deleteResponse = PasswordResetResponse.builder()
                 .message("Votre compte et toutes les données associées ont été supprimés")
@@ -256,47 +244,50 @@ public class AuthController {
     }
 
     /**
-     * Crée un cookie HttpOnly sécurisé contenant le JWT
+     * Ajoute un cookie JWT HttpOnly avec SameSite=Strict dans la réponse
      *
      * Flags de sécurité :
      * - HttpOnly : JavaScript ne peut pas lire le cookie (protection XSS)
      * - Secure : Cookie envoyé uniquement en HTTPS (désactivé en dev)
-     * - SameSite=Strict : Protection CSRF
+     * - SameSite=Strict : Protection CSRF (bloque les requêtes cross-site)
      * - Path=/ : Cookie disponible pour toute l'application
      * - MaxAge=24h : Durée de vie du cookie
      */
-    private Cookie createJwtCookie(String token) {
-        Cookie cookie = new Cookie("jwt", token);
-        cookie.setHttpOnly(true); // JavaScript ne peut pas lire
-        cookie.setSecure(cookieSecure); // Lit depuis application.properties (false=dev, true=prod)
-        cookie.setPath("/"); // Disponible pour toute l'application
-        cookie.setMaxAge(24 * 60 * 60); // 24 heures
-        // Note: SameSite=Strict est géré par le navigateur moderne par défaut
-
-        return cookie;
+    private void addJwtCookie(HttpServletResponse response, String token) {
+        ResponseCookie cookie = ResponseCookie.from("jwt", token)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/")
+                .maxAge(24L * 60 * 60)
+                .sameSite("Strict")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     /**
-     * Récupère l'adresse IP réelle du client
+     * Supprime le cookie JWT (expiration immédiate)
+     */
+    private void removeJwtCookie(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from("jwt", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/")
+                .maxAge(0L)
+                .sameSite("Strict")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    /**
+     * Récupère l'adresse IP du client directement depuis la socket TCP.
      *
-     * IMPORTANT : Prend en compte les proxies et load balancers
-     * En production derrière un proxy (Heroku, CloudFlare, etc.),
-     * l'IP réelle est dans les headers X-Forwarded-For ou X-Real-IP
+     * SÉCURITÉ : On n'utilise PAS X-Forwarded-For car ce header peut être
+     * forgé par n'importe quel client pour contourner le rate limiting.
+     * Si l'app est derrière un reverse proxy (nginx, Cloudflare), configurer
+     * server.forward-headers-strategy=NATIVE dans application-prod.properties
+     * pour que Spring Boot gère les headers proxy de façon sécurisée.
      */
     private String getClientIpAddress(HttpServletRequest request) {
-        String ipAddress = request.getHeader("X-Forwarded-For");
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
-            ipAddress = request.getHeader("X-Real-IP");
-        }
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
-            ipAddress = request.getRemoteAddr();
-        }
-
-        // Si plusieurs IPs dans X-Forwarded-For, prendre la première (client réel)
-        if (ipAddress != null && ipAddress.contains(",")) {
-            ipAddress = ipAddress.split(",")[0].trim();
-        }
-
-        return ipAddress != null ? ipAddress : "unknown";
+        return request.getRemoteAddr();
     }
 }

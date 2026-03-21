@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -20,6 +21,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -102,12 +105,30 @@ public class SecurityConfig {
                         .requestMatchers("/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
                         .requestMatchers("/bons-de-livraison/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
 
+                        // Routes clients et crédits (plan Entreprise)
+                        .requestMatchers(HttpMethod.GET, "/clients/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/clients/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/clients/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/clients/**").hasAnyAuthority("ADMIN")
+                        .requestMatchers("/credits/**").hasAnyAuthority("GERANT", "ADMIN")
+
                         // Routes devises : lecture accessible à tous, modification ADMIN uniquement
                         .requestMatchers("/devises/**").authenticated()
 
                         // Toutes les autres routes nécessitent un token (par sécurité)
                         .anyRequest().authenticated()
                 )
+        // Retourner 401 (pas 403) pour les requêtes non authentifiées
+        // Nécessaire pour que Angular redirige vers /login au lieu de bloquer
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.getWriter().write("{\"error\":\"Non authentifié\",\"message\":\"Veuillez vous connecter pour accéder à cette ressource.\"}");
+                        })
+                )
+
         // Ajouter les filtres dans l'ordre :
         // 1. JWT pour l'authentification (avant UsernamePasswordAuthenticationFilter)
         // 2. SubscriptionExpiration pour bloquer si l'abonnement est expiré (après UsernamePasswordAuthenticationFilter)
@@ -184,5 +205,28 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Empêche Spring Boot d'enregistrer JwtAuthenticationFilter comme filtre servlet autonome.
+     * Sans ça, le filtre s'exécute 2 fois : une fois avant Spring Security (au niveau servlet)
+     * et une fois dans la chaîne Spring Security. La 2ème exécution est skippée par OncePerRequestFilter,
+     * mais SecurityContextHolderFilter a déjà effacé le SecurityContext entre-temps → 403 sur tout.
+     */
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    /**
+     * Même raison que ci-dessus pour SubscriptionExpirationFilter.
+     */
+    @Bean
+    public FilterRegistrationBean<SubscriptionExpirationFilter> subscriptionFilterRegistration(SubscriptionExpirationFilter filter) {
+        FilterRegistrationBean<SubscriptionExpirationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 }

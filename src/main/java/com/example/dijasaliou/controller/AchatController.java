@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.Authentication;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -91,44 +93,33 @@ public class AchatController {
 
     /**
      * POST /api/achats
-     * Créer un nouvel achat
-     *
-     * @RequestBody : Les données viennent du corps de la requête (JSON)
-     * @RequestParam : L'ID utilisateur vient de l'URL (?utilisateurId=1)
-     *
-     * Exemple : POST /api/achats?utilisateurId=1
-     *           Body : { "quantite": 10, "nomProduit": "Collier", ... }
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PostMapping
     public ResponseEntity<AchatDto> creer(
             @Valid @RequestBody AchatEntity achat,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        // Récupérer l'utilisateur
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
-
-        // Créer l'achat
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
         AchatEntity achatCree = achatService.creerAchat(achat, utilisateur);
 
-        // Retourner avec code 201 Created
         return ResponseEntity.status(HttpStatus.CREATED).body(AchatDto.fromEntity(achatCree));
     }
 
     /**
      * PUT /api/achats/{id}
-     * Modifier un achat existant
-     *
-     * Exemple : PUT /api/achats/5?utilisateurId=1
-     *           Body : { "quantite": 20, "nomProduit": "Collier doré", ... }
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PutMapping("/{id}")
     public ResponseEntity<AchatDto> modifier(
             @PathVariable Long id,
             @Valid @RequestBody AchatEntity achatModifie,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        // Récupérer l'utilisateur qui modifie
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        // Récupérer l'utilisateur authentifié (depuis le JWT, pas d'un paramètre client)
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
 
         // Mettre à jour l'utilisateur de l'achat
         achatModifie.setUtilisateur(utilisateur);

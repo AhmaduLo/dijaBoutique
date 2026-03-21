@@ -36,6 +36,11 @@ public class VenteDto {
     private String photoUrl;
     private String unite;
 
+    // Crédit client
+    private Long clientId;
+    private String modePaiement;
+    private Boolean estSoldee;
+
     // Informations sur l'utilisateur qui a créé la vente
     private UserDto utilisateur;
 
@@ -72,6 +77,9 @@ public class VenteDto {
                 .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
+                .clientId(vente.getClientRef() != null ? vente.getClientRef().getId() : null)
+                .modePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : "ESPECES")
+                .estSoldee(vente.getEstSoldee())
                 .utilisateur(UserDto.fromEntityMinimal(vente.getUtilisateur()))
                 .estRecente(vente.estRecente())
                 .mois(vente.getMois())
