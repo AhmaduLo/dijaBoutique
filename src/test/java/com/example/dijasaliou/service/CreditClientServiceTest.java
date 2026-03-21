@@ -1,7 +1,11 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.CreditClientDto;
+import com.example.dijasaliou.dto.PaiementCreditDto;
 import com.example.dijasaliou.entity.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import com.example.dijasaliou.entity.PaiementCreditEntity.ModePaiement;
 import com.example.dijasaliou.repository.ClientRepository;
@@ -298,5 +302,92 @@ class CreditClientServiceTest {
         var stats = creditClientService.obtenirStats();
 
         assertThat((double) stats.get("tauxRecouvrement")).isEqualTo(0.0);
+    }
+
+    // =========================================================
+    // obtenirCredits
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirCredits() — retourne une page de crédits du tenant")
+    void obtenirCredits_retournePage() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        Page<CreditClientEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(creditClientRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = creditClientService.obtenirCredits(0, 10, null, "TOUS");
+
+        assertThat(resultat).isNotNull();
+        assertThat(resultat.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("obtenirCredits() — filtre par statut EN_ATTENTE")
+    void obtenirCredits_filtreParStatut() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        Page<CreditClientEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(creditClientRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = creditClientService.obtenirCredits(0, 10, null, "EN_ATTENTE");
+
+        assertThat(resultat).isNotNull();
+        verify(creditClientRepository).findAllWithSearch(
+                eq(CreditClientEntity.StatutCredit.EN_ATTENTE), any(), any(), any(Pageable.class));
+    }
+
+    // =========================================================
+    // obtenirPaiements
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirPaiements() — retourne la liste des paiements d'un crédit")
+    void obtenirPaiements_retourneListe() {
+        when(creditClientRepository.findById(20L)).thenReturn(Optional.of(credit));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(paiementCreditRepository.findByCreditOrderByCreatedDateDesc(credit))
+                .thenReturn(Collections.emptyList());
+
+        List<PaiementCreditDto> resultat = creditClientService.obtenirPaiements(20L);
+
+        assertThat(resultat).isNotNull().isEmpty();
+    }
+
+    @Test
+    @DisplayName("obtenirPaiements() — lève exception si crédit introuvable")
+    void obtenirPaiements_leveExceptionCreditIntrouvable() {
+        when(creditClientRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> creditClientService.obtenirPaiements(999L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Crédit introuvable");
+    }
+
+    // =========================================================
+    // obtenirHistoriqueClient
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirHistoriqueClient() — retourne les crédits d'un client")
+    void obtenirHistoriqueClient_retourneListe() {
+        when(clientRepository.findById(10L)).thenReturn(Optional.of(client));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(creditClientRepository.findByClientOrderByCreatedDateAsc(client))
+                .thenReturn(Collections.emptyList());
+
+        List<CreditClientDto> resultat = creditClientService.obtenirHistoriqueClient(10L);
+
+        assertThat(resultat).isNotNull().isEmpty();
+    }
+
+    @Test
+    @DisplayName("obtenirHistoriqueClient() — lève exception si client introuvable")
+    void obtenirHistoriqueClient_leveExceptionClientIntrouvable() {
+        when(clientRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> creditClientService.obtenirHistoriqueClient(999L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Client introuvable");
     }
 }

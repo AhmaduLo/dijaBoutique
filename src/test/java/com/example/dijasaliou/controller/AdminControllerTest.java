@@ -62,6 +62,12 @@ class AdminControllerTest {
     @MockitoBean(name = "jwtService")
     private com.example.dijasaliou.jwt.JwtService jwtService;
 
+    @MockitoBean
+    private com.example.dijasaliou.config.HibernateFilterInterceptor hibernateFilterInterceptor;
+
+    @MockitoBean
+    private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
+
     private Authentication authentication;
     private String emailAdmin;
     private UserDto utilisateurDto1;

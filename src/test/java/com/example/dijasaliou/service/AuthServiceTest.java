@@ -271,4 +271,40 @@ class AuthServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("invalide ou expiré");
     }
+
+    // =========================================================
+    // deleteAdminAccount
+    // =========================================================
+
+    @Test
+    @DisplayName("deleteAdminAccount() — supprime le tenant et toutes les données associées")
+    void deleteAdminAccount_succes() {
+        tenantTest.setUtilisateurs(java.util.List.of(utilisateur));
+        when(userRepository.findByEmailAndDeletedFalse("amadou@example.com"))
+                .thenReturn(Optional.of(utilisateur));
+
+        authService.deleteAdminAccount("amadou@example.com");
+
+        verify(tenantRepository).delete(tenantTest);
+        verify(achatRepository).deleteByUtilisateur(utilisateur);
+        verify(venteRepository).deleteByUtilisateur(utilisateur);
+        verify(depenseRepository).deleteByUtilisateur(utilisateur);
+    }
+
+    @Test
+    @DisplayName("deleteAdminAccount() — lève exception si l'utilisateur n'est pas ADMIN")
+    void deleteAdminAccount_leveExceptionSiNonAdmin() {
+        UserEntity nonAdmin = UserEntity.builder()
+                .id(2L).nom("User").prenom("Normal")
+                .email("user@example.com")
+                .role(UserEntity.Role.USER)
+                .tenant(tenantTest)
+                .build();
+        when(userRepository.findByEmailAndDeletedFalse("user@example.com"))
+                .thenReturn(Optional.of(nonAdmin));
+
+        assertThatThrownBy(() -> authService.deleteAdminAccount("user@example.com"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("administrateur");
+    }
 }

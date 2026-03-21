@@ -12,6 +12,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -301,5 +305,85 @@ class AchatServiceTest {
         List<AchatEntity> resultat = achatService.obtenirAchatsParUtilisateur(utilisateurTest);
 
         assertThat(resultat).hasSize(1);
+    }
+
+    // =========================================================
+    // obtenirAchatsPagines
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirAchatsPagines() — retourne une page d'achats")
+    void obtenirAchatsPagines_retournePage() {
+        Page<AchatEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(achatRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = achatService.obtenirAchatsPagines(0, 10, null, null, null);
+
+        assertThat(resultat).isNotNull();
+        assertThat(resultat.getContent()).isEmpty();
+    }
+
+    // =========================================================
+    // obtenirAchatsParPeriode
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirAchatsParPeriode() — retourne les achats entre deux dates")
+    void obtenirAchatsParPeriode_retourneListe() {
+        LocalDate debut = LocalDate.of(2025, 1, 1);
+        LocalDate fin = LocalDate.of(2025, 12, 31);
+        when(achatRepository.findByDateAchatBetween(debut, fin)).thenReturn(Arrays.asList(achatValide));
+
+        List<AchatEntity> resultat = achatService.obtenirAchatsParPeriode(debut, fin);
+
+        assertThat(resultat).hasSize(1);
+    }
+
+    // =========================================================
+    // calculerTotalAchats
+    // =========================================================
+
+    @Test
+    @DisplayName("calculerTotalAchats() — somme correcte sur la période")
+    void calculerTotalAchats_sommeCorrect() {
+        LocalDate debut = LocalDate.of(2025, 1, 1);
+        LocalDate fin = LocalDate.of(2025, 12, 31);
+        AchatEntity achat2 = AchatEntity.builder()
+                .prixTotal(new BigDecimal("1000.00"))
+                .build();
+        when(achatRepository.findByDateAchatBetween(debut, fin))
+                .thenReturn(Arrays.asList(achatValide, achat2));
+
+        BigDecimal total = achatService.calculerTotalAchats(debut, fin);
+
+        assertThat(total).isEqualByComparingTo(new BigDecimal("3500.00")); // 2500 + 1000
+    }
+
+    @Test
+    @DisplayName("calculerTotalAchats() — retourne zéro si aucun achat")
+    void calculerTotalAchats_retourneZeroSiVide() {
+        LocalDate debut = LocalDate.of(2025, 1, 1);
+        LocalDate fin = LocalDate.of(2025, 12, 31);
+        when(achatRepository.findByDateAchatBetween(debut, fin)).thenReturn(Collections.emptyList());
+
+        BigDecimal total = achatService.calculerTotalAchats(debut, fin);
+
+        assertThat(total).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // =========================================================
+    // obtenirProduitsAvecPrixVente
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirProduitsAvecPrixVente() — retourne tous les achats")
+    void obtenirProduitsAvecPrixVente_retourneListe() {
+        when(achatRepository.findAll()).thenReturn(Arrays.asList(achatValide));
+
+        List<AchatEntity> resultat = achatService.obtenirProduitsAvecPrixVente();
+
+        assertThat(resultat).hasSize(1);
+        verify(achatRepository).findAll();
     }
 }

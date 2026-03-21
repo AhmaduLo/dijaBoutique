@@ -12,6 +12,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -323,5 +327,35 @@ class DepenseServiceTest {
 
         assertThat(depenseService.calculerTotalDepenses(dateDebut, dateFin))
                 .isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // =========================================================
+    // obtenirDepensesPaginees
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirDepensesPaginees() — retourne une page de dépenses")
+    void obtenirDepensesPaginees_retournePage() {
+        Page<DepenseEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(depenseRepository.findAllWithSearch(any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = depenseService.obtenirDepensesPaginees(0, 10, null, null);
+
+        assertThat(resultat).isNotNull();
+        assertThat(resultat.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("obtenirDepensesPaginees() — filtre par catégorie valide")
+    void obtenirDepensesPaginees_filtreParCategorie() {
+        Page<DepenseEntity> pageMock = new PageImpl<>(Arrays.asList(depenseValide));
+        when(depenseRepository.findAllWithSearch(any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = depenseService.obtenirDepensesPaginees(0, 10, null, "LOYER");
+
+        assertThat(resultat).isNotNull();
+        assertThat(resultat.getContent()).hasSize(1);
     }
 }

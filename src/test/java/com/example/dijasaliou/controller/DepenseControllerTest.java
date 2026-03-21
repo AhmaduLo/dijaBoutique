@@ -1,5 +1,7 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.DepenseDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.DepenseEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.DepenseService;
@@ -65,6 +67,12 @@ class DepenseControllerTest {
     @MockitoBean(name = "jwtService")
     private com.example.dijasaliou.jwt.JwtService jwtService;
 
+    @MockitoBean
+    private com.example.dijasaliou.config.HibernateFilterInterceptor hibernateFilterInterceptor;
+
+    @MockitoBean
+    private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
+
     private UserEntity utilisateurTest;
     private DepenseEntity depenseTest;
     private DepenseEntity depenseTest2;
@@ -113,38 +121,48 @@ class DepenseControllerTest {
     @DisplayName("GET /depenses - Devrait retourner toutes les dépenses avec succès")
     void obtenirTous_DevraitRetournerToutesLesDepenses() throws Exception {
         // Arrange
-        List<DepenseEntity> depenses = Arrays.asList(depenseTest, depenseTest2);
-        when(depenseService.obtenirToutesLesDepenses()).thenReturn(depenses);
+        DepenseDto dto1 = DepenseDto.builder().id(1L).libelle("Loyer du magasin")
+                .montant(new BigDecimal("500000.00")).categorie(DepenseEntity.CategorieDepense.LOYER)
+                .notes("Loyer mensuel").estRecurrente(true).build();
+        DepenseDto dto2 = DepenseDto.builder().id(2L).libelle("Facture électricité")
+                .montant(new BigDecimal("75000.00")).categorie(DepenseEntity.CategorieDepense.ELECTRICITE)
+                .notes("Facture mensuelle").estRecurrente(true).build();
+        PagedResponse<DepenseDto> page = PagedResponse.<DepenseDto>builder()
+                .content(Arrays.asList(dto1, dto2)).currentPage(0).pageSize(20)
+                .totalElements(2L).totalPages(1).first(true).last(true).build();
+        when(depenseService.obtenirDepensesPaginees(0, 10, null, null)).thenReturn(page);
 
         // Act & Assert
         mockMvc.perform(get("/depenses")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].libelle", is("Loyer du magasin")))
-                .andExpect(jsonPath("$[0].montant", is(500000.00)))
-                .andExpect(jsonPath("$[0].categorie", is("LOYER")))
-                .andExpect(jsonPath("$[0].estRecurrente", is(true)))
-                .andExpect(jsonPath("$[1].id", is(2)))
-                .andExpect(jsonPath("$[1].libelle", is("Facture électricité")));
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].libelle", is("Loyer du magasin")))
+                .andExpect(jsonPath("$.content[0].categorie", is("LOYER")))
+                .andExpect(jsonPath("$.content[0].estRecurrente", is(true)))
+                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].libelle", is("Facture électricité")));
 
-        verify(depenseService, times(1)).obtenirToutesLesDepenses();
+        verify(depenseService, times(1)).obtenirDepensesPaginees(0, 10, null, null);
     }
 
     @Test
     @DisplayName("GET /depenses - Devrait retourner une liste vide quand aucune dépense")
     void obtenirTous_DevraitRetournerListeVide() throws Exception {
         // Arrange
-        when(depenseService.obtenirToutesLesDepenses()).thenReturn(Arrays.asList());
+        PagedResponse<DepenseDto> pageVide = PagedResponse.<DepenseDto>builder()
+                .content(Arrays.asList()).currentPage(0).pageSize(20)
+                .totalElements(0L).totalPages(0).first(true).last(true).build();
+        when(depenseService.obtenirDepensesPaginees(0, 10, null, null)).thenReturn(pageVide);
 
         // Act & Assert
         mockMvc.perform(get("/depenses")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.content", hasSize(0)));
 
-        verify(depenseService, times(1)).obtenirToutesLesDepenses();
+        verify(depenseService, times(1)).obtenirDepensesPaginees(0, 10, null, null);
     }
 
     // ==================== Tests pour GET /depenses/{id} ====================
@@ -171,17 +189,16 @@ class DepenseControllerTest {
 
     @Test
     @DisplayName("GET /depenses/{id} - Devrait lancer une exception si dépense inexistante")
-    void obtenirParId_DevraitLancerExceptionSiDepenseInexistante() {
+    void obtenirParId_DevraitLancerExceptionSiDepenseInexistante() throws Exception {
         // Arrange
         Long depenseId = 999L;
         when(depenseService.obtenirDepenseParId(depenseId))
                 .thenThrow(new RuntimeException("Dépense non trouvée"));
 
         // Act & Assert
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(get("/depenses/{id}", depenseId)
-                    .contentType(MediaType.APPLICATION_JSON));
-        });
+        mockMvc.perform(get("/depenses/{id}", depenseId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
 
         verify(depenseService, times(1)).obtenirDepenseParId(depenseId);
     }
@@ -324,7 +341,7 @@ class DepenseControllerTest {
 
     @Test
     @DisplayName("PUT /depenses/{id} - Devrait lancer une exception si dépense inexistante")
-    void modifier_DevraitLancerExceptionSiDepenseInexistante() {
+    void modifier_DevraitLancerExceptionSiDepenseInexistante() throws Exception {
         // Arrange
         Long depenseId = 999L;
         Long utilisateurId = 1L;
@@ -341,12 +358,11 @@ class DepenseControllerTest {
                 .thenThrow(new RuntimeException("Dépense non trouvée"));
 
         // Act & Assert
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(put("/depenses/{id}", depenseId)
-                    .param("utilisateurId", utilisateurId.toString())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(depenseModifiee)));
-        });
+        mockMvc.perform(put("/depenses/{id}", depenseId)
+                        .param("utilisateurId", utilisateurId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(depenseModifiee)))
+                .andExpect(status().isBadRequest());
 
         verify(depenseService, times(1)).modifierDepense(eq(depenseId), any(DepenseEntity.class));
     }
@@ -370,17 +386,16 @@ class DepenseControllerTest {
 
     @Test
     @DisplayName("DELETE /depenses/{id} - Devrait lancer une exception si dépense inexistante")
-    void supprimer_DevraitLancerExceptionSiDepenseInexistante() {
+    void supprimer_DevraitLancerExceptionSiDepenseInexistante() throws Exception {
         // Arrange
         Long depenseId = 999L;
         doThrow(new RuntimeException("Dépense non trouvée"))
                 .when(depenseService).supprimerDepense(depenseId);
 
         // Act & Assert
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(delete("/depenses/{id}", depenseId)
-                    .contentType(MediaType.APPLICATION_JSON));
-        });
+        mockMvc.perform(delete("/depenses/{id}", depenseId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
 
         verify(depenseService, times(1)).supprimerDepense(depenseId);
     }
@@ -553,17 +568,22 @@ class DepenseControllerTest {
                 .utilisateur(utilisateurTest)
                 .build();
 
-        when(depenseService.obtenirToutesLesDepenses())
-                .thenReturn(Arrays.asList(depenseSansNotes));
+        DepenseDto dtoSansNotes = DepenseDto.builder().id(3L).libelle("Transport")
+                .montant(new BigDecimal("25000.00")).categorie(DepenseEntity.CategorieDepense.TRANSPORT)
+                .notes(null).estRecurrente(false).build();
+        PagedResponse<DepenseDto> page = PagedResponse.<DepenseDto>builder()
+                .content(Arrays.asList(dtoSansNotes)).currentPage(0).pageSize(20)
+                .totalElements(1L).totalPages(1).first(true).last(true).build();
+        when(depenseService.obtenirDepensesPaginees(0, 10, null, null)).thenReturn(page);
 
         // Act & Assert
         mockMvc.perform(get("/depenses")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].notes").doesNotExist());
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].notes").doesNotExist());
 
-        verify(depenseService, times(1)).obtenirToutesLesDepenses();
+        verify(depenseService, times(1)).obtenirDepensesPaginees(0, 10, null, null);
     }
 
     @Test

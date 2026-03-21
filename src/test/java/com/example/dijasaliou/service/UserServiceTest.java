@@ -195,4 +195,30 @@ class UserServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Utilisateur non trouvé");
     }
+
+    // =========================================================
+    // modifierUtilisateur
+    // =========================================================
+
+    @Test
+    @DisplayName("modifierUtilisateur() — modifie et sauvegarde l'utilisateur")
+    void modifierUtilisateur_succes() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(utilisateur));
+        when(userRepository.save(any())).thenReturn(utilisateur);
+
+        UserEntity resultat = userService.modifierUtilisateur(1L, utilisateur);
+
+        assertThat(resultat).isNotNull();
+        verify(userRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("modifierUtilisateur() — lève exception si utilisateur non trouvé")
+    void modifierUtilisateur_leveExceptionSiAbsent() {
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.modifierUtilisateur(999L, utilisateur))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Utilisateur non trouvé");
+    }
 }

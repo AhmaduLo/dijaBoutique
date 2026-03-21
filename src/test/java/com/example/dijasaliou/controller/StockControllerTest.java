@@ -19,7 +19,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -58,6 +57,12 @@ class StockControllerTest {
 
     @MockitoBean(name = "jwtService")
     private com.example.dijasaliou.jwt.JwtService jwtService;
+
+    @MockitoBean
+    private com.example.dijasaliou.config.HibernateFilterInterceptor hibernateFilterInterceptor;
+
+    @MockitoBean
+    private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
 
     private StockDto stockTest1;
     private StockDto stockTest2;
@@ -177,17 +182,16 @@ class StockControllerTest {
 
     @Test
     @DisplayName("GET /stock/produit/{nomProduit} - Devrait lancer une exception si produit inexistant")
-    void obtenirStockParProduit_DevraitLancerExceptionSiProduitInexistant() {
+    void obtenirStockParProduit_DevraitLancerExceptionSiProduitInexistant() throws Exception {
         // Arrange
         String nomProduit = "Produit Inexistant";
         when(stockService.obtenirStockParNomProduit(nomProduit))
                 .thenThrow(new RuntimeException("Produit non trouvé"));
 
         // Act & Assert
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(get("/stock/produit/{nomProduit}", nomProduit)
-                    .contentType(MediaType.APPLICATION_JSON));
-        });
+        mockMvc.perform(get("/stock/produit/{nomProduit}", nomProduit)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
 
         verify(stockService, times(1)).obtenirStockParNomProduit(nomProduit);
     }

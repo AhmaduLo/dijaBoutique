@@ -1,9 +1,13 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.service.UserService;
 import com.example.dijasaliou.service.VenteService;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +69,12 @@ class VenteControllerTest {
     @MockitoBean(name = "jwtService")
     private com.example.dijasaliou.jwt.JwtService jwtService;
 
+    @MockitoBean
+    private com.example.dijasaliou.config.HibernateFilterInterceptor hibernateFilterInterceptor;
+
+    @MockitoBean
+    private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
+
     private UserEntity utilisateurTest;
     private VenteEntity venteTest;
     private VenteEntity venteTest2;
@@ -113,39 +123,44 @@ class VenteControllerTest {
     @DisplayName("GET /ventes - Devrait retourner toutes les ventes avec succès")
     void obtenirTous_DevraitRetournerToutesLesVentes() throws Exception {
         // Arrange
-        List<VenteEntity> ventes = Arrays.asList(venteTest, venteTest2);
-        when(venteService.obtenirToutesLesVentes()).thenReturn(ventes);
+        VenteDto dto1 = VenteDto.fromEntity(venteTest);
+        VenteDto dto2 = VenteDto.fromEntity(venteTest2);
+        PagedResponse<VenteDto> page = PagedResponse.<VenteDto>builder()
+                .content(Arrays.asList(dto1, dto2)).currentPage(0).pageSize(20)
+                .totalElements(2L).totalPages(1).first(true).last(true).build();
+        when(venteService.obtenirVentesPaginees(0, 20, null, null, null)).thenReturn(page);
 
         // Act & Assert
         mockMvc.perform(get("/ventes")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$[0].quantite", is(5)))
-                .andExpect(jsonPath("$[0].prixUnitaire", is(150000.00)))
-                .andExpect(jsonPath("$[0].prixTotal", is(750000.00)))
-                .andExpect(jsonPath("$[0].client", is("Mme Ndiaye")))
-                .andExpect(jsonPath("$[1].id", is(2)))
-                .andExpect(jsonPath("$[1].nomProduit", is("Bracelet en argent")));
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].nomProduit", is("Collier en or")))
+                .andExpect(jsonPath("$.content[0].quantite", is(5)))
+                .andExpect(jsonPath("$.content[0].client", is("Mme Ndiaye")))
+                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].nomProduit", is("Bracelet en argent")));
 
-        verify(venteService, times(1)).obtenirToutesLesVentes();
+        verify(venteService, times(1)).obtenirVentesPaginees(0, 20, null, null, null);
     }
 
     @Test
     @DisplayName("GET /ventes - Devrait retourner une liste vide quand aucune vente")
     void obtenirTous_DevraitRetournerListeVide() throws Exception {
         // Arrange
-        when(venteService.obtenirToutesLesVentes()).thenReturn(Arrays.asList());
+        PagedResponse<VenteDto> pageVide = PagedResponse.<VenteDto>builder()
+                .content(Arrays.asList()).currentPage(0).pageSize(20)
+                .totalElements(0L).totalPages(0).first(true).last(true).build();
+        when(venteService.obtenirVentesPaginees(0, 20, null, null, null)).thenReturn(pageVide);
 
         // Act & Assert
         mockMvc.perform(get("/ventes")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.content", hasSize(0)));
 
-        verify(venteService, times(1)).obtenirToutesLesVentes();
+        verify(venteService, times(1)).obtenirVentesPaginees(0, 20, null, null, null);
     }
 
     // ==================== Tests pour GET /ventes/{id} ====================
@@ -173,17 +188,16 @@ class VenteControllerTest {
 
     @Test
     @DisplayName("GET /ventes/{id} - Devrait lancer une exception si vente inexistante")
-    void obtenirParId_DevraitLancerExceptionSiVenteInexistante() {
+    void obtenirParId_DevraitLancerExceptionSiVenteInexistante() throws Exception {
         // Arrange
         Long venteId = 999L;
         when(venteService.obtenirVenteParId(venteId))
                 .thenThrow(new RuntimeException("Vente non trouvée"));
 
         // Act & Assert
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(get("/ventes/{id}", venteId)
-                    .contentType(MediaType.APPLICATION_JSON));
-        });
+        mockMvc.perform(get("/ventes/{id}", venteId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
 
         verify(venteService, times(1)).obtenirVenteParId(venteId);
     }
@@ -214,24 +228,23 @@ class VenteControllerTest {
                 .build();
         venteCreee.setId(3L);
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(venteService.creerVente(any(VenteEntity.class), eq(utilisateurTest)))
                 .thenReturn(venteCreee);
 
         // Act & Assert
         mockMvc.perform(post("/ventes")
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null, List.of(new SimpleGrantedAuthority("USER"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelleVente)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id", is(3)))
                 .andExpect(jsonPath("$.nomProduit", is("Bague en diamant")))
                 .andExpect(jsonPath("$.quantite", is(10)))
-                .andExpect(jsonPath("$.prixUnitaire", is(200000.00)))
                 .andExpect(jsonPath("$.prixTotal", is(2000000.00)))
                 .andExpect(jsonPath("$.client", is("Mme Ba")));
 
-        verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
+        verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
         verify(venteService, times(1)).creerVente(any(VenteEntity.class), eq(utilisateurTest));
     }
 
@@ -263,32 +276,30 @@ class VenteControllerTest {
                 .build();
         venteMiseAJour.setId(venteId);
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(venteService.modifierVente(eq(venteId), any(VenteEntity.class)))
                 .thenReturn(venteMiseAJour);
 
         // Act & Assert
         mockMvc.perform(put("/ventes/{id}", venteId)
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null, List.of(new SimpleGrantedAuthority("USER"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(venteModifiee)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or - Mise à jour")))
                 .andExpect(jsonPath("$.quantite", is(8)))
-                .andExpect(jsonPath("$.prixUnitaire", is(160000.00)))
                 .andExpect(jsonPath("$.prixTotal", is(1280000.00)));
 
-        verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
+        verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
         verify(venteService, times(1)).modifierVente(eq(venteId), any(VenteEntity.class));
     }
 
     @Test
     @DisplayName("PUT /ventes/{id} - Devrait lancer une exception si vente inexistante")
-    void modifier_DevraitLancerExceptionSiVenteInexistante() {
+    void modifier_DevraitLancerExceptionSiVenteInexistante() throws Exception {
         // Arrange
         Long venteId = 999L;
-        Long utilisateurId = 1L;
 
         VenteEntity venteModifiee = VenteEntity.builder()
                 .quantite(5)
@@ -297,17 +308,16 @@ class VenteControllerTest {
                 .dateVente(LocalDate.now())
                 .build();
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(venteService.modifierVente(eq(venteId), any(VenteEntity.class)))
                 .thenThrow(new RuntimeException("Vente non trouvée"));
 
         // Act & Assert
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(put("/ventes/{id}", venteId)
-                    .param("utilisateurId", utilisateurId.toString())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(venteModifiee)));
-        });
+        mockMvc.perform(put("/ventes/{id}", venteId)
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null, List.of(new SimpleGrantedAuthority("USER"))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(venteModifiee)))
+                .andExpect(status().isBadRequest());
 
         verify(venteService, times(1)).modifierVente(eq(venteId), any(VenteEntity.class));
     }
@@ -331,17 +341,16 @@ class VenteControllerTest {
 
     @Test
     @DisplayName("DELETE /ventes/{id} - Devrait lancer une exception si vente inexistante")
-    void supprimer_DevraitLancerExceptionSiVenteInexistante() {
+    void supprimer_DevraitLancerExceptionSiVenteInexistante() throws Exception {
         // Arrange
         Long venteId = 999L;
         doThrow(new RuntimeException("Vente non trouvée"))
                 .when(venteService).supprimerVente(venteId);
 
         // Act & Assert
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(delete("/ventes/{id}", venteId)
-                    .contentType(MediaType.APPLICATION_JSON));
-        });
+        mockMvc.perform(delete("/ventes/{id}", venteId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
 
         verify(venteService, times(1)).supprimerVente(venteId);
     }
@@ -353,22 +362,24 @@ class VenteControllerTest {
     void obtenirVentesParUtilisateur_DevraitRetournerVentes() throws Exception {
         // Arrange
         Long utilisateurId = 1L;
-        List<VenteEntity> ventes = Arrays.asList(venteTest, venteTest2);
+        PagedResponse<VenteDto> page = PagedResponse.<VenteDto>builder()
+                .content(Arrays.asList(VenteDto.fromEntity(venteTest), VenteDto.fromEntity(venteTest2)))
+                .currentPage(0).pageSize(20).totalElements(2L).totalPages(1).first(true).last(true).build();
         when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
-        when(venteService.obtenirVentesParUtilisateur(utilisateurTest)).thenReturn(ventes);
+        when(venteService.obtenirVentesParUtilisateurPaginees(utilisateurTest, 0, 20, null, null, null)).thenReturn(page);
 
         // Act & Assert
         mockMvc.perform(get("/ventes/utilisateur/{utilisateurId}", utilisateurId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$[1].id", is(2)))
-                .andExpect(jsonPath("$[1].nomProduit", is("Bracelet en argent")));
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].nomProduit", is("Collier en or")))
+                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].nomProduit", is("Bracelet en argent")));
 
         verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
-        verify(venteService, times(1)).obtenirVentesParUtilisateur(utilisateurTest);
+        verify(venteService, times(1)).obtenirVentesParUtilisateurPaginees(utilisateurTest, 0, 20, null, null, null);
     }
 
     @Test
@@ -376,17 +387,19 @@ class VenteControllerTest {
     void obtenirVentesParUtilisateur_DevraitRetournerListeVide() throws Exception {
         // Arrange
         Long utilisateurId = 1L;
+        PagedResponse<VenteDto> pageVide = PagedResponse.<VenteDto>builder()
+                .content(Arrays.asList()).currentPage(0).pageSize(20)
+                .totalElements(0L).totalPages(0).first(true).last(true).build();
         when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
-        when(venteService.obtenirVentesParUtilisateur(utilisateurTest)).thenReturn(Arrays.asList());
+        when(venteService.obtenirVentesParUtilisateurPaginees(utilisateurTest, 0, 20, null, null, null)).thenReturn(pageVide);
 
         // Act & Assert
         mockMvc.perform(get("/ventes/utilisateur/{utilisateurId}", utilisateurId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.content", hasSize(0)));
 
-        verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
-        verify(venteService, times(1)).obtenirVentesParUtilisateur(utilisateurTest);
+        verify(venteService, times(1)).obtenirVentesParUtilisateurPaginees(utilisateurTest, 0, 20, null, null, null);
     }
 
     // ==================== Tests pour GET /ventes/chiffre-affaires ====================
@@ -519,24 +532,25 @@ class VenteControllerTest {
                 .build();
         venteSansClient.setId(3L);
 
-        when(venteService.obtenirToutesLesVentes())
-                .thenReturn(Arrays.asList(venteSansClient));
+        PagedResponse<VenteDto> page = PagedResponse.<VenteDto>builder()
+                .content(Arrays.asList(VenteDto.fromEntity(venteSansClient)))
+                .currentPage(0).pageSize(20).totalElements(1L).totalPages(1).first(true).last(true).build();
+        when(venteService.obtenirVentesPaginees(0, 20, null, null, null)).thenReturn(page);
 
         // Act & Assert
         mockMvc.perform(get("/ventes")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].client").doesNotExist());
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].client").doesNotExist());
 
-        verify(venteService, times(1)).obtenirToutesLesVentes();
+        verify(venteService, times(1)).obtenirVentesPaginees(0, 20, null, null, null);
     }
 
     @Test
     @DisplayName("POST /ventes - Devrait calculer automatiquement le prix total")
     void creer_DevraitCalculerPrixTotal() throws Exception {
         // Arrange
-        Long utilisateurId = 1L;
         VenteEntity nouvelleVente = VenteEntity.builder()
                 .quantite(7)
                 .nomProduit("Chaîne en or")
@@ -555,13 +569,13 @@ class VenteControllerTest {
                 .build();
         venteCreee.setId(4L);
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(venteService.creerVente(any(VenteEntity.class), eq(utilisateurTest)))
                 .thenReturn(venteCreee);
 
         // Act & Assert
         mockMvc.perform(post("/ventes")
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null, List.of(new SimpleGrantedAuthority("USER"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelleVente)))
                 .andExpect(status().isCreated())

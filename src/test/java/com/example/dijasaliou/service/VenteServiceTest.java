@@ -16,6 +16,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -546,6 +550,84 @@ class VenteServiceTest {
         // 1000 + 300 = 1300
         assertThat((BigDecimal) especes.get("total")).isEqualByComparingTo(new BigDecimal("1300.00"));
         assertThat(especes.get("nombre")).isEqualTo(3L); // 2 + 1
+    }
+
+    // =========================================================
+    // modifierVente
+    // =========================================================
+
+    @Test
+    @DisplayName("modifierVente() — modifie et sauvegarde la vente")
+    void modifierVente_succes() {
+        venteValide.setId(1L);
+        VenteEntity modifications = VenteEntity.builder()
+                .quantite(3)
+                .nomProduit("Ordinateur") // même nom → pas d'appel au StockService
+                .prixUnitaire(new BigDecimal("600.00"))
+                .dateVente(LocalDate.now())
+                .build();
+
+        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.save(any())).thenReturn(venteValide);
+
+        VenteEntity resultat = venteService.modifierVente(1L, modifications);
+
+        assertThat(resultat).isNotNull();
+        verify(venteRepository).save(venteValide);
+        verify(stockService, never()).obtenirStockParNomProduit(any());
+    }
+
+    @Test
+    @DisplayName("modifierVente() — lève SecurityException si tenant différent")
+    void modifierVente_leveSecurityExceptionTenantDifferent() {
+        venteValide.setId(1L);
+        VenteEntity modifications = VenteEntity.builder()
+                .quantite(3).nomProduit("Ordinateur")
+                .prixUnitaire(new BigDecimal("600.00"))
+                .dateVente(LocalDate.now())
+                .build();
+
+        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        when(tenantService.getCurrentTenant()).thenReturn(autreenant());
+
+        assertThatThrownBy(() -> venteService.modifierVente(1L, modifications))
+                .isInstanceOf(SecurityException.class)
+                .hasMessageContaining("Accès refusé");
+    }
+
+    // =========================================================
+    // obtenirVentesPaginees / obtenirVentesParUtilisateurPaginees
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirVentesPaginees() — retourne une page de ventes")
+    void obtenirVentesPaginees_retournePage() {
+        Page<VenteEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(venteRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = venteService.obtenirVentesPaginees(0, 10, null, null, null);
+
+        assertThat(resultat).isNotNull();
+        assertThat(resultat.getContent()).isEmpty();
+        verify(venteRepository).findAllWithSearch(isNull(), isNull(), isNull(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("obtenirVentesParUtilisateurPaginees() — retourne une page filtrée par utilisateur")
+    void obtenirVentesParUtilisateurPaginees_retournePage() {
+        Page<VenteEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(venteRepository.findByUtilisateurWithSearch(
+                eq(utilisateurTest), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = venteService.obtenirVentesParUtilisateurPaginees(
+                utilisateurTest, 0, 10, null, null, null);
+
+        assertThat(resultat).isNotNull();
+        verify(venteRepository).findByUtilisateurWithSearch(
+                eq(utilisateurTest), isNull(), isNull(), isNull(), any(Pageable.class));
     }
 
     // =========================================================

@@ -62,6 +62,12 @@ class DeviseControllerTest {
     @MockitoBean(name = "jwtService")
     private com.example.dijasaliou.jwt.JwtService jwtService;
 
+    @MockitoBean
+    private com.example.dijasaliou.config.HibernateFilterInterceptor hibernateFilterInterceptor;
+
+    @MockitoBean
+    private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
+
     private DeviseEntity deviseXOF;
     private DeviseEntity deviseEUR;
     private DeviseEntity deviseUSD;

@@ -210,6 +210,36 @@ class AdminServiceTest {
     // obtenirStatistiques
     // =========================================================
 
+    // =========================================================
+    // obtenirUtilisateurParId
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirUtilisateurParId() — retourne l'utilisateur si trouvé")
+    void obtenirUtilisateurParId_retourneUser() {
+        when(userRepository.findByEmailAndDeletedFalse("admin@example.com")).thenReturn(Optional.of(admin));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+
+        var resultat = adminService.obtenirUtilisateurParId(2L, "admin@example.com");
+
+        assertThat(resultat).isNotNull();
+    }
+
+    @Test
+    @DisplayName("obtenirUtilisateurParId() — lève exception si utilisateur non trouvé")
+    void obtenirUtilisateurParId_leveException() {
+        when(userRepository.findByEmailAndDeletedFalse("admin@example.com")).thenReturn(Optional.of(admin));
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> adminService.obtenirUtilisateurParId(999L, "admin@example.com"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Utilisateur non trouvé");
+    }
+
+    // =========================================================
+    // obtenirStatistiques
+    // =========================================================
+
     @Test
     @DisplayName("obtenirStatistiques() — retourne les clés nombreTotal, nombreAdmins, nombreUsers")
     void obtenirStatistiques_retourneStats() {
