@@ -4,10 +4,14 @@ import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.ClientEntity;
+import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
+import com.example.dijasaliou.entity.PaiementCreditEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.ClientRepository;
+import com.example.dijasaliou.repository.CreditClientRepository;
+import com.example.dijasaliou.repository.PaiementCreditRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -18,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -33,19 +38,25 @@ public class VenteService {
     private final StockAlertService stockAlertService;
     private final CreditClientService creditClientService;
     private final ClientRepository clientRepository;
+    private final CreditClientRepository creditClientRepository;
+    private final PaiementCreditRepository paiementCreditRepository;
 
     public VenteService(VenteRepository venteRepository,
                         @Lazy StockService stockService,
                         TenantService tenantService,
                         StockAlertService stockAlertService,
                         @Lazy CreditClientService creditClientService,
-                        ClientRepository clientRepository) {
+                        ClientRepository clientRepository,
+                        CreditClientRepository creditClientRepository,
+                        PaiementCreditRepository paiementCreditRepository) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
         this.tenantService = tenantService;
         this.stockAlertService = stockAlertService;
         this.creditClientService = creditClientService;
         this.clientRepository = clientRepository;
+        this.creditClientRepository = creditClientRepository;
+        this.paiementCreditRepository = paiementCreditRepository;
     }
 
     /**
@@ -244,6 +255,78 @@ public class VenteService {
         return ventes.stream()
                 .map(VenteEntity::getPrixTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * Calcule la répartition du CA par mode de paiement pour une période.
+     *
+     * Logique :
+     * - ESPECES / WAVE / ORANGE_MONEY = ventes directes + remboursements de crédits du même mode
+     * - CREDIT = somme des montants restants dus sur les crédits non soldés (créés dans la période)
+     *
+     * Retourne une map : mode → {total, nombre}
+     */
+    public Map<String, Object> calculerRapportModePaiement(LocalDate debut, LocalDate fin) {
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+
+        Map<String, java.math.BigDecimal> totaux = new java.util.LinkedHashMap<>();
+        Map<String, Long> nombres = new java.util.LinkedHashMap<>();
+        for (String mode : List.of("ESPECES", "WAVE", "ORANGE_MONEY", "CREDIT")) {
+            totaux.put(mode, java.math.BigDecimal.ZERO);
+            nombres.put(mode, 0L);
+        }
+
+        // 1. Ventes directes non-CREDIT groupées par mode
+        List<Object[]> directVentes = venteRepository.sumDirectVentesParModeEtPeriode(
+                debut, fin, VenteEntity.ModePaiementVente.CREDIT, tenantUuid);
+        for (Object[] row : directVentes) {
+            String mode = ((VenteEntity.ModePaiementVente) row[0]).name();
+            Long count = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
+            java.math.BigDecimal total = row[2] instanceof java.math.BigDecimal
+                    ? (java.math.BigDecimal) row[2]
+                    : (row[2] instanceof Number ? new java.math.BigDecimal(row[2].toString()) : java.math.BigDecimal.ZERO);
+            totaux.put(mode, total);
+            nombres.put(mode, count);
+        }
+
+        // 2. Montant restant dû sur les crédits non soldés créés dans la période
+        Object[] creditRow = creditClientRepository.sumCreditsRestantParPeriode(
+                debut, fin, StatutCredit.SOLDE, tenantUuid);
+        if (creditRow != null && creditRow[1] != null) {
+            java.math.BigDecimal creditTotal = creditRow[1] instanceof java.math.BigDecimal
+                    ? (java.math.BigDecimal) creditRow[1]
+                    : new java.math.BigDecimal(creditRow[1].toString());
+            Long creditCount = creditRow[0] instanceof Number ? ((Number) creditRow[0]).longValue() : 0L;
+            totaux.put("CREDIT", creditTotal);
+            nombres.put("CREDIT", creditCount);
+        }
+
+        // 3. Remboursements de crédits par mode, additionnés aux totaux correspondants
+        List<Object[]> paiementsCredit = paiementCreditRepository.sumParModeEtPeriode(
+                debut, fin, tenantUuid);
+        for (Object[] row : paiementsCredit) {
+            String mode = ((PaiementCreditEntity.ModePaiement) row[0]).name();
+            Long count = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
+            java.math.BigDecimal total = row[2] instanceof java.math.BigDecimal
+                    ? (java.math.BigDecimal) row[2]
+                    : (row[2] instanceof Number ? new java.math.BigDecimal(row[2].toString()) : null);
+            if (total != null) {
+                totaux.merge(mode, total, java.math.BigDecimal::add);
+            }
+            if (count > 0) {
+                nombres.merge(mode, count, Long::sum);
+            }
+        }
+
+        // Construire la réponse : {ESPECES: {total, nombre}, WAVE: {...}, ...}
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        for (String mode : totaux.keySet()) {
+            Map<String, Object> entry = new java.util.LinkedHashMap<>();
+            entry.put("total", totaux.get(mode));
+            entry.put("nombre", nombres.get(mode));
+            result.put(mode, entry);
+        }
+        return result;
     }
 
     /**

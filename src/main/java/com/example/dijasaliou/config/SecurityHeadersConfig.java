@@ -50,6 +50,7 @@ public class SecurityHeadersConfig implements Filter {
                 "img-src 'self' data: blob: https:; " +
                 "font-src 'self' data:; " +
                 "connect-src 'self'; " +
+                "worker-src blob: 'self'; " +
                 "frame-ancestors 'none'; " +
                 "base-uri 'self'; " +
                 "form-action 'self'");
