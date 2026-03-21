@@ -99,6 +99,17 @@ public class VenteController {
     }
 
     /**
+     * GET /api/ventes/prochain-numero-facture
+     * Retourne le prochain numéro de ticket/facture unique basé sur le compteur en BDD.
+     */
+    @GetMapping("/prochain-numero-facture")
+    @PreAuthorize("hasAnyAuthority('USER', 'GERANT', 'ADMIN')")
+    public ResponseEntity<Map<String, String>> getProchainNumeroFacture() {
+        String numero = venteService.getProchainNumeroFacture();
+        return ResponseEntity.ok(Map.of("numero", numero));
+    }
+
+    /**
      * DELETE /api/ventes/{id}
      */
     @DeleteMapping("/{id}")

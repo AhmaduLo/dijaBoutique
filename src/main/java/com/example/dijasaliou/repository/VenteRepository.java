@@ -55,6 +55,9 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
     @Query("SELECT SUM(v.quantite) FROM VenteEntity v WHERE v.nomProduit = :nomProduit AND v.tenant = :tenant")
     Integer sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
 
+    @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.tenantUuid = :tenantUuid")
+    long countByTenantUuid(@Param("tenantUuid") String tenantUuid);
+
     /**
      * Recherche paginée avec filtre optionnel sur nomProduit, client et plage de dates
      */

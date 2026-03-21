@@ -333,6 +333,17 @@ public class VenteService {
     }
 
     /**
+     * Retourne le prochain numéro de ticket/facture pour le tenant courant.
+     * Format : FAC-001, FAC-002, ...
+     * Basé sur le nombre de ventes existantes en base → jamais de doublon entre appareils.
+     */
+    public String getProchainNumeroFacture() {
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        long count = venteRepository.countByTenantUuid(tenantUuid);
+        return String.format("FAC-%03d", count + 1);
+    }
+
+    /**
      * VALIDATION
      */
     private void validerVente(VenteEntity vente) {
