@@ -30,16 +30,18 @@ public class ClientService {
 
     public List<ClientDto> rechercherClients(String search) {
         String searchParam = (search != null && !search.isBlank()) ? search : null;
-        return clientRepository.findAllWithSearch(searchParam).stream()
-                .map(c -> ClientDto.fromEntity(c, countCreditsActifs(c.getId())))
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        return clientRepository.findAllWithSearch(searchParam, tenantUuid).stream()
+                .map(c -> ClientDto.fromEntity(c, countCreditsActifs(c.getId(), tenantUuid)))
                 .collect(Collectors.toList());
     }
 
     public PagedResponse<ClientDto> obtenirClientsPagines(int page, int size, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "nom"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
-        Page<ClientEntity> pageResult = clientRepository.findAllWithSearchPaged(searchParam, pageable);
-        Page<ClientDto> dtoPage = pageResult.map(c -> ClientDto.fromEntity(c, countCreditsActifs(c.getId())));
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        Page<ClientEntity> pageResult = clientRepository.findAllWithSearchPaged(searchParam, tenantUuid, pageable);
+        Page<ClientDto> dtoPage = pageResult.map(c -> ClientDto.fromEntity(c, countCreditsActifs(c.getId(), tenantUuid)));
         return PagedResponse.from(dtoPage);
     }
 
@@ -62,10 +64,11 @@ public class ClientService {
     public ClientDto obtenirClientParId(Long id) {
         ClientEntity client = clientRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Client introuvable : " + id));
-        return ClientDto.fromEntity(client, countCreditsActifs(id));
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        return ClientDto.fromEntity(client, countCreditsActifs(id, tenantUuid));
     }
 
-    private long countCreditsActifs(Long clientId) {
-        return creditClientRepository.countCreditsActifsByClientId(clientId, CreditClientEntity.StatutCredit.SOLDE);
+    private long countCreditsActifs(Long clientId, String tenantUuid) {
+        return creditClientRepository.countCreditsActifsByClientId(clientId, CreditClientEntity.StatutCredit.SOLDE, tenantUuid);
     }
 }

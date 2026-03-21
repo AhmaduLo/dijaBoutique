@@ -88,6 +88,7 @@ public class VenteService {
     /**
      * Créer une nouvelle vente
      */
+    @org.springframework.transaction.annotation.Transactional
     public VenteEntity creerVente(VenteEntity vente, UserEntity utilisateur) {
         // Validation
         validerVente(vente);
@@ -142,17 +143,13 @@ public class VenteService {
                         "Un client enregistré est obligatoire pour une vente à crédit");
             }
             venteSauvegardee.setEstSoldee(false);
+            venteSauvegardee.setClientRef(clientPourCredit);
             venteRepository.save(venteSauvegardee);
-            try {
-                creditClientService.creerCreditDepuisVente(
-                        venteSauvegardee,
-                        clientPourCredit,
-                        utilisateur,
-                        vente.getDateEcheance());
-            } catch (Exception e) {
-                log.error("Erreur lors de la création du crédit pour la vente #{} : {}",
-                        venteSauvegardee.getId(), e.getMessage());
-            }
+            creditClientService.creerCreditDepuisVente(
+                    venteSauvegardee,
+                    clientPourCredit,
+                    utilisateur,
+                    vente.getDateEcheance());
         }
 
         return venteSauvegardee;
@@ -207,14 +204,18 @@ public class VenteService {
     /**
      * Supprimer une vente
      */
+    @org.springframework.transaction.annotation.Transactional
     public void supprimerVente(Long id) {
-        // Récupérer la vente existante
         VenteEntity venteExistante = obtenirVenteParId(id);
 
-        // SÉCURITÉ : Vérifier que la vente appartient au tenant actuel (double sécurité)
         TenantEntity tenantActuel = tenantService.getCurrentTenant();
         if (!venteExistante.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
+        }
+
+        // Nettoyer les crédits liés avant suppression (évite crédits orphelins et dette corrompue)
+        if (venteExistante.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT) {
+            creditClientService.supprimerCreditsDeLaVente(id);
         }
 
         venteRepository.deleteById(id);

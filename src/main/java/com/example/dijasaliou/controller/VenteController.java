@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import org.springframework.security.core.Authentication;
@@ -110,6 +111,7 @@ public class VenteController {
      * GET /api/ventes/utilisateur/{utilisateurId}?page=0&size=20&search=xxx&dateDebut=...&dateFin=...
      */
     @GetMapping("/utilisateur/{utilisateurId}")
+    @PreAuthorize("hasAnyAuthority('USER', 'GERANT', 'ADMIN')")
     public ResponseEntity<PagedResponse<VenteDto>> obtenirVentesParUtilisateur(
             @PathVariable Long utilisateurId,
             @RequestParam(defaultValue = "0") int page,
@@ -129,6 +131,7 @@ public class VenteController {
      * Exemple : GET /api/ventes/chiffre-affaires?debut=2025-10-01&fin=2025-10-31
      */
     @GetMapping("/chiffre-affaires")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<BigDecimal> calculerChiffreAffaires(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
@@ -145,6 +148,7 @@ public class VenteController {
      * Exemple : GET /api/ventes/statistiques?debut=2025-10-01&fin=2025-10-31
      */
     @GetMapping("/statistiques")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> obtenirStatistiques(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {

@@ -105,6 +105,13 @@ public class SecurityConfig {
                         .requestMatchers("/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
                         .requestMatchers("/bons-de-livraison/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
 
+                        // Routes clients et crédits (plan Entreprise)
+                        .requestMatchers(HttpMethod.GET, "/clients/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/clients/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/clients/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/clients/**").hasAnyAuthority("ADMIN")
+                        .requestMatchers("/credits/**").hasAnyAuthority("GERANT", "ADMIN")
+
                         // Routes devises : lecture accessible à tous, modification ADMIN uniquement
                         .requestMatchers("/devises/**").authenticated()
 

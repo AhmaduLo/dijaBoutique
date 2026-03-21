@@ -15,16 +15,18 @@ public interface ClientRepository extends JpaRepository<ClientEntity, Long> {
 
     @Query("SELECT c FROM ClientEntity c WHERE " +
            "(:search IS NULL OR LOWER(c.nom) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(c.telephone) LIKE LOWER(CONCAT('%', :search, '%')))")
-    List<ClientEntity> findAllWithSearch(@Param("search") String search);
+           "OR LOWER(c.telephone) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND c.tenant.tenantUuid = :tenantUuid")
+    List<ClientEntity> findAllWithSearch(@Param("search") String search, @Param("tenantUuid") String tenantUuid);
 
     @Query("SELECT c FROM ClientEntity c WHERE " +
            "(:search IS NULL OR LOWER(c.nom) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(c.telephone) LIKE LOWER(CONCAT('%', :search, '%')))")
-    Page<ClientEntity> findAllWithSearchPaged(@Param("search") String search, Pageable pageable);
+           "OR LOWER(c.telephone) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND c.tenant.tenantUuid = :tenantUuid")
+    Page<ClientEntity> findAllWithSearchPaged(@Param("search") String search, @Param("tenantUuid") String tenantUuid, Pageable pageable);
 
-    @Query("SELECT c FROM ClientEntity c WHERE c.detteTotale > 0 ORDER BY c.detteTotale DESC")
-    List<ClientEntity> findClientsAvecDette();
+    @Query("SELECT c FROM ClientEntity c WHERE c.detteTotale > 0 AND c.tenant.tenantUuid = :tenantUuid ORDER BY c.detteTotale DESC")
+    List<ClientEntity> findClientsAvecDette(@Param("tenantUuid") String tenantUuid);
 
     boolean existsByTelephone(String telephone);
 }

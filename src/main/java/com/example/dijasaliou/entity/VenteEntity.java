@@ -34,10 +34,6 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = false)
 public class VenteEntity  extends BaseEntity{
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
     @NotNull(message = "La quantité est obligatoire")
     @Positive(message = "La quantité doit être positive")
     @Column(name = "quantite", nullable = false)
@@ -53,8 +49,6 @@ public class VenteEntity  extends BaseEntity{
     @Column(name = "prix_unitaire", nullable = false, precision = 10, scale = 2)
     private BigDecimal prixUnitaire;
 
-    @NotNull(message = "Le prix total est obligatoire")
-    @DecimalMin(value = "0.01", message = "Le prix total doit être supérieur à 0")
     @Column(name = "prix_total", nullable = false, precision = 10, scale = 2)
     private BigDecimal prixTotal;
 
@@ -241,19 +235,14 @@ public class VenteEntity  extends BaseEntity{
      * LIFECYCLE CALLBACKS
      */
 
-    @PrePersist
-    protected void onCreate() {
-        // Calcul automatique
+    @Override
+    protected void beforePersist() {
         if (this.prixTotal == null) {
             calculerPrixTotal();
         }
-
-        // Date par défaut
         if (this.dateVente == null) {
             this.dateVente = LocalDate.now();
         }
-
-        // Nettoyer les champs
         if (this.nomProduit != null) {
             this.nomProduit = this.nomProduit.trim();
         }
@@ -262,8 +251,8 @@ public class VenteEntity  extends BaseEntity{
         }
     }
 
-    @PreUpdate
-    protected void onUpdate() {
+    @Override
+    protected void beforeUpdate() {
         calculerPrixTotal();
     }
 

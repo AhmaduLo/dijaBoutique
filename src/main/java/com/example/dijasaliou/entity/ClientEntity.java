@@ -50,7 +50,7 @@ public class ClientEntity extends BaseEntity {
     @JsonIgnore
     private TenantEntity tenant;
 
-    @OneToMany(mappedBy = "client", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     @JsonIgnore
     private List<CreditClientEntity> credits = new ArrayList<>();

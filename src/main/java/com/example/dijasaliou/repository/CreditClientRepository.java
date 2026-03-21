@@ -19,32 +19,37 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
 
     @Query(value = "SELECT c FROM CreditClientEntity c WHERE " +
            "(:statut IS NULL OR c.statut = :statut) AND " +
-           "(:search IS NULL OR LOWER(c.client.nom) LIKE LOWER(CONCAT('%', :search, '%')))",
+           "(:search IS NULL OR LOWER(c.client.nom) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "c.tenant.tenantUuid = :tenantUuid",
            countQuery = "SELECT COUNT(c) FROM CreditClientEntity c WHERE " +
            "(:statut IS NULL OR c.statut = :statut) AND " +
-           "(:search IS NULL OR LOWER(c.client.nom) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "(:search IS NULL OR LOWER(c.client.nom) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "c.tenant.tenantUuid = :tenantUuid")
     Page<CreditClientEntity> findAllWithSearch(
             @Param("statut") StatutCredit statut,
             @Param("search") String search,
+            @Param("tenantUuid") String tenantUuid,
             Pageable pageable);
 
     List<CreditClientEntity> findByClientOrderByCreatedDateAsc(ClientEntity client);
 
-    @Query("SELECT COALESCE(SUM(c.montantRestant), 0) FROM CreditClientEntity c WHERE c.statut != :statut")
-    BigDecimal sumMontantRestantActif(@Param("statut") StatutCredit statut);
+    List<CreditClientEntity> findByVenteId(Long venteId);
 
-    @Query("SELECT COALESCE(SUM(c.montantInitial), 0) FROM CreditClientEntity c WHERE c.statut != :statut")
-    BigDecimal sumMontantInitialActif(@Param("statut") StatutCredit statut);
+    @Query("SELECT COALESCE(SUM(c.montantRestant), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
+    BigDecimal sumMontantRestantActif(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
-    @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.statut != :statut")
-    long countCreditsActifs(@Param("statut") StatutCredit statut);
+    @Query("SELECT COALESCE(SUM(c.montantInitial), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
+    BigDecimal sumMontantInitialActif(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
-    @Query("SELECT COUNT(DISTINCT c.client) FROM CreditClientEntity c WHERE c.statut != :statut")
-    long countClientsCrediteurs(@Param("statut") StatutCredit statut);
+    @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
+    long countCreditsActifs(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
-    @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.statut != :statut AND c.dateEcheance IS NOT NULL AND c.dateEcheance < :today")
-    long countCreditsEnRetard(@Param("statut") StatutCredit statut, @Param("today") LocalDate today);
+    @Query("SELECT COUNT(DISTINCT c.client) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
+    long countClientsCrediteurs(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
-    @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.client.id = :clientId AND c.statut != :statut")
-    long countCreditsActifsByClientId(@Param("clientId") Long clientId, @Param("statut") StatutCredit statut);
+    @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.statut != :statut AND c.dateEcheance IS NOT NULL AND c.dateEcheance < :today AND c.tenant.tenantUuid = :tenantUuid")
+    long countCreditsEnRetard(@Param("statut") StatutCredit statut, @Param("today") LocalDate today, @Param("tenantUuid") String tenantUuid);
+
+    @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.client.id = :clientId AND c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
+    long countCreditsActifsByClientId(@Param("clientId") Long clientId, @Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 }

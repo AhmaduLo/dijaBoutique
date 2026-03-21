@@ -116,9 +116,9 @@ public class CreditClientService {
         ClientEntity client = credit.getClient();
 
         if (nouveauRestant.compareTo(BigDecimal.ZERO) == 0) {
-            // Crédit soldé
+            // Crédit soldé — soustraire uniquement le montant de CE paiement (les partiels précédents ont déjà réduit la dette)
             credit.setStatut(StatutCredit.SOLDE);
-            BigDecimal nouvelleDette = client.getDetteTotale().subtract(credit.getMontantInitial());
+            BigDecimal nouvelleDette = client.getDetteTotale().subtract(montant);
             client.setDetteTotale(nouvelleDette.max(BigDecimal.ZERO));
             // Marquer la vente comme soldée
             if (credit.getVente() != null) {
@@ -144,6 +144,7 @@ public class CreditClientService {
 
     public PagedResponse<CreditClientDto> obtenirCredits(int page, int size, String search, String statut) {
         Pageable pageable = PageRequest.of(page, size);
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
         StatutCredit statutEnum = null;
         if (statut != null && !statut.isBlank() && !statut.equals("TOUS")) {
             try {
@@ -153,6 +154,7 @@ public class CreditClientService {
         Page<CreditClientEntity> pageResult = creditClientRepository.findAllWithSearch(
                 statutEnum,
                 (search != null && !search.isBlank()) ? search : null,
+                tenantUuid,
                 pageable);
         Page<CreditClientDto> dtoPage = pageResult.map(CreditClientDto::fromEntity);
         return PagedResponse.from(dtoPage);
@@ -161,6 +163,10 @@ public class CreditClientService {
     public List<PaiementCreditDto> obtenirPaiements(Long creditId) {
         CreditClientEntity credit = creditClientRepository.findById(creditId)
                 .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(currentTenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
         return paiementCreditRepository.findByCreditOrderByCreatedDateDesc(credit).stream()
                 .map(PaiementCreditDto::fromEntity)
                 .collect(Collectors.toList());
@@ -169,19 +175,42 @@ public class CreditClientService {
     public List<CreditClientDto> obtenirHistoriqueClient(Long clientId) {
         ClientEntity client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client introuvable : " + clientId));
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        if (!client.getTenant().getTenantUuid().equals(currentTenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
         return creditClientRepository.findByClientOrderByCreatedDateAsc(client).stream()
                 .map(CreditClientDto::fromEntity)
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public void supprimerCreditsDeLaVente(Long venteId) {
+        List<CreditClientEntity> credits = creditClientRepository.findByVenteId(venteId);
+        for (CreditClientEntity credit : credits) {
+            if (credit.getStatut() != StatutCredit.SOLDE) {
+                ClientEntity client = credit.getClient();
+                if (client != null) {
+                    BigDecimal nouvelleDette = client.getDetteTotale().subtract(credit.getMontantRestant());
+                    client.setDetteTotale(nouvelleDette.max(BigDecimal.ZERO));
+                    clientRepository.save(client);
+                }
+            }
+            creditClientRepository.delete(credit);
+        }
+    }
+
+    @Transactional(readOnly = true)
     public Map<String, Object> obtenirStats() {
         Map<String, Object> stats = new HashMap<>();
-        BigDecimal montantTotalDu = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE);
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+
+        BigDecimal montantTotalDu = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
         if (montantTotalDu == null) montantTotalDu = BigDecimal.ZERO;
 
-        // Calculer le taux de recouvrement = montant payé / montant initial total
-        BigDecimal montantInitialTotal = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE);
+        BigDecimal montantInitialTotal = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid);
         if (montantInitialTotal == null) montantInitialTotal = BigDecimal.ZERO;
+
         double tauxRecouvrement = 0.0;
         if (montantInitialTotal.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal montantPaye = montantInitialTotal.subtract(montantTotalDu);
@@ -192,9 +221,9 @@ public class CreditClientService {
 
         stats.put("totalEnAttente", montantTotalDu);
         stats.put("montantTotalDu", montantTotalDu);
-        stats.put("nombreCreditsActifs", creditClientRepository.countCreditsActifs(StatutCredit.SOLDE));
-        stats.put("nombreClientsCrediteurs", creditClientRepository.countClientsCrediteurs(StatutCredit.SOLDE));
-        stats.put("creditsEnRetard", creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, LocalDate.now()));
+        stats.put("nombreCreditsActifs", creditClientRepository.countCreditsActifs(StatutCredit.SOLDE, tenantUuid));
+        stats.put("nombreClientsCrediteurs", creditClientRepository.countClientsCrediteurs(StatutCredit.SOLDE, tenantUuid));
+        stats.put("creditsEnRetard", creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, LocalDate.now(), tenantUuid));
         stats.put("tauxRecouvrement", tauxRecouvrement);
         return stats;
     }

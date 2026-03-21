@@ -31,7 +31,7 @@ public class ClientController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
     public ResponseEntity<List<ClientDto>> rechercher(@RequestParam(required = false) String q) {
         return ResponseEntity.ok(clientService.rechercherClients(q));
     }
