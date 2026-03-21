@@ -20,7 +20,8 @@ import java.time.LocalDate;
                 @Index(name = "idx_vente_produit", columnList = "nom_produit"),
                 @Index(name = "idx_vente_utilisateur", columnList = "utilisateur_id"),
                 @Index(name = "idx_vente_client", columnList = "client"),
-                @Index(name = "idx_vente_tenant", columnList = "tenant_id")
+                @Index(name = "idx_vente_tenant", columnList = "tenant_id"),
+                @Index(name = "idx_vente_mode_paiement", columnList = "mode_paiement")
         }
 )
 @org.hibernate.annotations.Filter(name = "tenantFilter", condition = "tenant_id = (SELECT t.id FROM tenants t WHERE t.tenant_uuid = :tenantId)")
@@ -120,6 +121,47 @@ public class VenteEntity  extends BaseEntity{
     @JoinColumn(name = "tenant_id", nullable = false, foreignKey = @ForeignKey(name = "fk_vente_tenant"))
     @JsonIgnore
     private TenantEntity tenant;
+
+    /**
+     * Lien structuré vers le client enregistré (Plan Entreprise — crédit)
+     * Nullable : les ventes classiques n'ont pas forcément un client enregistré
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "client_id", nullable = true, foreignKey = @ForeignKey(name = "fk_vente_client_ref"))
+    @JsonIgnore
+    private ClientEntity clientRef;
+
+    /**
+     * ID du client enregistré — champ transient pour la désérialisation JSON
+     * Résolu en ClientEntity dans VenteService avant la création du crédit
+     */
+    @Transient
+    private Long clientId;
+
+    /**
+     * Date d'échéance pour les ventes à crédit — champ transient pour la désérialisation JSON
+     */
+    @Transient
+    private LocalDate dateEcheance;
+
+    public enum ModePaiementVente {
+        ESPECES, WAVE, ORANGE_MONEY, CREDIT;
+
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public static ModePaiementVente fromString(String value) {
+            if (value == null) return ESPECES;
+            return ModePaiementVente.valueOf(value.toUpperCase());
+        }
+    }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_paiement", length = 20)
+    @Builder.Default
+    private ModePaiementVente modePaiement = ModePaiementVente.ESPECES;
+
+    @Column(name = "est_soldee", nullable = false)
+    @Builder.Default
+    private Boolean estSoldee = true;
 
 
 

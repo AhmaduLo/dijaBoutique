@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.Authentication;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -59,13 +61,15 @@ public class VenteController {
 
     /**
      * POST /api/ventes
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PostMapping
     public ResponseEntity<VenteDto> creer(
             @Valid @RequestBody VenteEntity vente,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
         VenteEntity venteCree = venteService.creerVente(vente, utilisateur);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(VenteDto.fromEntity(venteCree));
@@ -73,15 +77,17 @@ public class VenteController {
 
     /**
      * PUT /api/ventes/{id}
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PutMapping("/{id}")
     public ResponseEntity<VenteDto> modifier(
             @PathVariable Long id,
             @Valid @RequestBody VenteEntity venteModifiee,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        // Récupérer l'utilisateur qui modifie
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        // Récupérer l'utilisateur authentifié (depuis le JWT, pas d'un paramètre client)
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
 
         // Mettre à jour l'utilisateur de la vente
         venteModifiee.setUtilisateur(utilisateur);

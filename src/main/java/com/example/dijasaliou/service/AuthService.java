@@ -103,8 +103,12 @@ public class AuthService {
         }
 
         // 3. Déterminer le rôle de l'utilisateur
-        // Si aucun rôle n'est spécifié, utiliser ADMIN par défaut (premier utilisateur)
-        UserEntity.Role userRole = request.getRole() != null ? request.getRole() : UserEntity.Role.ADMIN;
+        // SÉCURITÉ : À l'inscription publique, seul le rôle ADMIN est autorisé.
+        // SUPER_ADMIN ne peut être créé que manuellement en base (jamais via l'API).
+        UserEntity.Role userRole = UserEntity.Role.ADMIN;
+        if (request.getRole() != null && request.getRole() != UserEntity.Role.SUPER_ADMIN) {
+            userRole = request.getRole();
+        }
 
         // 4. VALIDATION DES DOCUMENTS LÉGAUX pour les ADMIN
         // L'acceptation des CGU et de la Politique de Confidentialité est OBLIGATOIRE pour les ADMIN

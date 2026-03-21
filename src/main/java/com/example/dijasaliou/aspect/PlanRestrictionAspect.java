@@ -49,17 +49,24 @@ public class PlanRestrictionAspect {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         RequiresPlan requiresPlan = signature.getMethod().getAnnotation(RequiresPlan.class);
 
-        // 2. Récupérer le tenant actuel
+        // 2. Si pas de tenant dans le contexte (SUPER_ADMIN ou non authentifié),
+        //    on laisse passer — Spring Security gère l'authentification séparément
+        if (!tenantService.isTenantDefined()) {
+            log.debug("Pas de tenant en contexte — vérification du plan ignorée");
+            return;
+        }
+
+        // 3. Récupérer le tenant actuel
         TenantEntity tenant = tenantService.getCurrentTenant();
 
-        // 3. Récupérer le plan du tenant
+        // 4. Récupérer le plan du tenant
         TenantEntity.Plan currentPlan = tenant.getPlan();
 
-        // 4. Vérifier si le plan actuel est dans la liste des plans autorisés
+        // 5. Vérifier si le plan actuel est dans la liste des plans autorisés
         TenantEntity.Plan[] allowedPlans = requiresPlan.plans();
         boolean isAllowed = Arrays.asList(allowedPlans).contains(currentPlan);
 
-        // 5. Si pas autorisé, lancer une exception
+        // 6. Si pas autorisé, lancer une exception
         if (!isAllowed) {
             String allowedPlansStr = Arrays.stream(allowedPlans)
                     .map(TenantEntity.Plan::getLibelle)

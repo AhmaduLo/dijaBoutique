@@ -3,9 +3,11 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.VenteDto;
+import com.example.dijasaliou.entity.ClientEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
+import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -16,26 +18,34 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Service pour la logique métier des ventes
  */
 @Service
+@Slf4j
 public class VenteService {
 
     private final VenteRepository venteRepository;
     private final StockService stockService;
     private final TenantService tenantService;
     private final StockAlertService stockAlertService;
+    private final CreditClientService creditClientService;
+    private final ClientRepository clientRepository;
 
     public VenteService(VenteRepository venteRepository,
                         @Lazy StockService stockService,
                         TenantService tenantService,
-                        StockAlertService stockAlertService) {
+                        StockAlertService stockAlertService,
+                        @Lazy CreditClientService creditClientService,
+                        ClientRepository clientRepository) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
         this.tenantService = tenantService;
         this.stockAlertService = stockAlertService;
+        this.creditClientService = creditClientService;
+        this.clientRepository = clientRepository;
     }
 
     /**
@@ -111,12 +121,38 @@ public class VenteService {
         VenteEntity venteSauvegardee = venteRepository.save(vente);
 
         // ALERTE DE STOCK : Vérifier le stock après la vente et envoyer une alerte si nécessaire
-        // (uniquement pour le plan ENTREPRISE)
+        // (uniquement pour les plans PREMIUM et ENTREPRISE)
         try {
             stockAlertService.verifierEtEnvoyerAlerte(vente.getNomProduit());
         } catch (Exception e) {
             // Ne pas bloquer la vente si l'envoi d'alerte échoue
-            // L'erreur est déjà loguée dans StockAlertService
+        }
+
+        // CRÉDIT CLIENT : Si mode_paiement = CREDIT, créer automatiquement un crédit
+        // (uniquement pour le plan ENTREPRISE)
+        if (vente.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT) {
+            // Résoudre clientId → ClientEntity si clientRef pas déjà défini
+            ClientEntity clientPourCredit = vente.getClientRef();
+            if (clientPourCredit == null && vente.getClientId() != null) {
+                clientPourCredit = clientRepository.findById(vente.getClientId())
+                        .orElse(null);
+            }
+            if (clientPourCredit == null) {
+                throw new IllegalArgumentException(
+                        "Un client enregistré est obligatoire pour une vente à crédit");
+            }
+            venteSauvegardee.setEstSoldee(false);
+            venteRepository.save(venteSauvegardee);
+            try {
+                creditClientService.creerCreditDepuisVente(
+                        venteSauvegardee,
+                        clientPourCredit,
+                        utilisateur,
+                        vente.getDateEcheance());
+            } catch (Exception e) {
+                log.error("Erreur lors de la création du crédit pour la vente #{} : {}",
+                        venteSauvegardee.getId(), e.getMessage());
+            }
         }
 
         return venteSauvegardee;
