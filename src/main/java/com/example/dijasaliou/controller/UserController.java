@@ -6,6 +6,7 @@ import com.example.dijasaliou.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,14 +18,14 @@ import java.util.stream.Collectors;
 /**
  * Controller REST pour les utilisateurs
  *
- * ⚠️ RESTRICTIONS ⚠️
+ * RESTRICTIONS :
  * - Les USER ne peuvent PAS créer, modifier ou supprimer des comptes
  * - Seul l'ADMIN peut gérer les comptes (via AdminController)
- * - Les routes de consultation sont accessibles à tous les utilisateurs authentifiés
+ * - GET /utilisateurs et /utilisateurs/{id} réservés aux GERANT et ADMIN
+ * - GET /utilisateurs/moi accessible à tous (chaque user consulte son propre profil)
  */
 @RestController
 @RequestMapping("/utilisateurs")
-@CrossOrigin(origins = "http://localhost:4200")
 public class UserController {
 
     private final UserService userService;
@@ -35,9 +36,10 @@ public class UserController {
 
     /**
      * GET /api/utilisateurs
-     * Accessible à tous les utilisateurs authentifiés
+     * Réservé aux GERANT et ADMIN (liste des employés)
      */
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<List<UserDto>> obtenirTous() {
         List<UserEntity> utilisateurs = userService.obtenirTousLesUtilisateurs();
         List<UserDto> utilisateursDto = utilisateurs.stream()
@@ -48,9 +50,10 @@ public class UserController {
 
     /**
      * GET /api/utilisateurs/{id}
-     * Accessible à tous les utilisateurs authentifiés
+     * Réservé aux GERANT et ADMIN
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<UserDto> obtenirParId(@PathVariable Long id) {
         UserEntity utilisateur = userService.obtenirUtilisateurParId(id);
         return ResponseEntity.ok(UserDto.fromEntity(utilisateur));
@@ -58,9 +61,10 @@ public class UserController {
 
     /**
      * GET /api/utilisateurs/email/{email}
-     * Accessible à tous les utilisateurs authentifiés
+     * Réservé aux GERANT et ADMIN
      */
     @GetMapping("/email/{email}")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<UserDto> obtenirParEmail(@PathVariable String email) {
         UserEntity utilisateur = userService.obtenirUtilisateurParEmail(email);
         return ResponseEntity.ok(UserDto.fromEntity(utilisateur));
@@ -68,7 +72,7 @@ public class UserController {
 
     /**
      * GET /api/utilisateurs/moi
-     * Obtenir les informations du compte connecté
+     * Accessible à tous : chaque utilisateur consulte son propre profil
      */
     @GetMapping("/moi")
     public ResponseEntity<UserDto> obtenirMonProfil(Authentication authentication) {
@@ -79,7 +83,7 @@ public class UserController {
 
     /**
      * POST /api/utilisateurs
-     * ❌ DÉSACTIVÉ - Seul l'ADMIN peut créer des comptes via /api/admin/utilisateurs
+     * DESACTIVE - Seul l'ADMIN peut créer des comptes via /api/admin/utilisateurs
      */
     @PostMapping
     public ResponseEntity<Map<String, String>> creer(@Valid @RequestBody UserEntity utilisateur) {
@@ -91,7 +95,7 @@ public class UserController {
 
     /**
      * PUT /api/utilisateurs/{id}
-     * ❌ DÉSACTIVÉ - Seul l'ADMIN peut modifier des comptes via /api/admin/utilisateurs/{id}
+     * DESACTIVE - Seul l'ADMIN peut modifier des comptes via /api/admin/utilisateurs/{id}
      */
     @PutMapping("/{id}")
     public ResponseEntity<Map<String, String>> modifier(
@@ -106,7 +110,7 @@ public class UserController {
 
     /**
      * DELETE /api/utilisateurs/{id}
-     * ❌ DÉSACTIVÉ - Seul l'ADMIN peut supprimer des comptes via /api/admin/utilisateurs/{id}
+     * DESACTIVE - Seul l'ADMIN peut supprimer des comptes via /api/admin/utilisateurs/{id}
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, String>> supprimer(@PathVariable Long id) {

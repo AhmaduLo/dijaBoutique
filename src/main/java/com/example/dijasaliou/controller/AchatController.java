@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/achats")
-@CrossOrigin(origins = "http://localhost:4200")
+
 public class AchatController {
 
     private final AchatService achatService;

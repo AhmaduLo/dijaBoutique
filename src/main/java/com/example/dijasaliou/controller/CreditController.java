@@ -23,7 +23,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/credits")
-@CrossOrigin(origins = "http://localhost:4200")
+
 @Slf4j
 @RequiredArgsConstructor
 public class CreditController {

@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/auth")
-@CrossOrigin(origins = "http://localhost:4200")
+
 public class AuthController {
 
     private final AuthService authService;
@@ -170,6 +170,13 @@ public class AuthController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<PasswordResetResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        if (!rateLimitService.allowPasswordReset(request.getEmail())) {
+            PasswordResetResponse response = PasswordResetResponse.builder()
+                    .message("Trop de tentatives. Veuillez patienter avant de réessayer.")
+                    .build();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS).body(response);
+        }
+
         authService.forgotPassword(request);
 
         // Message générique pour ne pas révéler si l'email existe

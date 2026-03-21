@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/depenses")
-@CrossOrigin(origins = "http://localhost:4200")
+
 public class DepenseController {
 
     private final DepenseService depenseService;

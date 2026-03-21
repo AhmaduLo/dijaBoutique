@@ -14,7 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/clients")
-@CrossOrigin(origins = "http://localhost:4200")
+
 @Slf4j
 @RequiredArgsConstructor
 public class ClientController {

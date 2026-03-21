@@ -30,7 +30,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/superadmin")
-@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:64390"})
 @PreAuthorize("hasAuthority('SUPER_ADMIN')")
 @Slf4j
 public class SuperAdminController {
