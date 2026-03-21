@@ -78,7 +78,7 @@ public class FileUploadController {
             log.error("Erreur lors de l'upload de la photo : {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "success", false,
-                    "message", "Erreur lors de l'upload de la photo : " + e.getMessage()
+                    "message", "Une erreur est survenue lors de l'upload. Veuillez réessayer."
             ));
         }
     }

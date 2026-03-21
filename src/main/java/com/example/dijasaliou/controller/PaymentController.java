@@ -35,7 +35,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/payment")
-@CrossOrigin(origins = "http://localhost:4200")
+
 @Slf4j
 public class PaymentController {
 
@@ -255,6 +255,21 @@ public class PaymentController {
             @SuppressWarnings("unchecked")
             Map<String, Object> payloadMap = new com.fasterxml.jackson.databind.ObjectMapper()
                     .readValue(payload, Map.class);
+
+            // Protection replay attack : timestamp doit être < 5 minutes
+            Object timestampObj = payloadMap.get("timestamp");
+            if (timestampObj != null) {
+                try {
+                    long webhookTimestamp = Long.parseLong(timestampObj.toString());
+                    long nowSeconds = java.time.Instant.now().getEpochSecond();
+                    if (Math.abs(nowSeconds - webhookTimestamp) > 300) {
+                        log.error("SECURITE: Webhook Wave expire (timestamp={}, now={}). Replay attack possible.", webhookTimestamp, nowSeconds);
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook expire");
+                    }
+                } catch (NumberFormatException ignored) {
+                    // timestamp non numérique — pas de vérification possible
+                }
+            }
 
             boolean success = waveService.handleWebhook(payloadMap);
 

@@ -1,5 +1,6 @@
 package com.example.dijasaliou.exception;
 
+import com.example.dijasaliou.aspect.PlanRestrictionAspect;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,21 @@ import java.util.Map;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    /**
+     * Gestion des restrictions de plan d'abonnement (@RequiresPlan)
+     * Retourne un 403 Forbidden avec un message explicite
+     */
+    @ExceptionHandler(PlanRestrictionAspect.PlanRestrictionException.class)
+    public ResponseEntity<Map<String, Object>> handlePlanRestriction(PlanRestrictionAspect.PlanRestrictionException ex) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.FORBIDDEN.value());
+        errorResponse.put("error", "Fonctionnalité non disponible");
+        errorResponse.put("message", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
 
     /**
      * Gestion de l'exception de limitation d'utilisateurs
@@ -46,6 +62,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
+        log.error("RuntimeException: {} - {}", ex.getClass().getName(), ex.getMessage(), ex);
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
@@ -84,13 +101,12 @@ public class GlobalExceptionHandler {
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
-        errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        errorResponse.put("error", "Erreur d'état du système");
-        // Message générique pour le client (pas de détails sensibles)
-        errorResponse.put("message", "Une erreur s'est produite lors du traitement de votre demande.");
+        errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
+        errorResponse.put("error", "Erreur de traitement");
+        errorResponse.put("message", ex.getMessage());
 
         return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .status(HttpStatus.BAD_REQUEST)
                 .body(errorResponse);
     }
 

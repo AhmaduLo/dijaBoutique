@@ -29,7 +29,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/bons-de-livraison")
-@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:64390"})
 @Slf4j
 public class BonLivraisonController {
 

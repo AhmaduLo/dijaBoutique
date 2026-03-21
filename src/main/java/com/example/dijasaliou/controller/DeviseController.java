@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/devises")
-@CrossOrigin(origins = "http://localhost:4200")
+
 public class DeviseController {
 
     private final DeviseService deviseService;
