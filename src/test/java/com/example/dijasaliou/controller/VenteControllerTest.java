@@ -84,7 +84,6 @@ class VenteControllerTest {
 
         // Création d'une première vente de test
         venteTest = VenteEntity.builder()
-                .id(1L)
                 .quantite(5)
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("150000.00"))
@@ -93,10 +92,10 @@ class VenteControllerTest {
                 .client("Mme Ndiaye")
                 .utilisateur(utilisateurTest)
                 .build();
+        venteTest.setId(1L);
 
         // Création d'une deuxième vente de test
         venteTest2 = VenteEntity.builder()
-                .id(2L)
                 .quantite(3)
                 .nomProduit("Bracelet en argent")
                 .prixUnitaire(new BigDecimal("80000.00"))
@@ -105,6 +104,7 @@ class VenteControllerTest {
                 .client("M. Sow")
                 .utilisateur(utilisateurTest)
                 .build();
+        venteTest2.setId(2L);
     }
 
     // ==================== Tests pour GET /ventes ====================
@@ -204,7 +204,6 @@ class VenteControllerTest {
                 .build();
 
         VenteEntity venteCreee = VenteEntity.builder()
-                .id(3L)
                 .quantite(10)
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("200000.00"))
@@ -213,6 +212,7 @@ class VenteControllerTest {
                 .client("Mme Ba")
                 .utilisateur(utilisateurTest)
                 .build();
+        venteCreee.setId(3L);
 
         when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
         when(venteService.creerVente(any(VenteEntity.class), eq(utilisateurTest)))
@@ -253,7 +253,6 @@ class VenteControllerTest {
                 .build();
 
         VenteEntity venteMiseAJour = VenteEntity.builder()
-                .id(venteId)
                 .quantite(8)
                 .nomProduit("Collier en or - Mise à jour")
                 .prixUnitaire(new BigDecimal("160000.00"))
@@ -262,6 +261,7 @@ class VenteControllerTest {
                 .client("Mme Ndiaye (modifié)")
                 .utilisateur(utilisateurTest)
                 .build();
+        venteMiseAJour.setId(venteId);
 
         when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
         when(venteService.modifierVente(eq(venteId), any(VenteEntity.class)))
@@ -509,7 +509,6 @@ class VenteControllerTest {
     void obtenirTous_DevraitGererClientNull() throws Exception {
         // Arrange
         VenteEntity venteSansClient = VenteEntity.builder()
-                .id(3L)
                 .quantite(2)
                 .nomProduit("Montre")
                 .prixUnitaire(new BigDecimal("120000.00"))
@@ -518,6 +517,7 @@ class VenteControllerTest {
                 .client(null) // Pas de client
                 .utilisateur(utilisateurTest)
                 .build();
+        venteSansClient.setId(3L);
 
         when(venteService.obtenirToutesLesVentes())
                 .thenReturn(Arrays.asList(venteSansClient));
@@ -546,7 +546,6 @@ class VenteControllerTest {
 
         // Le service devrait calculer : 7 × 90000.00 = 630000.00
         VenteEntity venteCreee = VenteEntity.builder()
-                .id(4L)
                 .quantite(7)
                 .nomProduit("Chaîne en or")
                 .prixUnitaire(new BigDecimal("90000.00"))
@@ -554,6 +553,7 @@ class VenteControllerTest {
                 .dateVente(LocalDate.now())
                 .utilisateur(utilisateurTest)
                 .build();
+        venteCreee.setId(4L);
 
         when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
         when(venteService.creerVente(any(VenteEntity.class), eq(utilisateurTest)))
