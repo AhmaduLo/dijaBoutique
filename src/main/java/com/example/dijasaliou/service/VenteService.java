@@ -290,15 +290,18 @@ public class VenteService {
         }
 
         // 2. Montant restant dû sur les crédits non soldés créés dans la période
-        Object[] creditRow = creditClientRepository.sumCreditsRestantParPeriode(
+        List<Object[]> creditRows = creditClientRepository.sumCreditsRestantParPeriode(
                 debut, fin, StatutCredit.SOLDE, tenantUuid);
-        if (creditRow != null && creditRow[1] != null) {
-            java.math.BigDecimal creditTotal = creditRow[1] instanceof java.math.BigDecimal
-                    ? (java.math.BigDecimal) creditRow[1]
-                    : new java.math.BigDecimal(creditRow[1].toString());
-            Long creditCount = creditRow[0] instanceof Number ? ((Number) creditRow[0]).longValue() : 0L;
-            totaux.put("CREDIT", creditTotal);
-            nombres.put("CREDIT", creditCount);
+        if (creditRows != null && !creditRows.isEmpty()) {
+            Object[] creditRow = creditRows.get(0);
+            if (creditRow != null && creditRow.length >= 2 && creditRow[1] != null) {
+                java.math.BigDecimal creditTotal = creditRow[1] instanceof java.math.BigDecimal
+                        ? (java.math.BigDecimal) creditRow[1]
+                        : new java.math.BigDecimal(creditRow[1].toString());
+                Long creditCount = creditRow[0] instanceof Number ? ((Number) creditRow[0]).longValue() : 0L;
+                totaux.put("CREDIT", creditTotal);
+                nombres.put("CREDIT", creditCount);
+            }
         }
 
         // 3. Remboursements de crédits par mode, additionnés aux totaux correspondants

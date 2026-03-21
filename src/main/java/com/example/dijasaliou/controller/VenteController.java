@@ -141,6 +141,23 @@ public class VenteController {
     }
 
     /**
+     * GET /api/ventes/rapport-modes-paiement?debut=2025-01-01&fin=2025-12-31
+     *
+     * Retourne la répartition du CA par mode de paiement en tenant compte
+     * des remboursements de crédits (table paiements_credit).
+     *
+     * - ESPECES / WAVE / ORANGE_MONEY = ventes directes + remboursements crédits du même mode
+     * - CREDIT = somme des montants restants non soldés (ventes crédit créées dans la période)
+     */
+    @GetMapping("/rapport-modes-paiement")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    public ResponseEntity<Map<String, Object>> rapportModePaiement(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        return ResponseEntity.ok(venteService.calculerRapportModePaiement(debut, fin));
+    }
+
+    /**
      * GET /api/ventes/statistiques?debut=2025-01-01&fin=2025-12-31
      * Obtenir les statistiques de ventes sur une période
      * (nombre de ventes, CA total, liste des ventes)

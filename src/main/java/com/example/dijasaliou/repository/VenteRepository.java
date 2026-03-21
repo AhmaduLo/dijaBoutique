@@ -71,6 +71,21 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
     /**
      * Recherche paginée par utilisateur avec filtre optionnel et plage de dates
      */
+    /**
+     * Agrège les ventes directes (hors CREDIT) par mode de paiement sur une période.
+     * Retourne Object[] : [modePaiement, count, sum(prixTotal)]
+     */
+    @Query("SELECT v.modePaiement, COUNT(v), COALESCE(SUM(v.prixTotal), 0) " +
+           "FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.modePaiement <> :creditMode " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "GROUP BY v.modePaiement")
+    List<Object[]> sumDirectVentesParModeEtPeriode(@Param("debut") LocalDate debut,
+                                                   @Param("fin") LocalDate fin,
+                                                   @Param("creditMode") VenteEntity.ModePaiementVente creditMode,
+                                                   @Param("tenantUuid") String tenantUuid);
+
     @Query("SELECT v FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +

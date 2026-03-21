@@ -120,10 +120,17 @@ public class CreditClientService {
             credit.setStatut(StatutCredit.SOLDE);
             BigDecimal nouvelleDette = client.getDetteTotale().subtract(montant);
             client.setDetteTotale(nouvelleDette.max(BigDecimal.ZERO));
-            // Marquer la vente comme soldée
+            // Marquer la vente comme soldée et mettre à jour le mode de paiement
             if (credit.getVente() != null) {
-                credit.getVente().setEstSoldee(true);
-                venteRepository.save(credit.getVente());
+                VenteEntity vente = credit.getVente();
+                vente.setEstSoldee(true);
+                // Mettre à jour le modePaiement de la vente avec celui du dernier paiement
+                VenteEntity.ModePaiementVente modePaiementVente =
+                        VenteEntity.ModePaiementVente.valueOf(modePaiement.name());
+                vente.setModePaiement(modePaiementVente);
+                venteRepository.save(vente);
+                log.info("Vente #{} : modePaiement mis à jour → {} (crédit soldé)",
+                        vente.getId(), modePaiementVente);
             }
             log.info("Crédit #{} soldé pour {} (tenant: {})",
                     creditId, client.getNom(), currentTenant.getTenantUuid());

@@ -52,4 +52,18 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
 
     @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.client.id = :clientId AND c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     long countCreditsActifsByClientId(@Param("clientId") Long clientId, @Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
+
+    /**
+     * Somme le montant restant dû sur les crédits non soldés dont la vente a été créée dans la période.
+     * Retourne List<Object[]> : chaque Object[] = [count, sum(montantRestant)]
+     */
+    @Query("SELECT COUNT(c), COALESCE(SUM(c.montantRestant), 0) " +
+           "FROM CreditClientEntity c " +
+           "WHERE c.vente.dateVente BETWEEN :debut AND :fin " +
+           "AND c.statut <> :statut " +
+           "AND c.tenant.tenantUuid = :tenantUuid")
+    List<Object[]> sumCreditsRestantParPeriode(@Param("debut") LocalDate debut,
+                                               @Param("fin") LocalDate fin,
+                                               @Param("statut") StatutCredit statut,
+                                               @Param("tenantUuid") String tenantUuid);
 }
