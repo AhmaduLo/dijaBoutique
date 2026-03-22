@@ -55,6 +55,22 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
     @Query("SELECT SUM(v.quantite) FROM VenteEntity v WHERE v.nomProduit = :nomProduit AND v.tenant = :tenant")
     Integer sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
 
+    /**
+     * Récupère toutes les ventes d'un tenant (filtre explicite — évite findAll())
+     */
+    @Query("SELECT v FROM VenteEntity v WHERE v.tenant = :tenant ORDER BY v.nomProduit")
+    List<VenteEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
+
+    /**
+     * Calcule le chiffre d'affaires d'une période directement en SQL (évite le chargement en mémoire)
+     */
+    @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid")
+    BigDecimal sumChiffreAffairesPeriode(@Param("debut") LocalDate debut,
+                                         @Param("fin") LocalDate fin,
+                                         @Param("tenantUuid") String tenantUuid);
+
     @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.tenantUuid = :tenantUuid")
     long countByTenantUuid(@Param("tenantUuid") String tenantUuid);
 

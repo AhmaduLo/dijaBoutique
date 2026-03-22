@@ -13,6 +13,7 @@ import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -60,10 +61,10 @@ public class VenteService {
     }
 
     /**
-     * Récupérer toutes les ventes (utilisé pour rapports/export)
+     * Récupérer toutes les ventes du tenant courant (rapports/export)
      */
     public List<VenteEntity> obtenirToutesLesVentes() {
-        return venteRepository.findAll();
+        return venteRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
 
     /**
@@ -99,6 +100,7 @@ public class VenteService {
     /**
      * Créer une nouvelle vente
      */
+    @CacheEvict(value = "stocks", allEntries = true)
     @org.springframework.transaction.annotation.Transactional
     public VenteEntity creerVente(VenteEntity vente, UserEntity utilisateur) {
         // Validation
@@ -169,6 +171,7 @@ public class VenteService {
     /**
      * Modifier une vente
      */
+    @CacheEvict(value = "stocks", allEntries = true)
     public VenteEntity modifierVente(Long id, VenteEntity venteModifiee) {
         VenteEntity venteExistante = obtenirVenteParId(id);
 
@@ -215,6 +218,7 @@ public class VenteService {
     /**
      * Supprimer une vente
      */
+    @CacheEvict(value = "stocks", allEntries = true)
     @org.springframework.transaction.annotation.Transactional
     public void supprimerVente(Long id) {
         VenteEntity venteExistante = obtenirVenteParId(id);
@@ -250,11 +254,8 @@ public class VenteService {
      * Calculer le chiffre d'affaires d'une période
      */
     public BigDecimal calculerChiffreAffaires(LocalDate debut, LocalDate fin) {
-        List<VenteEntity> ventes = obtenirVentesParPeriode(debut, fin);
-
-        return ventes.stream()
-                .map(VenteEntity::getPrixTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        return venteRepository.sumChiffreAffairesPeriode(debut, fin, tenantUuid);
     }
 
     /**

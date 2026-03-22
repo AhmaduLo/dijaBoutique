@@ -31,10 +31,10 @@ public class DepenseService {
 
 
     /**
-     * Récupérer toutes les dépenses (pour rapports/export)
+     * Récupérer toutes les dépenses du tenant courant (rapports/export)
      */
     public List<DepenseEntity> obtenirToutesLesDepenses() {
-        return depenseRepository.findAll();
+        return depenseRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
 
     /**

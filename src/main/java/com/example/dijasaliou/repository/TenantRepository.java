@@ -1,6 +1,8 @@
 package com.example.dijasaliou.repository;
 
 import com.example.dijasaliou.entity.TenantEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -56,4 +58,9 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
      * @return Tenant ou Optional.empty()
      */
     Optional<TenantEntity> findByNumeroTelephone(String numeroTelephone);
+
+    /**
+     * Version paginée de findAll() — pour SuperAdmin
+     */
+    Page<TenantEntity> findAll(Pageable pageable);
 }

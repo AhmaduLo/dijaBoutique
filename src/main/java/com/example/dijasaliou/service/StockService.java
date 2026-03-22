@@ -6,6 +6,8 @@ import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -35,14 +37,17 @@ public class StockService {
     }
 
     /**
-     * Obtenir le stock de tous les produits
+     * Obtenir le stock de tous les produits — mis en cache 2 min par tenant.
+     * Le cache est invalidé après chaque achat ou vente (voir invalidateStockCache).
      *
      * @return Liste des stocks par produit
      */
+    @Cacheable(value = "stocks", key = "#root.target.getCurrentTenantKey()")
     public List<StockDto> obtenirTousLesStocks() {
-        // 1. Récupérer tous les achats et ventes
-        List<AchatEntity> achats = achatRepository.findAll();
-        List<VenteEntity> ventes = venteRepository.findAll();
+        // 1. Récupérer les achats et ventes du tenant courant uniquement
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
+        List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
 
         // 2. Grouper les achats par nom de produit et calculer les totaux
         Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
@@ -155,6 +160,25 @@ public class StockService {
     }
 
     /**
+     * Clé de cache = UUID du tenant courant (isolé par entreprise).
+     * Appelée par @Cacheable(key = "#root.target.getCurrentTenantKey()").
+     */
+    public String getCurrentTenantKey() {
+        return tenantService.isTenantDefined()
+                ? tenantService.getCurrentTenant().getTenantUuid()
+                : "no-tenant";
+    }
+
+    /**
+     * Invalide le cache des stocks pour le tenant courant.
+     * À appeler après chaque achat ou vente.
+     */
+    @CacheEvict(value = "stocks", key = "#tenantUuid")
+    public void invalidateStockCache(String tenantUuid) {
+        // méthode vide — l'annotation fait le travail
+    }
+
+    /**
      * Méthode privée pour calculer le stock d'un produit
      *
      * @param nomProduit Nom du produit
@@ -212,7 +236,7 @@ public class StockService {
         StockDto.StatutStock statut = StockDto.determinerStatut(stockDisponible);
 
         // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
-        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        TenantEntity currentTenant = tenantService.isTenantDefined() ? tenantService.getCurrentTenant() : null;
         boolean canViewPhotos = currentTenant != null &&
                                 currentTenant.getPlan() == TenantEntity.Plan.ENTREPRISE;
 

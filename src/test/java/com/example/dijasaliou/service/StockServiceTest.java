@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,8 +76,8 @@ class StockServiceTest {
     @DisplayName("obtenirTousLesStocks() — calcule les stocks de 2 produits")
     void obtenirTousLesStocks_calculeCorrectement() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(achatRepository.findAll()).thenReturn(Arrays.asList(achat1, achat2));
-        when(venteRepository.findAll()).thenReturn(Arrays.asList(vente1));
+        when(achatRepository.findAllByTenant(any())).thenReturn(Arrays.asList(achat1, achat2));
+        when(venteRepository.findAllByTenant(any())).thenReturn(Arrays.asList(vente1));
 
         List<StockDto> resultat = stockService.obtenirTousLesStocks();
 
@@ -86,8 +87,9 @@ class StockServiceTest {
     @Test
     @DisplayName("obtenirTousLesStocks() — liste vide si aucun achat")
     void obtenirTousLesStocks_retourneVideSiAucunAchat() {
-        when(achatRepository.findAll()).thenReturn(Collections.emptyList());
-        when(venteRepository.findAll()).thenReturn(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findAllByTenant(any())).thenReturn(Collections.emptyList());
+        when(venteRepository.findAllByTenant(any())).thenReturn(Collections.emptyList());
 
         List<StockDto> resultat = stockService.obtenirTousLesStocks();
 
@@ -101,7 +103,6 @@ class StockServiceTest {
     @Test
     @DisplayName("obtenirStockParNomProduit() — calcule le stock correct (10-3=7)")
     void obtenirStockParNomProduit_retourneStock() {
-        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(achat1));
         when(venteRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(vente1));
 
@@ -116,7 +117,6 @@ class StockServiceTest {
     @Test
     @DisplayName("obtenirStockParNomProduit() — insensible à la casse via fallback")
     void obtenirStockParNomProduit_insensibleCasse() {
-        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         // Exact match retourne rien → fallback vers findByNomProduitContaining
         when(achatRepository.findByNomProduit("ORDINATEUR")).thenReturn(Collections.emptyList());
         when(venteRepository.findByNomProduit("ORDINATEUR")).thenReturn(Collections.emptyList());
@@ -157,8 +157,8 @@ class StockServiceTest {
                 .nomProduit("Clavier").quantite(5).prixUnitaire(new BigDecimal("50.00"))
                 .dateVente(LocalDate.now()).build();
 
-        when(achatRepository.findAll()).thenReturn(Arrays.asList(achatRupture));
-        when(venteRepository.findAll()).thenReturn(Arrays.asList(venteRupture));
+        when(achatRepository.findAllByTenant(any())).thenReturn(Arrays.asList(achatRupture));
+        when(venteRepository.findAllByTenant(any())).thenReturn(Arrays.asList(venteRupture));
 
         List<StockDto> resultat = stockService.obtenirProduitsEnRupture();
 
@@ -181,8 +181,8 @@ class StockServiceTest {
                 .nomProduit("Ecran").quantite(10).prixUnitaire(new BigDecimal("300.00"))
                 .dateVente(LocalDate.now()).build();
 
-        when(achatRepository.findAll()).thenReturn(Arrays.asList(achatStockBas));
-        when(venteRepository.findAll()).thenReturn(Arrays.asList(venteStockBas));
+        when(achatRepository.findAllByTenant(any())).thenReturn(Arrays.asList(achatStockBas));
+        when(venteRepository.findAllByTenant(any())).thenReturn(Arrays.asList(venteStockBas));
 
         List<StockDto> resultat = stockService.obtenirProduitsStockBas();
 
@@ -197,7 +197,6 @@ class StockServiceTest {
     @Test
     @DisplayName("verifierStockDisponible() — retourne true si stock suffisant")
     void verifierStockDisponible_retourneTrue() {
-        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(achat1));
         when(venteRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(vente1));
 
@@ -210,7 +209,6 @@ class StockServiceTest {
     @Test
     @DisplayName("verifierStockDisponible() — retourne false si stock insuffisant")
     void verifierStockDisponible_retourneFalse() {
-        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(achat1));
         when(venteRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(vente1));
 
@@ -241,8 +239,8 @@ class StockServiceTest {
     @DisplayName("obtenirValeurTotaleStock() — somme > 0 si stock disponible")
     void obtenirValeurTotaleStock_retourneValeur() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(achatRepository.findAll()).thenReturn(Arrays.asList(achat1, achat2));
-        when(venteRepository.findAll()).thenReturn(Arrays.asList(vente1));
+        when(achatRepository.findAllByTenant(any())).thenReturn(Arrays.asList(achat1, achat2));
+        when(venteRepository.findAllByTenant(any())).thenReturn(Arrays.asList(vente1));
 
         BigDecimal valeur = stockService.obtenirValeurTotaleStock();
 
@@ -252,8 +250,9 @@ class StockServiceTest {
     @Test
     @DisplayName("obtenirValeurTotaleStock() — zéro si aucun stock")
     void obtenirValeurTotaleStock_retourneZeroSiVide() {
-        when(achatRepository.findAll()).thenReturn(Collections.emptyList());
-        when(venteRepository.findAll()).thenReturn(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findAllByTenant(any())).thenReturn(Collections.emptyList());
+        when(venteRepository.findAllByTenant(any())).thenReturn(Collections.emptyList());
 
         BigDecimal valeur = stockService.obtenirValeurTotaleStock();
 

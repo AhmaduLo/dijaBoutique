@@ -73,18 +73,20 @@ class AchatServiceTest {
     void obtenirTousLesAchats_retourneListe() {
         AchatEntity achat2 = AchatEntity.builder().id(2L).nomProduit("Souris")
                 .quantite(10).prixUnitaire(new BigDecimal("15.00")).build();
-        when(achatRepository.findAll()).thenReturn(Arrays.asList(achatValide, achat2));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findAllByTenant(tenantTest)).thenReturn(Arrays.asList(achatValide, achat2));
 
         List<AchatEntity> resultat = achatService.obtenirTousLesAchats();
 
         assertThat(resultat).hasSize(2).containsExactly(achatValide, achat2);
-        verify(achatRepository).findAll();
+        verify(achatRepository).findAllByTenant(tenantTest);
     }
 
     @Test
     @DisplayName("obtenirTousLesAchats() — liste vide si aucun achat")
     void obtenirTousLesAchats_retourneListeVide() {
-        when(achatRepository.findAll()).thenReturn(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findAllByTenant(tenantTest)).thenReturn(Collections.emptyList());
 
         assertThat(achatService.obtenirTousLesAchats()).isEmpty();
     }
@@ -379,11 +381,12 @@ class AchatServiceTest {
     @Test
     @DisplayName("obtenirProduitsAvecPrixVente() — retourne tous les achats")
     void obtenirProduitsAvecPrixVente_retourneListe() {
-        when(achatRepository.findAll()).thenReturn(Arrays.asList(achatValide));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findAllByTenant(tenantTest)).thenReturn(Arrays.asList(achatValide));
 
         List<AchatEntity> resultat = achatService.obtenirProduitsAvecPrixVente();
 
         assertThat(resultat).hasSize(1);
-        verify(achatRepository).findAll();
+        verify(achatRepository).findAllByTenant(tenantTest);
     }
 }

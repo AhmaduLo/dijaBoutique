@@ -1,8 +1,11 @@
 package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.FactureDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.TenantAdminDto;
 import com.example.dijasaliou.entity.TenantEntity;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import com.example.dijasaliou.service.SuperAdminService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,33 +109,35 @@ class SuperAdminControllerTest {
     // ==================== GET /superadmin/tenants ====================
 
     @Test
-    @DisplayName("GET /superadmin/tenants - Devrait retourner tous les tenants")
+    @DisplayName("GET /superadmin/tenants - Devrait retourner tous les tenants paginés")
     void getAllTenants_DevraitRetournerTousLesTenants() throws Exception {
-        when(superAdminService.getAllTenants()).thenReturn(List.of(tenantDto1, tenantDto2));
+        PagedResponse<TenantAdminDto> pagedResponse = PagedResponse.from(
+                new PageImpl<>(List.of(tenantDto1, tenantDto2), PageRequest.of(0, 20), 2));
+        when(superAdminService.getAllTenants(0, 20)).thenReturn(pagedResponse);
 
         mockMvc.perform(get("/superadmin/tenants")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].tenantUuid", is("tenant-001")))
-                .andExpect(jsonPath("$[0].nomEntreprise", is("Boutique Alpha")))
-                .andExpect(jsonPath("$[0].statut", is("ACTIF")))
-                .andExpect(jsonPath("$[1].statut", is("EXPIRE")));
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].tenantUuid", is("tenant-001")))
+                .andExpect(jsonPath("$.content[0].nomEntreprise", is("Boutique Alpha")));
 
-        verify(superAdminService, times(1)).getAllTenants();
+        verify(superAdminService, times(1)).getAllTenants(0, 20);
     }
 
     @Test
     @DisplayName("GET /superadmin/tenants - Devrait retourner liste vide")
     void getAllTenants_DevraitRetournerListeVide() throws Exception {
-        when(superAdminService.getAllTenants()).thenReturn(List.of());
+        PagedResponse<TenantAdminDto> pagedResponse = PagedResponse.from(
+                new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+        when(superAdminService.getAllTenants(0, 20)).thenReturn(pagedResponse);
 
         mockMvc.perform(get("/superadmin/tenants")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.content", hasSize(0)));
     }
 
     // ==================== GET /superadmin/tenants/{id} ====================

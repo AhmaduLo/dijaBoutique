@@ -1,5 +1,6 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.dto.UserDto;
 import com.example.dijasaliou.entity.UserEntity;
@@ -11,7 +12,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -43,9 +43,12 @@ public class AdminController {
      * Retourne la liste complète des comptes avec leurs infos (sauf mot de passe)
      */
     @GetMapping("/utilisateurs")
-    public ResponseEntity<List<UserDto>> obtenirTousLesUtilisateurs(Authentication authentication) {
+    public ResponseEntity<PagedResponse<UserDto>> obtenirTousLesUtilisateurs(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         String emailAdmin = authentication.getName();
-        List<UserDto> utilisateurs = adminService.obtenirTousLesUtilisateurs(emailAdmin);
+        PagedResponse<UserDto> utilisateurs = adminService.obtenirTousLesUtilisateurs(emailAdmin, page, size);
         return ResponseEntity.ok(utilisateurs);
     }
 

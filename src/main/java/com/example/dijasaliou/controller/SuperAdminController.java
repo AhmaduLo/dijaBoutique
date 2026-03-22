@@ -1,6 +1,7 @@
 package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.FactureDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.TenantAdminDto;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.SuperAdminService;
@@ -55,9 +56,12 @@ public class SuperAdminController {
      * Liste tous les tenants avec leurs stats
      */
     @GetMapping("/tenants")
-    public ResponseEntity<List<TenantAdminDto>> getAllTenants(Authentication auth) {
+    public ResponseEntity<PagedResponse<TenantAdminDto>> getAllTenants(
+            Authentication auth,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         log.info("[SUPER_ADMIN] {} consulte tous les tenants", auth.getName());
-        return ResponseEntity.ok(superAdminService.getAllTenants());
+        return ResponseEntity.ok(superAdminService.getAllTenants(page, size));
     }
 
     /**

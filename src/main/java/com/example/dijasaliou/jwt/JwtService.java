@@ -1,5 +1,6 @@
 package com.example.dijasaliou.jwt;
 
+import com.example.dijasaliou.entity.UserEntity;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -40,31 +41,42 @@ public class JwtService {
     }
 
     /**
-     * Générer un token JWT pour un utilisateur avec tenant_id
+     * Générer un token JWT pour un utilisateur avec tenant_id et rôle
      *
      * MULTI-TENANT : Le tenant_id est CRUCIAL pour la sécurité
-     * Il est inclus dans le token et utilisé pour filtrer les données
+     * Le rôle est stocké dans le token pour éviter une requête BDD à chaque appel API
      *
-     * @param email Email de l'utilisateur
+     * @param email    Email de l'utilisateur
      * @param tenantId UUID du tenant (entreprise)
+     * @param role     Rôle de l'utilisateur (ADMIN, USER, SUPER_ADMIN)
      * @return Token JWT
      */
-    public String generateToken(String email, String tenantId) {
+    public String generateToken(String email, String tenantId, UserEntity.Role role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
         var builder = Jwts.builder()
-                .setSubject(email)                    // Email dans le token
-                .setIssuedAt(now)                     // Date de création
-                .setExpiration(expiryDate)            // Date d'expiration
-                .signWith(getSigningKey());           // Signature avec la clé secrète
+                .setSubject(email)
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(getSigningKey());
 
-        // Ajouter le tenant_id si présent
         if (tenantId != null && !tenantId.trim().isEmpty()) {
             builder.claim("tenant_id", tenantId);
         }
+        if (role != null) {
+            builder.claim("role", role.name());
+        }
 
         return builder.compact();
+    }
+
+    /**
+     * @deprecated Utiliser generateToken(email, tenantId, role) pour éviter les requêtes BDD
+     */
+    @Deprecated
+    public String generateToken(String email, String tenantId) {
+        return generateToken(email, tenantId, null);
     }
 
     /**
@@ -76,6 +88,17 @@ public class JwtService {
     public String getEmailFromToken(String token) {
         Claims claims = getClaims(token);
         return claims.getSubject();
+    }
+
+    /**
+     * Extraire le rôle du token JWT (évite une requête BDD dans le filtre)
+     *
+     * @param token Token JWT
+     * @return Nom du rôle ou null si absent
+     */
+    public String getRoleFromToken(String token) {
+        Claims claims = getClaims(token);
+        return claims.get("role", String.class);
     }
 
     /**

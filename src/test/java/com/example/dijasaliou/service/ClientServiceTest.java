@@ -123,7 +123,7 @@ class ClientServiceTest {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(clientRepository.findAllWithSearch(isNull(), eq("uuid-boutique-test")))
                 .thenReturn(List.of(clientTest));
-        when(creditClientRepository.countCreditsActifsByClientId(any(), any(), any())).thenReturn(0L);
+        when(creditClientRepository.countCreditsActifsByClientIds(any(), any(), any())).thenReturn(List.of());
 
         List<ClientDto> result = clientService.rechercherClients(null);
 
@@ -137,7 +137,7 @@ class ClientServiceTest {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(clientRepository.findAllWithSearch(eq("Ousmane"), eq("uuid-boutique-test")))
                 .thenReturn(List.of(clientTest));
-        when(creditClientRepository.countCreditsActifsByClientId(any(), any(), any())).thenReturn(0L);
+        when(creditClientRepository.countCreditsActifsByClientIds(any(), any(), any())).thenReturn(List.of());
 
         List<ClientDto> result = clientService.rechercherClients("Ousmane");
 

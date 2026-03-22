@@ -137,8 +137,8 @@ class VenteIntegrationTest {
                 .build());
 
         // Génération des tokens JWT pour chaque tenant (utilise Bearer header)
-        jwtBasic = jwtService.generateToken("user@basic.com", "it-tenant-basic");
-        jwtPremium = jwtService.generateToken("user@premium.com", "it-tenant-premium");
+        jwtBasic = jwtService.generateToken("user@basic.com", "it-tenant-basic", com.example.dijasaliou.entity.UserEntity.Role.USER);
+        jwtPremium = jwtService.generateToken("user@premium.com", "it-tenant-premium", com.example.dijasaliou.entity.UserEntity.Role.USER);
     }
 
     // ==================== Item 6 : Filtrage photo selon le plan ====================

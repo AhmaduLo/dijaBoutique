@@ -8,14 +8,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Filtre JWT qui intercepte CHAQUE requête
@@ -33,11 +33,9 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
     }
     @Override
     protected void doFilterInternal(
@@ -69,12 +67,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 5. Si l'email existe ET l'utilisateur n'est pas déjà authentifié
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // 6. Charger l'utilisateur depuis la base
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-
-                // 7. Valider le token
+                // 6. Valider le token (signature + expiration)
                 if (jwtService.validateToken(token)) {
-                    // 8. MULTI-TENANT : Extraire et stocker le tenant_id
+                    // 7. MULTI-TENANT : Extraire et stocker le tenant_id depuis le token (0 requête BDD)
                     String tenantId = jwtService.getTenantIdFromToken(token);
                     if (tenantId != null && !tenantId.trim().isEmpty()) {
                         TenantContext.setCurrentTenant(tenantId);
@@ -83,13 +78,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         log.debug("Token sans tenant_id pour l'utilisateur: {} (SUPER_ADMIN ou token legacy)", email);
                     }
 
-                    // 9. Créer l'objet d'authentification
+                    // 8. Construire les authorities depuis le rôle dans le token (0 requête BDD)
+                    String role = jwtService.getRoleFromToken(token);
+                    List<SimpleGrantedAuthority> authorities = role != null
+                            ? List.of(new SimpleGrantedAuthority(role))
+                            : List.of();
+
+                    // 9. Créer l'objet d'authentification avec l'email comme principal
                     UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
+                            new UsernamePasswordAuthenticationToken(email, null, authorities);
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 

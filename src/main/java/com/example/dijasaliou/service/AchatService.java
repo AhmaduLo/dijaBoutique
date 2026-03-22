@@ -6,6 +6,7 @@ import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.AchatRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -40,13 +41,10 @@ public class AchatService {
     }
 
     /**
-     * MÉTHODE 1 : Récupérer tous les achats
-     *
-     * Simple : Juste appeler le repository
-     * Pas de logique métier ici
+     * Récupérer tous les achats du tenant courant
      */
     public List<AchatEntity> obtenirTousLesAchats() {
-        return achatRepository.findAll();
+        return achatRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
 
     /**
@@ -76,6 +74,7 @@ public class AchatService {
      * - Vérifications métier
      * - MULTI-TENANT : Assignation automatique du tenant
      */
+    @CacheEvict(value = "stocks", allEntries = true)
     public AchatEntity creerAchat(AchatEntity achat, UserEntity utilisateur) {
 
         // 1. VALIDATION : Vérifier que les données sont correctes
@@ -121,6 +120,7 @@ public class AchatService {
     /**
      * Modifier un achat existant
      */
+    @CacheEvict(value = "stocks", allEntries = true)
     public AchatEntity modifierAchat(Long id, AchatEntity achatModifie) {
         // 1. Vérifier que l'achat existe
         AchatEntity achatExistant = obtenirAchatParId(id);
@@ -157,6 +157,7 @@ public class AchatService {
     /**
      * Supprimer un achat
      */
+    @CacheEvict(value = "stocks", allEntries = true)
     public void supprimerAchat(Long id) {
         // 1. Récupérer l'achat existant
         AchatEntity achatExistant = obtenirAchatParId(id);
@@ -209,7 +210,7 @@ public class AchatService {
      * @return Liste des achats avec uniquement les infos nécessaires pour la vente
      */
     public List<AchatEntity> obtenirProduitsAvecPrixVente() {
-        return achatRepository.findAll();
+        return achatRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
 
 }

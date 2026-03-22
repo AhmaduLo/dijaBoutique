@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -45,6 +46,7 @@ public class EmailService {
      * @param token Token de réinitialisation
      * @param userName Nom de l'utilisateur
      */
+    @Async
     public void sendPasswordResetEmail(String toEmail, String token, String userName) {
         try {
             String resetLink = frontendUrl + "/reset-password/" + token;
@@ -171,6 +173,7 @@ public class EmailService {
      *
      * @param request Les informations du formulaire de contact
      */
+    @Async
     public void sendContactEmail(ContactRequest request) {
         try {
             String subject = "Contact depuis l'application - " + request.getSujet();
@@ -328,6 +331,7 @@ public class EmailService {
      * @param devise Devise (EUR ou CFA)
      * @param dateExpiration Date d'expiration de l'abonnement
      */
+    @Async
     public void sendPaymentConfirmationEmail(String toEmail, String userName, String nomEntreprise,
                                              String plan, double montant, String devise,
                                              String dateExpiration) {
@@ -581,6 +585,7 @@ public class EmailService {
      * @param stockActuel Stock actuel
      * @param seuilAlerte Seuil qui a déclenché l'alerte (15, 10, 5, ou 0)
      */
+    @Async
     public void sendStockAlertEmail(String toEmail, String userName, String nomEntreprise,
                                     String nomProduit, int stockActuel, int seuilAlerte) {
         try {
@@ -857,6 +862,7 @@ public class EmailService {
      *
      * @param facture La facture à envoyer
      */
+    @Async
     public void sendFactureEmail(FactureEntity facture) {
         try {
             String subject = "Facture " + facture.getNumeroFacture() + " - Abonnement HeasyStock";

@@ -54,6 +54,18 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
     long countCreditsActifsByClientId(@Param("clientId") Long clientId, @Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
     /**
+     * Compte les crédits actifs pour une liste de clients en une seule requête.
+     * Évite le problème N+1 de ClientService (1 requête au lieu de 1 par client).
+     * Retourne Object[] : [clientId, count]
+     */
+    @Query("SELECT c.client.id, COUNT(c) FROM CreditClientEntity c " +
+           "WHERE c.client.id IN :clientIds AND c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid " +
+           "GROUP BY c.client.id")
+    List<Object[]> countCreditsActifsByClientIds(@Param("clientIds") List<Long> clientIds,
+                                                  @Param("statut") StatutCredit statut,
+                                                  @Param("tenantUuid") String tenantUuid);
+
+    /**
      * Somme le montant restant dû sur les crédits non soldés dont la vente a été créée dans la période.
      * Retourne List<Object[]> : chaque Object[] = [count, sum(montantRestant)]
      */

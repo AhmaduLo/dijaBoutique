@@ -1,11 +1,15 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.dto.UserDto;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.exception.UserLimitExceededException;
 import com.example.dijasaliou.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,18 +59,14 @@ public class AdminService {
     }
 
     /**
-     * Obtenir tous les utilisateurs actifs (non supprimés)
+     * Obtenir tous les utilisateurs actifs (non supprimés) — paginé
      * Accessible uniquement aux ADMIN
      */
-    public List<UserDto> obtenirTousLesUtilisateurs(String emailAdmin) {
+    public PagedResponse<UserDto> obtenirTousLesUtilisateurs(String emailAdmin, int page, int size) {
         verifierAdmin(emailAdmin);
-
-        // Ne retourner que les utilisateurs actifs
-        List<UserEntity> utilisateurs = userRepository.findByDeletedFalse();
-
-        return utilisateurs.stream()
-                .map(UserDto::fromEntity)
-                .collect(Collectors.toList());
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "nom"));
+        Page<UserEntity> resultPage = userRepository.findByDeletedFalse(pageable);
+        return PagedResponse.from(resultPage.map(UserDto::fromEntity));
     }
 
     /**

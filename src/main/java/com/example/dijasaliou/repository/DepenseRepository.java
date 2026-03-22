@@ -1,6 +1,7 @@
 package com.example.dijasaliou.repository;
 
 import com.example.dijasaliou.entity.DepenseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,6 +44,12 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, Long> {
      * Supprimer toutes les dépenses d'un utilisateur
      */
     void deleteByUtilisateur(UserEntity utilisateur);
+
+    /**
+     * Récupère toutes les dépenses d'un tenant (filtre explicite — évite findAll())
+     */
+    @Query("SELECT d FROM DepenseEntity d WHERE d.tenant = :tenant ORDER BY d.dateDepense DESC")
+    List<DepenseEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
      * Recherche paginée avec filtre optionnel sur libelle et catégorie

@@ -81,12 +81,13 @@ class VenteServiceTest {
     @Test
     @DisplayName("obtenirToutesLesVentes() — retourne toutes les ventes")
     void obtenirToutesLesVentes_retourneListe() {
-        when(venteRepository.findAll()).thenReturn(List.of(venteValide));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.findAllByTenant(tenantTest)).thenReturn(List.of(venteValide));
 
         List<VenteEntity> resultat = venteService.obtenirToutesLesVentes();
 
         assertThat(resultat).hasSize(1);
-        verify(venteRepository).findAll();
+        verify(venteRepository).findAllByTenant(tenantTest);
     }
 
     // =========================================================
@@ -392,17 +393,13 @@ class VenteServiceTest {
     // =========================================================
 
     @Test
-    @DisplayName("calculerChiffreAffaires() — somme correcte sur plusieurs ventes")
+    @DisplayName("calculerChiffreAffaires() — délègue le calcul au repository via SQL SUM")
     void calculerChiffreAffaires_sommeListe() {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
-
-        VenteEntity vente2 = VenteEntity.builder()
-                .prixTotal(new BigDecimal("500.00"))
-                .build();
-
-        when(venteRepository.findByDateVenteBetween(debut, fin))
-                .thenReturn(List.of(venteValide, vente2));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.sumChiffreAffairesPeriode(debut, fin, tenantTest.getTenantUuid()))
+                .thenReturn(new BigDecimal("1500.00"));
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
 
@@ -414,7 +411,9 @@ class VenteServiceTest {
     void calculerChiffreAffaires_retourneZeroSiVide() {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
-        when(venteRepository.findByDateVenteBetween(debut, fin)).thenReturn(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.sumChiffreAffairesPeriode(debut, fin, tenantTest.getTenantUuid()))
+                .thenReturn(BigDecimal.ZERO);
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
 

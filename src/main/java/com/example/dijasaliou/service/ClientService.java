@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,8 +32,10 @@ public class ClientService {
     public List<ClientDto> rechercherClients(String search) {
         String searchParam = (search != null && !search.isBlank()) ? search : null;
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
-        return clientRepository.findAllWithSearch(searchParam, tenantUuid).stream()
-                .map(c -> ClientDto.fromEntity(c, countCreditsActifs(c.getId(), tenantUuid)))
+        List<ClientEntity> clients = clientRepository.findAllWithSearch(searchParam, tenantUuid);
+        Map<Long, Long> countParClient = countCreditsActifsBatch(clients, tenantUuid);
+        return clients.stream()
+                .map(c -> ClientDto.fromEntity(c, countParClient.getOrDefault(c.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
@@ -41,7 +44,9 @@ public class ClientService {
         String searchParam = (search != null && !search.isBlank()) ? search : null;
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
         Page<ClientEntity> pageResult = clientRepository.findAllWithSearchPaged(searchParam, tenantUuid, pageable);
-        Page<ClientDto> dtoPage = pageResult.map(c -> ClientDto.fromEntity(c, countCreditsActifs(c.getId(), tenantUuid)));
+        List<ClientEntity> clients = pageResult.getContent();
+        Map<Long, Long> countParClient = countCreditsActifsBatch(clients, tenantUuid);
+        Page<ClientDto> dtoPage = pageResult.map(c -> ClientDto.fromEntity(c, countParClient.getOrDefault(c.getId(), 0L)));
         return PagedResponse.from(dtoPage);
     }
 
@@ -70,5 +75,21 @@ public class ClientService {
 
     private long countCreditsActifs(Long clientId, String tenantUuid) {
         return creditClientRepository.countCreditsActifsByClientId(clientId, CreditClientEntity.StatutCredit.SOLDE, tenantUuid);
+    }
+
+    /**
+     * Compte les crédits actifs pour tous les clients en une seule requête SQL.
+     * Évite le problème N+1 (1 requête au lieu de 1 par client).
+     */
+    private Map<Long, Long> countCreditsActifsBatch(List<ClientEntity> clients, String tenantUuid) {
+        if (clients.isEmpty()) return Map.of();
+        List<Long> ids = clients.stream().map(ClientEntity::getId).collect(Collectors.toList());
+        return creditClientRepository
+                .countCreditsActifsByClientIds(ids, CreditClientEntity.StatutCredit.SOLDE, tenantUuid)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
     }
 }

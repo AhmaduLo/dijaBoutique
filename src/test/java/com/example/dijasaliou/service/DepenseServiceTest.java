@@ -78,18 +78,20 @@ class DepenseServiceTest {
     void obtenirToutesLesDepenses_retourneListe() {
         DepenseEntity d2 = DepenseEntity.builder().id(2L).libelle("Electricité")
                 .montant(new BigDecimal("150.00")).categorie(DepenseEntity.CategorieDepense.ELECTRICITE).build();
-        when(depenseRepository.findAll()).thenReturn(Arrays.asList(depenseValide, d2));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(depenseRepository.findAllByTenant(tenantTest)).thenReturn(Arrays.asList(depenseValide, d2));
 
         List<DepenseEntity> resultat = depenseService.obtenirToutesLesDepenses();
 
         assertThat(resultat).hasSize(2);
-        verify(depenseRepository).findAll();
+        verify(depenseRepository).findAllByTenant(tenantTest);
     }
 
     @Test
     @DisplayName("obtenirToutesLesDepenses() — liste vide si aucune dépense")
     void obtenirToutesLesDepenses_retourneListeVide() {
-        when(depenseRepository.findAll()).thenReturn(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(depenseRepository.findAllByTenant(tenantTest)).thenReturn(Collections.emptyList());
 
         assertThat(depenseService.obtenirToutesLesDepenses()).isEmpty();
     }

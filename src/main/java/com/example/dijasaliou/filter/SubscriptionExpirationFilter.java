@@ -1,7 +1,7 @@
 package com.example.dijasaliou.filter;
 
 import com.example.dijasaliou.entity.TenantEntity;
-import com.example.dijasaliou.repository.TenantRepository;
+import com.example.dijasaliou.service.TenantCacheService;
 import com.example.dijasaliou.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
@@ -34,11 +34,11 @@ import java.util.Map;
 @Slf4j
 public class SubscriptionExpirationFilter extends OncePerRequestFilter {
 
-    private final TenantRepository tenantRepository;
+    private final TenantCacheService tenantCacheService;
     private final ObjectMapper objectMapper;
 
-    public SubscriptionExpirationFilter(TenantRepository tenantRepository, ObjectMapper objectMapper) {
-        this.tenantRepository = tenantRepository;
+    public SubscriptionExpirationFilter(TenantCacheService tenantCacheService, ObjectMapper objectMapper) {
+        this.tenantCacheService = tenantCacheService;
         this.objectMapper = objectMapper;
     }
 
@@ -64,8 +64,8 @@ public class SubscriptionExpirationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Vérifier l'expiration
-        TenantEntity tenant = tenantRepository.findByTenantUuid(tenantId).orElse(null);
+        // Vérifier l'expiration — résultat mis en cache 5 min (évite 1 requête BDD par appel API)
+        TenantEntity tenant = tenantCacheService.findByUuid(tenantId).orElse(null);
 
         if (tenant != null && isSubscriptionExpired(tenant)) {
             log.warn("Accès bloqué pour le tenant {} - Abonnement expiré le {}",
