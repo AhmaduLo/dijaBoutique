@@ -157,6 +157,14 @@ public class VenteEntity  extends BaseEntity{
     @Builder.Default
     private Boolean estSoldee = true;
 
+    /**
+     * Identifiant de groupe pour relier les produits d'une même vente multi-produits.
+     * Généré côté frontend (UUID) — tous les articles d'un même panier partagent le même UUID.
+     */
+    @Size(max = 36, message = "Le groupeVenteId ne peut dépasser 36 caractères")
+    @Column(name = "groupe_vente_id", length = 36)
+    private String groupeVenteId;
+
 
 
     /**
