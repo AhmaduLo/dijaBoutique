@@ -56,6 +56,15 @@ class AuthControllerTest {
     @MockitoBean(name = "jwtService")
     private com.example.dijasaliou.jwt.JwtService jwtService;
 
+    @MockitoBean
+    private com.example.dijasaliou.config.HibernateFilterInterceptor hibernateFilterInterceptor;
+
+    @MockitoBean
+    private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.RateLimitService rateLimitService;
+
     private RegisterRequest registerRequestUser;
     private RegisterRequest registerRequestAdmin;
     private LoginRequest loginRequest;
@@ -119,6 +128,11 @@ class AuthControllerTest {
                 .token("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.admin.token")
                 .user(adminTest)
                 .build();
+
+        // Autoriser les requêtes par défaut (mock retourne false sinon → 429)
+        when(rateLimitService.allowRegister(any())).thenReturn(true);
+        when(rateLimitService.allowLogin(any())).thenReturn(true);
+        when(rateLimitService.allowPasswordReset(any())).thenReturn(true);
     }
 
     // ==================== Tests pour POST /auth/register ====================
@@ -134,7 +148,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequestUser)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token", is("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.user.token")))
+                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
+                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user.id", is(1)))
                 .andExpect(jsonPath("$.user.nom", is("Diop")))
                 .andExpect(jsonPath("$.user.prenom", is("Amadou")))
@@ -155,7 +170,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequestAdmin)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token", is("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.admin.token")))
+                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
+                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user.id", is(2)))
                 .andExpect(jsonPath("$.user.nom", is("Saliou")))
                 .andExpect(jsonPath("$.user.prenom", is("Dija")))
@@ -176,8 +192,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequestUser)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token", notNullValue()))
-                .andExpect(jsonPath("$.token", org.hamcrest.Matchers.startsWith("eyJ"))) // JWT commence toujours par eyJ
+                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
+                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user", notNullValue()));
 
         verify(authService, times(1)).register(any(RegisterRequest.class));
@@ -293,7 +309,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token", is("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.user.token")))
+                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
+                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user.id", is(1)))
                 .andExpect(jsonPath("$.user.email", is("amadou@example.com")))
                 .andExpect(jsonPath("$.user.nom", is("Diop")))
@@ -314,7 +331,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequestAdmin)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token", is("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.admin.token")))
+                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
+                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user.id", is(2)))
                 .andExpect(jsonPath("$.user.email", is("dija@boutique.com")))
                 .andExpect(jsonPath("$.user.role", is("ADMIN")));
@@ -333,8 +351,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token", notNullValue()))
-                .andExpect(jsonPath("$.token", org.hamcrest.Matchers.startsWith("eyJ")))
+                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
+                .andExpect(jsonPath("$.token").doesNotExist())
                 .andExpect(jsonPath("$.user", notNullValue()));
 
         verify(authService, times(1)).login(any(LoginRequest.class));

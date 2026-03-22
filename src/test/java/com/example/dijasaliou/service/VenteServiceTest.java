@@ -1,8 +1,12 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.StockDto;
-import com.example.dijasaliou.entity.UserEntity;
-import com.example.dijasaliou.entity.VenteEntity;
+import com.example.dijasaliou.entity.*;
+import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
+import com.example.dijasaliou.entity.PaiementCreditEntity.ModePaiement;
+import com.example.dijasaliou.repository.ClientRepository;
+import com.example.dijasaliou.repository.CreditClientRepository;
+import com.example.dijasaliou.repository.PaiementCreditRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,42 +16,53 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Tests du VenteService")
+@DisplayName("Tests unitaires — VenteService")
 class VenteServiceTest {
 
-    @Mock
-    private VenteRepository venteRepository;
-
-    @Mock
-    private StockService stockService;
+    @Mock private VenteRepository venteRepository;
+    @Mock private StockService stockService;
+    @Mock private TenantService tenantService;
+    @Mock private StockAlertService stockAlertService;
+    @Mock private CreditClientService creditClientService;
+    @Mock private ClientRepository clientRepository;
+    @Mock private CreditClientRepository creditClientRepository;
+    @Mock private PaiementCreditRepository paiementCreditRepository;
 
     @InjectMocks
     private VenteService venteService;
 
     private VenteEntity venteValide;
     private UserEntity utilisateurTest;
+    private TenantEntity tenantTest;
 
     @BeforeEach
     void setUp() {
+        tenantTest = new TenantEntity();
+        tenantTest.setTenantUuid("uuid-tenant-test");
+
         utilisateurTest = UserEntity.builder()
-                .id(1L)
                 .nom("Diop")
                 .email("amadou@example.com")
                 .build();
 
         venteValide = VenteEntity.builder()
-                .id(1L)
                 .nomProduit("Ordinateur")
                 .quantite(2)
                 .prixUnitaire(new BigDecimal("500.00"))
@@ -55,34 +70,44 @@ class VenteServiceTest {
                 .client("Client A")
                 .dateVente(LocalDate.now())
                 .utilisateur(utilisateurTest)
+                .tenant(tenantTest)
                 .build();
     }
 
+    // =========================================================
+    // obtenirToutesLesVentes
+    // =========================================================
+
     @Test
-    @DisplayName("obtenirToutesLesVentes() - Devrait retourner toutes les ventes")
-    void obtenirToutesLesVentes_DevraitRetourner() {
-        when(venteRepository.findAll()).thenReturn(Arrays.asList(venteValide));
+    @DisplayName("obtenirToutesLesVentes() — retourne toutes les ventes")
+    void obtenirToutesLesVentes_retourneListe() {
+        when(venteRepository.findAll()).thenReturn(List.of(venteValide));
 
         List<VenteEntity> resultat = venteService.obtenirToutesLesVentes();
 
         assertThat(resultat).hasSize(1);
-        verify(venteRepository, times(1)).findAll();
+        verify(venteRepository).findAll();
     }
 
+    // =========================================================
+    // obtenirVenteParId
+    // =========================================================
+
     @Test
-    @DisplayName("obtenirVenteParId() - Devrait retourner une vente")
-    void obtenirVenteParId_DevraitRetourner() {
+    @DisplayName("obtenirVenteParId() — retourne la vente si elle existe")
+    void obtenirVenteParId_retourneVente() {
+        venteValide.setId(1L);
         when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
 
         VenteEntity resultat = venteService.obtenirVenteParId(1L);
 
-        assertThat(resultat).isNotNull();
         assertThat(resultat.getId()).isEqualTo(1L);
+        assertThat(resultat.getNomProduit()).isEqualTo("Ordinateur");
     }
 
     @Test
-    @DisplayName("obtenirVenteParId() - Devrait lancer exception si non trouvée")
-    void obtenirVenteParId_DevraitLancerException() {
+    @DisplayName("obtenirVenteParId() — lève RuntimeException si non trouvée")
+    void obtenirVenteParId_leveExceptionSiAbsente() {
         when(venteRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> venteService.obtenirVenteParId(999L))
@@ -90,26 +115,107 @@ class VenteServiceTest {
                 .hasMessageContaining("Vente non trouvée");
     }
 
+    // =========================================================
+    // creerVente — validations
+    // =========================================================
+
     @Test
-    @DisplayName("creerVente() - Devrait créer une vente avec stock suffisant")
-    void creerVente_DevraitCreerAvecStockSuffisant() {
+    @DisplayName("creerVente() — lève exception si quantité = 0")
+    void creerVente_leveExceptionQuantiteZero() {
+        VenteEntity vente = VenteEntity.builder()
+                .nomProduit("Produit")
+                .quantite(0)
+                .prixUnitaire(new BigDecimal("100.00"))
+                .build();
+
+        assertThatThrownBy(() -> venteService.creerVente(vente, utilisateurTest))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("quantité");
+    }
+
+    @Test
+    @DisplayName("creerVente() — lève exception si quantité négative")
+    void creerVente_leveExceptionQuantiteNegative() {
+        VenteEntity vente = VenteEntity.builder()
+                .nomProduit("Produit")
+                .quantite(-5)
+                .prixUnitaire(new BigDecimal("100.00"))
+                .build();
+
+        assertThatThrownBy(() -> venteService.creerVente(vente, utilisateurTest))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("quantité");
+    }
+
+    @Test
+    @DisplayName("creerVente() — lève exception si prix = 0")
+    void creerVente_leveExceptionPrixZero() {
+        VenteEntity vente = VenteEntity.builder()
+                .nomProduit("Produit")
+                .quantite(5)
+                .prixUnitaire(BigDecimal.ZERO)
+                .build();
+
+        assertThatThrownBy(() -> venteService.creerVente(vente, utilisateurTest))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("prix");
+    }
+
+    @Test
+    @DisplayName("creerVente() — lève exception si nom produit vide")
+    void creerVente_leveExceptionNomProduitVide() {
+        VenteEntity vente = VenteEntity.builder()
+                .nomProduit("")
+                .quantite(5)
+                .prixUnitaire(new BigDecimal("100.00"))
+                .build();
+
+        assertThatThrownBy(() -> venteService.creerVente(vente, utilisateurTest))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("nom du produit");
+    }
+
+    @Test
+    @DisplayName("creerVente() — lève exception si nom produit null")
+    void creerVente_leveExceptionNomProduitNull() {
+        VenteEntity vente = VenteEntity.builder()
+                .nomProduit(null)
+                .quantite(5)
+                .prixUnitaire(new BigDecimal("100.00"))
+                .build();
+
+        assertThatThrownBy(() -> venteService.creerVente(vente, utilisateurTest))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("nom du produit");
+    }
+
+    // =========================================================
+    // creerVente — stock
+    // =========================================================
+
+    @Test
+    @DisplayName("creerVente() — succès avec stock suffisant")
+    void creerVente_succes_stockSuffisant() {
         StockDto stock = StockDto.builder()
                 .nomProduit("Ordinateur")
                 .stockDisponible(10)
                 .build();
 
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(stockService.obtenirStockParNomProduit("Ordinateur")).thenReturn(stock);
-        when(venteRepository.save(any(VenteEntity.class))).thenReturn(venteValide);
+        when(venteRepository.save(any())).thenReturn(venteValide);
+        doNothing().when(stockAlertService).verifierEtEnvoyerAlerte(any());
 
         VenteEntity resultat = venteService.creerVente(venteValide, utilisateurTest);
 
         assertThat(resultat).isNotNull();
-        verify(venteRepository, times(1)).save(any());
+        assertThat(resultat.getNomProduit()).isEqualTo("Ordinateur");
+        verify(venteRepository).save(any());
     }
 
     @Test
-    @DisplayName("creerVente() - Devrait lancer exception si stock insuffisant")
-    void creerVente_DevraitLancerExceptionStockInsuffisant() {
+    @DisplayName("creerVente() — lève exception si stock insuffisant")
+    void creerVente_leveExceptionStockInsuffisant() {
         StockDto stock = StockDto.builder()
                 .nomProduit("Ordinateur")
                 .stockDisponible(1)
@@ -123,120 +229,414 @@ class VenteServiceTest {
     }
 
     @Test
-    @DisplayName("creerVente() - Devrait lancer exception si quantité invalide")
-    void creerVente_DevraitLancerExceptionQuantiteInvalide() {
-        VenteEntity venteInvalide = VenteEntity.builder()
-                .nomProduit("Produit")
-                .quantite(0)
-                .prixUnitaire(new BigDecimal("100.00"))
+    @DisplayName("creerVente() — autorisée si produit jamais acheté (pas dans le stock)")
+    void creerVente_autorisee_produitInexistantDansStock() {
+        when(stockService.obtenirStockParNomProduit("Ordinateur"))
+                .thenThrow(new RuntimeException("Produit non trouvé : Ordinateur"));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.save(any())).thenReturn(venteValide);
+        doNothing().when(stockAlertService).verifierEtEnvoyerAlerte(any());
+
+        VenteEntity resultat = venteService.creerVente(venteValide, utilisateurTest);
+
+        assertThat(resultat).isNotNull();
+    }
+
+    // =========================================================
+    // creerVente — mode CREDIT
+    // =========================================================
+
+    @Test
+    @DisplayName("creerVente() — mode CREDIT avec client enregistré crée un crédit")
+    void creerVente_modeCREDIT_creeCredit() {
+        ClientEntity client = new ClientEntity();
+        client.setId(10L);
+        client.setNom("Client Test");
+
+        VenteEntity venteCredit = VenteEntity.builder()
+                .nomProduit("Téléphone")
+                .quantite(1)
+                .prixUnitaire(new BigDecimal("200.00"))
+                .prixTotal(new BigDecimal("200.00"))
+                .dateVente(LocalDate.now())
+                .modePaiement(VenteEntity.ModePaiementVente.CREDIT)
+                .clientRef(client)
+                .dateEcheance(LocalDate.now().plusDays(30))
                 .build();
 
-        assertThatThrownBy(() -> venteService.creerVente(venteInvalide, utilisateurTest))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("quantité");
+        StockDto stock = StockDto.builder().nomProduit("Téléphone").stockDisponible(5).build();
+
+        when(stockService.obtenirStockParNomProduit("Téléphone")).thenReturn(stock);
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.save(any())).thenReturn(venteCredit);
+        doNothing().when(stockAlertService).verifierEtEnvoyerAlerte(any());
+
+        venteService.creerVente(venteCredit, utilisateurTest);
+
+        verify(creditClientService).creerCreditDepuisVente(any(), eq(client), eq(utilisateurTest), any());
     }
 
     @Test
-    @DisplayName("creerVente() - Devrait lancer exception si prix invalide")
-    void creerVente_DevraitLancerExceptionPrixInvalide() {
-        VenteEntity venteInvalide = VenteEntity.builder()
-                .nomProduit("Produit")
-                .quantite(5)
-                .prixUnitaire(BigDecimal.ZERO)
+    @DisplayName("creerVente() — mode CREDIT sans client lève exception")
+    void creerVente_modeCREDIT_sansClient_leveException() {
+        VenteEntity venteCredit = VenteEntity.builder()
+                .nomProduit("Téléphone")
+                .quantite(1)
+                .prixUnitaire(new BigDecimal("200.00"))
+                .dateVente(LocalDate.now())
+                .modePaiement(VenteEntity.ModePaiementVente.CREDIT)
+                .clientRef(null)
+                .clientId(null)
                 .build();
 
-        assertThatThrownBy(() -> venteService.creerVente(venteInvalide, utilisateurTest))
+        StockDto stock = StockDto.builder().nomProduit("Téléphone").stockDisponible(5).build();
+
+        when(stockService.obtenirStockParNomProduit("Téléphone")).thenReturn(stock);
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.save(any())).thenReturn(venteCredit);
+        doNothing().when(stockAlertService).verifierEtEnvoyerAlerte(any());
+
+        assertThatThrownBy(() -> venteService.creerVente(venteCredit, utilisateurTest))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("prix");
+                .hasMessageContaining("client enregistré");
     }
 
-    @Test
-    @DisplayName("creerVente() - Devrait lancer exception si nom produit vide")
-    void creerVente_DevraitLancerExceptionNomProduitVide() {
-        VenteEntity venteInvalide = VenteEntity.builder()
-                .nomProduit("")
-                .quantite(5)
-                .prixUnitaire(new BigDecimal("100.00"))
-                .build();
-
-        assertThatThrownBy(() -> venteService.creerVente(venteInvalide, utilisateurTest))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("nom du produit");
-    }
+    // =========================================================
+    // supprimerVente
+    // =========================================================
 
     @Test
-    @DisplayName("supprimerVente() - Devrait supprimer une vente")
-    void supprimerVente_DevraitSupprimer() {
-        when(venteRepository.existsById(1L)).thenReturn(true);
+    @DisplayName("supprimerVente() — supprime une vente ESPECES")
+    void supprimerVente_supprimeSansCredit() {
+        venteValide.setId(1L);
+        venteValide.setModePaiement(VenteEntity.ModePaiementVente.ESPECES);
+
+        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         venteService.supprimerVente(1L);
 
-        verify(venteRepository, times(1)).deleteById(1L);
+        verify(venteRepository).deleteById(1L);
+        verify(creditClientService, never()).supprimerCreditsDeLaVente(any());
     }
 
     @Test
-    @DisplayName("supprimerVente() - Devrait lancer exception si non trouvée")
-    void supprimerVente_DevraitLancerException() {
-        when(venteRepository.existsById(999L)).thenReturn(false);
+    @DisplayName("supprimerVente() — supprime les crédits liés si mode CREDIT")
+    void supprimerVente_supprimeCreditLies() {
+        venteValide.setId(2L);
+        venteValide.setModePaiement(VenteEntity.ModePaiementVente.CREDIT);
+
+        when(venteRepository.findById(2L)).thenReturn(Optional.of(venteValide));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+
+        venteService.supprimerVente(2L);
+
+        verify(creditClientService).supprimerCreditsDeLaVente(2L);
+        verify(venteRepository).deleteById(2L);
+    }
+
+    @Test
+    @DisplayName("supprimerVente() — lève exception si vente non trouvée")
+    void supprimerVente_leveExceptionSiAbsente() {
+        when(venteRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> venteService.supprimerVente(999L))
-                .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Vente non trouvée");
     }
 
     @Test
-    @DisplayName("obtenirVentesParUtilisateur() - Devrait retourner les ventes")
-    void obtenirVentesParUtilisateur_DevraitRetourner() {
-        when(venteRepository.findByUtilisateur(utilisateurTest))
-                .thenReturn(Arrays.asList(venteValide));
+    @DisplayName("supprimerVente() — lève SecurityException si tenant différent")
+    void supprimerVente_leveSecurityExceptionTenantDifferent() {
+        TenantEntity autretenant = new TenantEntity();
+        autretenant.setTenantUuid("uuid-autre-tenant");
+        venteValide.setId(3L);
+
+        when(venteRepository.findById(3L)).thenReturn(Optional.of(venteValide));
+        when(tenantService.getCurrentTenant()).thenReturn(autreenant());
+
+        assertThatThrownBy(() -> venteService.supprimerVente(3L))
+                .isInstanceOf(SecurityException.class)
+                .hasMessageContaining("Accès refusé");
+    }
+
+    // =========================================================
+    // obtenirVentesParUtilisateur / obtenirVentesParPeriode
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirVentesParUtilisateur() — retourne les ventes de l'utilisateur")
+    void obtenirVentesParUtilisateur_retourneListe() {
+        when(venteRepository.findByUtilisateur(utilisateurTest)).thenReturn(List.of(venteValide));
 
         List<VenteEntity> resultat = venteService.obtenirVentesParUtilisateur(utilisateurTest);
 
         assertThat(resultat).hasSize(1);
+        assertThat(resultat.get(0).getClient()).isEqualTo("Client A");
     }
 
     @Test
-    @DisplayName("obtenirVentesParPeriode() - Devrait retourner les ventes d'une période")
-    void obtenirVentesParPeriode_DevraitRetourner() {
-        LocalDate debut = LocalDate.of(2024, 1, 1);
-        LocalDate fin = LocalDate.of(2024, 12, 31);
-
-        when(venteRepository.findByDateVenteBetween(debut, fin))
-                .thenReturn(Arrays.asList(venteValide));
+    @DisplayName("obtenirVentesParPeriode() — retourne les ventes de la période")
+    void obtenirVentesParPeriode_retourneListe() {
+        LocalDate debut = LocalDate.of(2025, 1, 1);
+        LocalDate fin = LocalDate.of(2025, 12, 31);
+        when(venteRepository.findByDateVenteBetween(debut, fin)).thenReturn(List.of(venteValide));
 
         List<VenteEntity> resultat = venteService.obtenirVentesParPeriode(debut, fin);
 
         assertThat(resultat).hasSize(1);
     }
 
+    // =========================================================
+    // calculerChiffreAffaires
+    // =========================================================
+
     @Test
-    @DisplayName("calculerChiffreAffaires() - Devrait calculer le CA")
-    void calculerChiffreAffaires_DevraitCalculer() {
-        LocalDate debut = LocalDate.of(2024, 1, 1);
-        LocalDate fin = LocalDate.of(2024, 12, 31);
+    @DisplayName("calculerChiffreAffaires() — somme correcte sur plusieurs ventes")
+    void calculerChiffreAffaires_sommeListe() {
+        LocalDate debut = LocalDate.of(2025, 1, 1);
+        LocalDate fin = LocalDate.of(2025, 12, 31);
 
         VenteEntity vente2 = VenteEntity.builder()
                 .prixTotal(new BigDecimal("500.00"))
                 .build();
 
         when(venteRepository.findByDateVenteBetween(debut, fin))
-                .thenReturn(Arrays.asList(venteValide, vente2));
+                .thenReturn(List.of(venteValide, vente2));
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
 
-        assertThat(ca).isEqualTo(new BigDecimal("1500.00"));
+        assertThat(ca).isEqualByComparingTo(new BigDecimal("1500.00"));
     }
 
     @Test
-    @DisplayName("calculerChiffreAffaires() - Devrait retourner zéro si aucune vente")
-    void calculerChiffreAffaires_DevraitRetournerZero() {
-        LocalDate debut = LocalDate.of(2024, 1, 1);
-        LocalDate fin = LocalDate.of(2024, 12, 31);
-
-        when(venteRepository.findByDateVenteBetween(debut, fin))
-                .thenReturn(Arrays.asList());
+    @DisplayName("calculerChiffreAffaires() — retourne zéro si aucune vente")
+    void calculerChiffreAffaires_retourneZeroSiVide() {
+        LocalDate debut = LocalDate.of(2025, 1, 1);
+        LocalDate fin = LocalDate.of(2025, 12, 31);
+        when(venteRepository.findByDateVenteBetween(debut, fin)).thenReturn(Collections.emptyList());
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
 
-        assertThat(ca).isEqualTo(BigDecimal.ZERO);
+        assertThat(ca).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // =========================================================
+    // getProchainNumeroFacture
+    // =========================================================
+
+    @Test
+    @DisplayName("getProchainNumeroFacture() — format FAC-XXX avec padding 3 chiffres")
+    void getProchainNumeroFacture_formatCorrect() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.countByTenantUuid("uuid-tenant-test")).thenReturn(4L);
+
+        String numero = venteService.getProchainNumeroFacture();
+
+        assertThat(numero).isEqualTo("FAC-005");
+    }
+
+    @Test
+    @DisplayName("getProchainNumeroFacture() — premier numéro = FAC-001 quand aucune vente")
+    void getProchainNumeroFacture_premierNumero() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.countByTenantUuid("uuid-tenant-test")).thenReturn(0L);
+
+        String numero = venteService.getProchainNumeroFacture();
+
+        assertThat(numero).isEqualTo("FAC-001");
+    }
+
+    @Test
+    @DisplayName("getProchainNumeroFacture() — padding correct à 3+ chiffres (FAC-100)")
+    void getProchainNumeroFacture_paddingGrandNombre() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.countByTenantUuid("uuid-tenant-test")).thenReturn(99L);
+
+        String numero = venteService.getProchainNumeroFacture();
+
+        assertThat(numero).isEqualTo("FAC-100");
+    }
+
+    // =========================================================
+    // calculerRapportModePaiement
+    // =========================================================
+
+    @Test
+    @DisplayName("calculerRapportModePaiement() — retourne les 4 modes même si aucune vente")
+    void calculerRapportModePaiement_retourne4ModesSansVentes() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.sumDirectVentesParModeEtPeriode(any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(creditClientRepository.sumCreditsRestantParPeriode(any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(paiementCreditRepository.sumParModeEtPeriode(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        Map<String, Object> rapport = venteService.calculerRapportModePaiement(
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+
+        assertThat(rapport).containsKeys("ESPECES", "WAVE", "ORANGE_MONEY", "CREDIT");
+    }
+
+    @Test
+    @DisplayName("calculerRapportModePaiement() — total ESPECES correct avec ventes directes")
+    void calculerRapportModePaiement_totalEspecesCorrect() {
+        List<Object[]> directVentes = new java.util.ArrayList<>();
+        directVentes.add(new Object[]{VenteEntity.ModePaiementVente.ESPECES, 3L, new BigDecimal("1500.00")});
+
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.sumDirectVentesParModeEtPeriode(any(), any(), any(), any()))
+                .thenReturn(directVentes);
+        when(creditClientRepository.sumCreditsRestantParPeriode(any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(paiementCreditRepository.sumParModeEtPeriode(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        Map<String, Object> rapport = venteService.calculerRapportModePaiement(
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> especes = (Map<String, Object>) rapport.get("ESPECES");
+        assertThat(especes.get("nombre")).isEqualTo(3L);
+        assertThat((BigDecimal) especes.get("total")).isEqualByComparingTo(new BigDecimal("1500.00"));
+    }
+
+    @Test
+    @DisplayName("calculerRapportModePaiement() — total CREDIT depuis les crédits restants")
+    void calculerRapportModePaiement_totalCreditCorrect() {
+        List<Object[]> creditRows = new java.util.ArrayList<>();
+        creditRows.add(new Object[]{2L, new BigDecimal("800.00")});
+
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.sumDirectVentesParModeEtPeriode(any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(creditClientRepository.sumCreditsRestantParPeriode(any(), any(), any(), any()))
+                .thenReturn(creditRows);
+        when(paiementCreditRepository.sumParModeEtPeriode(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        Map<String, Object> rapport = venteService.calculerRapportModePaiement(
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> credit = (Map<String, Object>) rapport.get("CREDIT");
+        assertThat(credit.get("nombre")).isEqualTo(2L);
+        assertThat((BigDecimal) credit.get("total")).isEqualByComparingTo(new BigDecimal("800.00"));
+    }
+
+    @Test
+    @DisplayName("calculerRapportModePaiement() — remboursements ajoutés aux totaux directs")
+    void calculerRapportModePaiement_remboursementsAjoutesAuxTotaux() {
+        List<Object[]> directVentes = new java.util.ArrayList<>();
+        directVentes.add(new Object[]{VenteEntity.ModePaiementVente.ESPECES, 2L, new BigDecimal("1000.00")});
+
+        List<Object[]> remboursements = new java.util.ArrayList<>();
+        remboursements.add(new Object[]{ModePaiement.ESPECES, 1L, new BigDecimal("300.00")});
+
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.sumDirectVentesParModeEtPeriode(any(), any(), any(), any()))
+                .thenReturn(directVentes);
+        when(creditClientRepository.sumCreditsRestantParPeriode(any(), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(paiementCreditRepository.sumParModeEtPeriode(any(), any(), any()))
+                .thenReturn(remboursements);
+
+        Map<String, Object> rapport = venteService.calculerRapportModePaiement(
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> especes = (Map<String, Object>) rapport.get("ESPECES");
+        // 1000 + 300 = 1300
+        assertThat((BigDecimal) especes.get("total")).isEqualByComparingTo(new BigDecimal("1300.00"));
+        assertThat(especes.get("nombre")).isEqualTo(3L); // 2 + 1
+    }
+
+    // =========================================================
+    // modifierVente
+    // =========================================================
+
+    @Test
+    @DisplayName("modifierVente() — modifie et sauvegarde la vente")
+    void modifierVente_succes() {
+        venteValide.setId(1L);
+        VenteEntity modifications = VenteEntity.builder()
+                .quantite(3)
+                .nomProduit("Ordinateur") // même nom → pas d'appel au StockService
+                .prixUnitaire(new BigDecimal("600.00"))
+                .dateVente(LocalDate.now())
+                .build();
+
+        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(venteRepository.save(any())).thenReturn(venteValide);
+
+        VenteEntity resultat = venteService.modifierVente(1L, modifications);
+
+        assertThat(resultat).isNotNull();
+        verify(venteRepository).save(venteValide);
+        verify(stockService, never()).obtenirStockParNomProduit(any());
+    }
+
+    @Test
+    @DisplayName("modifierVente() — lève SecurityException si tenant différent")
+    void modifierVente_leveSecurityExceptionTenantDifferent() {
+        venteValide.setId(1L);
+        VenteEntity modifications = VenteEntity.builder()
+                .quantite(3).nomProduit("Ordinateur")
+                .prixUnitaire(new BigDecimal("600.00"))
+                .dateVente(LocalDate.now())
+                .build();
+
+        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        when(tenantService.getCurrentTenant()).thenReturn(autreenant());
+
+        assertThatThrownBy(() -> venteService.modifierVente(1L, modifications))
+                .isInstanceOf(SecurityException.class)
+                .hasMessageContaining("Accès refusé");
+    }
+
+    // =========================================================
+    // obtenirVentesPaginees / obtenirVentesParUtilisateurPaginees
+    // =========================================================
+
+    @Test
+    @DisplayName("obtenirVentesPaginees() — retourne une page de ventes")
+    void obtenirVentesPaginees_retournePage() {
+        Page<VenteEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(venteRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = venteService.obtenirVentesPaginees(0, 10, null, null, null);
+
+        assertThat(resultat).isNotNull();
+        assertThat(resultat.getContent()).isEmpty();
+        verify(venteRepository).findAllWithSearch(isNull(), isNull(), isNull(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("obtenirVentesParUtilisateurPaginees() — retourne une page filtrée par utilisateur")
+    void obtenirVentesParUtilisateurPaginees_retournePage() {
+        Page<VenteEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(venteRepository.findByUtilisateurWithSearch(
+                eq(utilisateurTest), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(pageMock);
+
+        var resultat = venteService.obtenirVentesParUtilisateurPaginees(
+                utilisateurTest, 0, 10, null, null, null);
+
+        assertThat(resultat).isNotNull();
+        verify(venteRepository).findByUtilisateurWithSearch(
+                eq(utilisateurTest), isNull(), isNull(), isNull(), any(Pageable.class));
+    }
+
+    // =========================================================
+    // Helpers
+    // =========================================================
+
+    private TenantEntity autreenant() {
+        TenantEntity autre = new TenantEntity();
+        autre.setTenantUuid("uuid-autre-tenant");
+        return autre;
     }
 }

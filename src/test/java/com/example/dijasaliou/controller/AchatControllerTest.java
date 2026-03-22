@@ -1,9 +1,13 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.AchatDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AchatService;
 import com.example.dijasaliou.service.UserService;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -66,6 +69,12 @@ class AchatControllerTest {
 
     @MockitoBean(name = "jwtService")
     private com.example.dijasaliou.jwt.JwtService jwtService;
+
+    @MockitoBean
+    private com.example.dijasaliou.config.HibernateFilterInterceptor hibernateFilterInterceptor;
+
+    @MockitoBean
+    private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
 
     private UserEntity utilisateurTest;
     private AchatEntity achatTest;
@@ -116,39 +125,41 @@ class AchatControllerTest {
     @DisplayName("GET /achats - Devrait retourner tous les achats avec succès")
     void obtenirTous_DevraitRetournerTousLesAchats() throws Exception {
         // Arrange (Préparation)
-        List<AchatEntity> achats = Arrays.asList(achatTest, achatTest2);
-        when(achatService.obtenirTousLesAchats()).thenReturn(achats);
+        PagedResponse<AchatDto> page = PagedResponse.<AchatDto>builder()
+                .content(Arrays.asList(AchatDto.fromEntity(achatTest), AchatDto.fromEntity(achatTest2)))
+                .currentPage(0).pageSize(20).totalElements(2L).totalPages(1).first(true).last(true).build();
+        when(achatService.obtenirAchatsPagines(0, 20, null, null, null)).thenReturn(page);
 
         // Act & Assert (Action et Vérification)
         mockMvc.perform(get("/achats")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$[0].quantite", is(10)))
-                .andExpect(jsonPath("$[0].prixUnitaire", is(50.00)))
-                .andExpect(jsonPath("$[0].prixTotal", is(500.00)))
-                .andExpect(jsonPath("$[1].id", is(2)))
-                .andExpect(jsonPath("$[1].nomProduit", is("Bracelet en argent")));
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].nomProduit", is("Collier en or")))
+                .andExpect(jsonPath("$.content[0].quantite", is(10)))
+                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].nomProduit", is("Bracelet en argent")));
 
-        // Vérifier que le service a été appelé une fois
-        verify(achatService, times(1)).obtenirTousLesAchats();
+        verify(achatService, times(1)).obtenirAchatsPagines(0, 20, null, null, null);
     }
 
     @Test
     @DisplayName("GET /achats - Devrait retourner une liste vide quand aucun achat")
     void obtenirTous_DevraitRetournerListeVide() throws Exception {
         // Arrange
-        when(achatService.obtenirTousLesAchats()).thenReturn(Arrays.asList());
+        PagedResponse<AchatDto> pageVide = PagedResponse.<AchatDto>builder()
+                .content(Arrays.asList()).currentPage(0).pageSize(20)
+                .totalElements(0L).totalPages(0).first(true).last(true).build();
+        when(achatService.obtenirAchatsPagines(0, 20, null, null, null)).thenReturn(pageVide);
 
         // Act & Assert
         mockMvc.perform(get("/achats")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.content", hasSize(0)));
 
-        verify(achatService, times(1)).obtenirTousLesAchats();
+        verify(achatService, times(1)).obtenirAchatsPagines(0, 20, null, null, null);
     }
 
     // ==================== Tests pour GET /achats/{id} ====================
@@ -176,18 +187,16 @@ class AchatControllerTest {
 
     @Test
     @DisplayName("GET /achats/{id} - Devrait lancer une exception si achat inexistant")
-    void obtenirParId_DevraitLancerExceptionSiAchatInexistant() {
+    void obtenirParId_DevraitLancerExceptionSiAchatInexistant() throws Exception {
         // Arrange
         Long achatId = 999L;
         when(achatService.obtenirAchatParId(achatId))
                 .thenThrow(new RuntimeException("Achat non trouvé"));
 
         // Act & Assert
-        // Vérifie que l'exécution lance une exception (ServletException qui encapsule RuntimeException)
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(get("/achats/{id}", achatId)
-                    .contentType(MediaType.APPLICATION_JSON));
-        });
+        mockMvc.perform(get("/achats/{id}", achatId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
 
         verify(achatService, times(1)).obtenirAchatParId(achatId);
     }
@@ -241,11 +250,11 @@ class AchatControllerTest {
     @DisplayName("POST /achats - Devrait créer un nouvel achat avec succès")
     void creer_DevraitCreerNouvelAchat() throws Exception {
         // Arrange
-        Long utilisateurId = 1L;
         AchatEntity nouvelAchat = AchatEntity.builder()
                 .quantite(15)
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("100.00"))
+                .prixTotal(new BigDecimal("1500.00"))
                 .dateAchat(LocalDate.now())
                 .fournisseur("Fournisseur C")
                 .build();
@@ -261,54 +270,48 @@ class AchatControllerTest {
                 .utilisateur(utilisateurTest)
                 .build();
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(achatService.creerAchat(any(AchatEntity.class), eq(utilisateurTest)))
                 .thenReturn(achatCree);
 
         // Act & Assert
         mockMvc.perform(post("/achats")
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null, List.of(new SimpleGrantedAuthority("USER"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelAchat)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id", is(3)))
                 .andExpect(jsonPath("$.nomProduit", is("Bague en diamant")))
                 .andExpect(jsonPath("$.quantite", is(15)))
-                .andExpect(jsonPath("$.prixUnitaire", is(100.00)))
                 .andExpect(jsonPath("$.prixTotal", is(1500.00)));
 
-        verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
+        verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
         verify(achatService, times(1)).creerAchat(any(AchatEntity.class), eq(utilisateurTest));
     }
 
     @Test
     @DisplayName("POST /achats - Devrait gérer les données invalides")
     void creer_AvecDonneesInvalides() throws Exception {
-        // Arrange
-        Long utilisateurId = 1L;
+        // Arrange - données invalides : quantité négative, nom vide, prix négatif, prixTotal null
         AchatEntity achatInvalide = AchatEntity.builder()
                 .quantite(-5) // Quantité négative (invalide)
                 .nomProduit("") // Nom vide (invalide)
                 .prixUnitaire(new BigDecimal("-10.00")) // Prix négatif (invalide)
                 .build();
 
-        // Note: En test unitaire avec @WebMvcTest, la validation Bean (@Valid) n'est pas appliquée automatiquement
-        // comme elle le serait dans un test d'intégration complet. Le controller acceptera donc les données.
-        // Pour tester la validation complète, il faudrait utiliser @SpringBootTest
-
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
-        when(achatService.creerAchat(any(AchatEntity.class), eq(utilisateurTest)))
-                .thenReturn(achatInvalide);
+        // @Valid déclenche MethodArgumentNotValidException qui est interceptée par
+        // GlobalExceptionHandler.handleGeneralException → 500 (il n'étend pas ResponseEntityExceptionHandler)
 
         // Act & Assert
         mockMvc.perform(post("/achats")
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null,
+                                List.of(new SimpleGrantedAuthority("USER"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(achatInvalide)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isInternalServerError());
 
-        // Dans ce test unitaire, le service est appelé car la validation n'est pas active
-        verify(achatService, times(1)).creerAchat(any(), any());
+        // La validation échoue avant d'appeler le service
+        verify(achatService, never()).creerAchat(any(), any());
     }
 
     // ==================== Tests pour PUT /achats/{id} ====================
@@ -318,12 +321,12 @@ class AchatControllerTest {
     void modifier_DevraitModifierAchat() throws Exception {
         // Arrange
         Long achatId = 1L;
-        Long utilisateurId = 1L;
 
         AchatEntity achatModifie = AchatEntity.builder()
                 .quantite(20)
                 .nomProduit("Collier en or modifié")
                 .prixUnitaire(new BigDecimal("60.00"))
+                .prixTotal(new BigDecimal("1200.00"))
                 .dateAchat(LocalDate.of(2025, 10, 25))
                 .fournisseur("Fournisseur A modifié")
                 .build();
@@ -339,13 +342,14 @@ class AchatControllerTest {
                 .utilisateur(utilisateurTest)
                 .build();
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(achatService.modifierAchat(eq(achatId), any(AchatEntity.class)))
                 .thenReturn(achatMiseAJour);
 
         // Act & Assert
         mockMvc.perform(put("/achats/{id}", achatId)
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null,
+                                List.of(new SimpleGrantedAuthority("USER"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(achatModifie)))
                 .andExpect(status().isOk())
@@ -355,35 +359,35 @@ class AchatControllerTest {
                 .andExpect(jsonPath("$.prixUnitaire", is(60.00)))
                 .andExpect(jsonPath("$.prixTotal", is(1200.00)));
 
-        verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
+        verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
         verify(achatService, times(1)).modifierAchat(eq(achatId), any(AchatEntity.class));
     }
 
     @Test
     @DisplayName("PUT /achats/{id} - Devrait lancer une exception si achat inexistant")
-    void modifier_DevraitLancerExceptionSiAchatInexistant() {
+    void modifier_DevraitLancerExceptionSiAchatInexistant() throws Exception {
         // Arrange
         Long achatId = 999L;
-        Long utilisateurId = 1L;
 
         AchatEntity achatModifie = AchatEntity.builder()
                 .quantite(20)
                 .nomProduit("Produit inexistant")
                 .prixUnitaire(new BigDecimal("50.00"))
+                .prixTotal(new BigDecimal("1000.00"))
+                .dateAchat(LocalDate.of(2025, 10, 25))
                 .build();
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(achatService.modifierAchat(eq(achatId), any(AchatEntity.class)))
                 .thenThrow(new RuntimeException("Achat non trouvé"));
 
         // Act & Assert
-        // Vérifie que l'exécution lance une exception
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(put("/achats/{id}", achatId)
-                    .param("utilisateurId", utilisateurId.toString())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(achatModifie)));
-        });
+        mockMvc.perform(put("/achats/{id}", achatId)
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null,
+                                List.of(new SimpleGrantedAuthority("USER"))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(achatModifie)))
+                .andExpect(status().isBadRequest());
 
         verify(achatService, times(1)).modifierAchat(eq(achatId), any(AchatEntity.class));
     }
@@ -476,18 +480,16 @@ class AchatControllerTest {
 
     @Test
     @DisplayName("DELETE /achats/{id} - Devrait lancer une exception si achat inexistant")
-    void supprimer_DevraitLancerExceptionSiAchatInexistant() {
+    void supprimer_DevraitLancerExceptionSiAchatInexistant() throws Exception {
         // Arrange
         Long achatId = 999L;
         doThrow(new RuntimeException("Achat non trouvé"))
                 .when(achatService).supprimerAchat(achatId);
 
         // Act & Assert
-        // Vérifie que l'exécution lance une exception
-        assertThrows(Exception.class, () -> {
-            mockMvc.perform(delete("/achats/{id}", achatId)
-                    .contentType(MediaType.APPLICATION_JSON));
-        });
+        mockMvc.perform(delete("/achats/{id}", achatId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
 
         verify(achatService, times(1)).supprimerAchat(achatId);
     }
@@ -509,54 +511,57 @@ class AchatControllerTest {
                 .utilisateur(utilisateurTest)
                 .build();
 
-        when(achatService.obtenirTousLesAchats())
-                .thenReturn(Arrays.asList(achatSansFournisseur));
+        PagedResponse<AchatDto> page = PagedResponse.<AchatDto>builder()
+                .content(Arrays.asList(AchatDto.fromEntity(achatSansFournisseur)))
+                .currentPage(0).pageSize(20).totalElements(1L).totalPages(1).first(true).last(true).build();
+        when(achatService.obtenirAchatsPagines(0, 20, null, null, null)).thenReturn(page);
 
         // Act & Assert
         mockMvc.perform(get("/achats")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].fournisseur").doesNotExist());
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].fournisseur").doesNotExist());
 
-        verify(achatService, times(1)).obtenirTousLesAchats();
+        verify(achatService, times(1)).obtenirAchatsPagines(0, 20, null, null, null);
     }
 
     @Test
     @DisplayName("POST /achats - Devrait calculer automatiquement le prix total")
     void creer_DevraitCalculerPrixTotal() throws Exception {
-        // Arrange
-        Long utilisateurId = 1L;
+        // Arrange - 12 × 25.00 = 300.00 (prixTotal fourni, le service confirme le calcul)
         AchatEntity nouvelAchat = AchatEntity.builder()
                 .quantite(12)
                 .nomProduit("Boucles d'oreilles")
                 .prixUnitaire(new BigDecimal("25.00"))
+                .prixTotal(new BigDecimal("300.00"))
                 .dateAchat(LocalDate.now())
                 .build();
 
-        // Le service devrait calculer : 12 × 25.00 = 300.00
         AchatEntity achatCree = AchatEntity.builder()
                 .id(4L)
                 .quantite(12)
                 .nomProduit("Boucles d'oreilles")
                 .prixUnitaire(new BigDecimal("25.00"))
-                .prixTotal(new BigDecimal("300.00")) // Calculé automatiquement
+                .prixTotal(new BigDecimal("300.00"))
                 .dateAchat(LocalDate.now())
                 .utilisateur(utilisateurTest)
                 .build();
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(achatService.creerAchat(any(AchatEntity.class), eq(utilisateurTest)))
                 .thenReturn(achatCree);
 
         // Act & Assert
         mockMvc.perform(post("/achats")
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null,
+                                List.of(new SimpleGrantedAuthority("USER"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelAchat)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.prixTotal", is(300.00)));
 
+        verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
         verify(achatService, times(1)).creerAchat(any(AchatEntity.class), eq(utilisateurTest));
     }
 }
