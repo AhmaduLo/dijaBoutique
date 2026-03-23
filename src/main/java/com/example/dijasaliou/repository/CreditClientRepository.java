@@ -6,6 +6,7 @@ import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -15,7 +16,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface CreditClientRepository extends JpaRepository<CreditClientEntity, Long> {
+public interface CreditClientRepository extends JpaRepository<CreditClientEntity, Long>,
+        JpaSpecificationExecutor<CreditClientEntity> {
 
     @Query(value = "SELECT c FROM CreditClientEntity c WHERE " +
            "(:statut IS NULL OR c.statut = :statut) AND " +

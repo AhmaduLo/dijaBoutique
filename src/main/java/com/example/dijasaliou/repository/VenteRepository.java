@@ -77,7 +77,14 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
     /**
      * Recherche paginée avec filtre optionnel sur nomProduit, client et plage de dates
      */
-    @Query("SELECT v FROM VenteEntity v WHERE " +
+    @Query(value = "SELECT v FROM VenteEntity v WHERE " +
+           "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
+           "(:dateFin IS NULL OR v.dateVente <= :dateFin) " +
+           "ORDER BY v.dateVente DESC, v.id DESC",
+           countQuery = "SELECT COUNT(v) FROM VenteEntity v WHERE " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
@@ -106,7 +113,14 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
                                                    @Param("creditMode") VenteEntity.ModePaiementVente creditMode,
                                                    @Param("tenantUuid") String tenantUuid);
 
-    @Query("SELECT v FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
+    @Query(value = "SELECT v FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
+           "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
+           "(:dateFin IS NULL OR v.dateVente <= :dateFin) " +
+           "ORDER BY v.dateVente DESC, v.id DESC",
+           countQuery = "SELECT COUNT(v) FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
