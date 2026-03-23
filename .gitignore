@@ -37,10 +37,11 @@ docs/screenshots/
 
 ### Photos uploadées des produits ###
 uploads/
-<<<<<<< HEAD
-=======
 
 ### Variables d'environnement (secrets) ###
 .env
 src/main/resources/application-local.properties
->>>>>>> 4d8b3357870f853b26d99476cbf0d627f6cdc17f
+
+### Logs JVM (crashdumps) ###
+hs_err_pid*.log
+replay_pid*.log
