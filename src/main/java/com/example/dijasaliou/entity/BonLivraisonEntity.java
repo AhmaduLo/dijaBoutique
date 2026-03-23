@@ -74,7 +74,7 @@ public class BonLivraisonEntity extends BaseEntity {
     private Statut statut = Statut.EN_ATTENTE;
 
     @OneToMany(mappedBy = "bonLivraison", cascade = CascadeType.ALL,
-               orphanRemoval = true, fetch = FetchType.EAGER)
+               orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<LigneBLEntity> lignes = new ArrayList<>();
 }

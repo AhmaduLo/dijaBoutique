@@ -57,6 +57,12 @@ public interface AchatRepository extends JpaRepository<AchatEntity, Long> {
     Integer sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
 
     /**
+     * Récupère tous les achats d'un tenant (filtre explicite — évite findAll())
+     */
+    @Query("SELECT a FROM AchatEntity a WHERE a.tenant = :tenant ORDER BY a.nomProduit")
+    List<AchatEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
+
+    /**
      * Recherche paginée avec filtre optionnel sur nomProduit, fournisseur et plage de dates
      */
     @Query("SELECT a FROM AchatEntity a WHERE " +

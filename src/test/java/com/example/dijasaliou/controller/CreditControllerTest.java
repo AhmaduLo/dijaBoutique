@@ -112,7 +112,7 @@ class CreditControllerTest {
     @Test
     @DisplayName("GET /credits — retourne 200 avec la liste paginée des crédits")
     void obtenirCredits_retourne200AvecPage() throws Exception {
-        when(creditClientService.obtenirCredits(0, 20, null, null))
+        when(creditClientService.obtenirCredits(0, 20, null, null, null, null))
                 .thenReturn(pageResponse);
 
         mockMvc.perform(get("/credits")
@@ -125,7 +125,7 @@ class CreditControllerTest {
                 .andExpect(jsonPath("$.totalElements", is(1)))
                 .andExpect(jsonPath("$.totalPages", is(1)));
 
-        verify(creditClientService).obtenirCredits(0, 20, null, null);
+        verify(creditClientService).obtenirCredits(0, 20, null, null, null, null);
     }
 
     @Test
@@ -136,7 +136,7 @@ class CreditControllerTest {
                 .currentPage(0).pageSize(20).totalElements(0L).totalPages(0)
                 .first(true).last(true).build();
 
-        when(creditClientService.obtenirCredits(0, 20, null, "EN_ATTENTE"))
+        when(creditClientService.obtenirCredits(0, 20, null, "EN_ATTENTE", null, null))
                 .thenReturn(pageVide);
 
         mockMvc.perform(get("/credits")
@@ -145,13 +145,13 @@ class CreditControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(0)));
 
-        verify(creditClientService).obtenirCredits(0, 20, null, "EN_ATTENTE");
+        verify(creditClientService).obtenirCredits(0, 20, null, "EN_ATTENTE", null, null);
     }
 
     @Test
     @DisplayName("GET /credits?search=Ndiaye — filtre par recherche")
     void obtenirCredits_filtreParRecherche() throws Exception {
-        when(creditClientService.obtenirCredits(0, 20, "Ndiaye", null))
+        when(creditClientService.obtenirCredits(0, 20, "Ndiaye", null, null, null))
                 .thenReturn(pageResponse);
 
         mockMvc.perform(get("/credits")
@@ -169,7 +169,7 @@ class CreditControllerTest {
                 .currentPage(0).pageSize(20).totalElements(0L).totalPages(0)
                 .first(true).last(true).build();
 
-        when(creditClientService.obtenirCredits(anyInt(), anyInt(), any(), any()))
+        when(creditClientService.obtenirCredits(anyInt(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(pageVide);
 
         mockMvc.perform(get("/credits"))

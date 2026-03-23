@@ -6,6 +6,7 @@ import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -15,7 +16,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface CreditClientRepository extends JpaRepository<CreditClientEntity, Long> {
+public interface CreditClientRepository extends JpaRepository<CreditClientEntity, Long>,
+        JpaSpecificationExecutor<CreditClientEntity> {
 
     @Query(value = "SELECT c FROM CreditClientEntity c WHERE " +
            "(:statut IS NULL OR c.statut = :statut) AND " +
@@ -34,6 +36,8 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
     List<CreditClientEntity> findByClientOrderByCreatedDateAsc(ClientEntity client);
 
     List<CreditClientEntity> findByVenteId(Long venteId);
+
+    boolean existsByVenteIdAndStatutIn(Long venteId, List<StatutCredit> statuts);
 
     @Query("SELECT COALESCE(SUM(c.montantRestant), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     BigDecimal sumMontantRestantActif(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
@@ -54,12 +58,25 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
     long countCreditsActifsByClientId(@Param("clientId") Long clientId, @Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
     /**
+     * Compte les crédits actifs pour une liste de clients en une seule requête.
+     * Évite le problème N+1 de ClientService (1 requête au lieu de 1 par client).
+     * Retourne Object[] : [clientId, count]
+     */
+    @Query("SELECT c.client.id, COUNT(c) FROM CreditClientEntity c " +
+           "WHERE c.client.id IN :clientIds AND c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid " +
+           "GROUP BY c.client.id")
+    List<Object[]> countCreditsActifsByClientIds(@Param("clientIds") List<Long> clientIds,
+                                                  @Param("statut") StatutCredit statut,
+                                                  @Param("tenantUuid") String tenantUuid);
+
+    /**
      * Somme le montant restant dû sur les crédits non soldés dont la vente a été créée dans la période.
      * Retourne List<Object[]> : chaque Object[] = [count, sum(montantRestant)]
      */
     @Query("SELECT COUNT(c), COALESCE(SUM(c.montantRestant), 0) " +
            "FROM CreditClientEntity c " +
-           "WHERE c.vente.dateVente BETWEEN :debut AND :fin " +
+           "WHERE c.vente IS NOT NULL " +
+           "AND c.vente.dateVente BETWEEN :debut AND :fin " +
            "AND c.statut <> :statut " +
            "AND c.tenant.tenantUuid = :tenantUuid")
     List<Object[]> sumCreditsRestantParPeriode(@Param("debut") LocalDate debut,

@@ -1,6 +1,7 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.FactureDto;
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.TenantAdminDto;
 import com.example.dijasaliou.entity.FactureEntity;
 import com.example.dijasaliou.entity.TenantEntity;
@@ -9,6 +10,9 @@ import com.example.dijasaliou.repository.FactureRepository;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,25 +40,34 @@ public class SuperAdminService {
     private final UserRepository userRepository;
     private final FactureService factureService;
     private final FactureRepository factureRepository;
+    private final TenantCacheService tenantCacheService;
 
     public SuperAdminService(TenantRepository tenantRepository,
                              UserRepository userRepository,
                              FactureService factureService,
-                             FactureRepository factureRepository) {
+                             FactureRepository factureRepository,
+                             TenantCacheService tenantCacheService) {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.factureService = factureService;
         this.factureRepository = factureRepository;
+        this.tenantCacheService = tenantCacheService;
     }
 
     /**
-     * Retourne tous les tenants avec leurs stats
+     * Retourne tous les tenants avec leurs stats — paginé
      */
-    public List<TenantAdminDto> getAllTenants() {
-        List<TenantEntity> tenants = tenantRepository.findAll();
-        return tenants.stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponse<TenantAdminDto> getAllTenants(int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        Page<TenantEntity> tenantsPage = tenantRepository.findAll(pageable);
+        return PagedResponse.from(tenantsPage.map(this::toDto));
+    }
+
+    /**
+     * Retourne tous les tenants sans pagination (pour les stats globales uniquement)
+     */
+    private List<TenantEntity> getAllTenantsForStats() {
+        return tenantRepository.findAll();
     }
 
     /**
@@ -75,6 +88,7 @@ public class SuperAdminService {
                 .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + id));
         tenant.setActif(true);
         tenantRepository.save(tenant);
+        tenantCacheService.evict(tenant.getTenantUuid());
         log.info("[SUPER_ADMIN] Tenant {} activé", tenant.getTenantUuid());
     }
 
@@ -87,6 +101,7 @@ public class SuperAdminService {
                 .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + id));
         tenant.setActif(false);
         tenantRepository.save(tenant);
+        tenantCacheService.evict(tenant.getTenantUuid());
         log.info("[SUPER_ADMIN] Tenant {} désactivé", tenant.getTenantUuid());
     }
 
@@ -112,6 +127,7 @@ public class SuperAdminService {
         }
 
         tenantRepository.save(tenant);
+        tenantCacheService.evict(tenant.getTenantUuid());
         log.info("[SUPER_ADMIN] Tenant {} : plan {} → {} (expire dans {} jours, était: {})",
                 tenant.getTenantUuid(), ancienPlanExpiration, plan, jours, ancienPlanExpiration);
 
@@ -176,7 +192,7 @@ public class SuperAdminService {
      * Stats globales de la plateforme
      */
     public Map<String, Object> getGlobalStats() {
-        List<TenantEntity> tenants = tenantRepository.findAll();
+        List<TenantEntity> tenants = getAllTenantsForStats();
 
         long total = tenants.size();
         long actifs = tenants.stream().filter(t -> Boolean.TRUE.equals(t.getActif())).count();

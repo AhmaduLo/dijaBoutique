@@ -72,11 +72,11 @@ class AdminServiceTest {
     @DisplayName("obtenirTousLesUtilisateurs() — retourne tous les utilisateurs actifs")
     void obtenirTousLesUtilisateurs_retourneListe() {
         when(userRepository.findByEmailAndDeletedFalse("admin@example.com")).thenReturn(Optional.of(admin));
-        when(userRepository.findByDeletedFalse()).thenReturn(Arrays.asList(admin, user));
+        when(userRepository.findByDeletedFalse(any())).thenReturn(new org.springframework.data.domain.PageImpl<>(Arrays.asList(admin, user)));
 
-        var resultat = adminService.obtenirTousLesUtilisateurs("admin@example.com");
+        var resultat = adminService.obtenirTousLesUtilisateurs("admin@example.com", 0, 20);
 
-        assertThat(resultat).hasSize(2);
+        assertThat(resultat.getContent()).hasSize(2);
     }
 
     @Test
@@ -84,7 +84,7 @@ class AdminServiceTest {
     void obtenirTousLesUtilisateurs_leveExceptionSiNonAdmin() {
         when(userRepository.findByEmailAndDeletedFalse("user@example.com")).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> adminService.obtenirTousLesUtilisateurs("user@example.com"))
+        assertThatThrownBy(() -> adminService.obtenirTousLesUtilisateurs("user@example.com", 0, 20))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Accès refusé");
     }

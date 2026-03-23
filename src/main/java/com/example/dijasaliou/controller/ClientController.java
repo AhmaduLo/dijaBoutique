@@ -31,19 +31,19 @@ public class ClientController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT', 'USER')")
     public ResponseEntity<List<ClientDto>> rechercher(@RequestParam(required = false) String q) {
         return ResponseEntity.ok(clientService.rechercherClients(q));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT', 'USER')")
     public ResponseEntity<ClientDto> obtenirParId(@PathVariable Long id) {
         return ResponseEntity.ok(clientService.obtenirClientParId(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT', 'USER')")
     public ResponseEntity<ClientDto> creer(@RequestBody Map<String, String> body) {
         String nom = body.get("nom");
         String telephone = body.get("telephone");

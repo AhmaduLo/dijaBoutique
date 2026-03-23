@@ -18,6 +18,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +34,25 @@ public class CreditController {
     private final CreditClientService creditClientService;
     private final UserService userService;
 
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('USER', 'GERANT', 'ADMIN')")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
+    public ResponseEntity<CreditClientDto> creerCredit(
+            @RequestBody Map<String, Object> body,
+            Authentication auth) {
+        Long venteId = Long.valueOf(body.get("venteId").toString());
+        Long clientId = Long.valueOf(body.get("clientId").toString());
+        java.time.LocalDate dateEcheance = body.get("dateEcheance") != null
+                ? java.time.LocalDate.parse(body.get("dateEcheance").toString())
+                : null;
+        com.example.dijasaliou.entity.UserEntity employe =
+                userService.obtenirUtilisateurParEmail(auth.getName());
+        com.example.dijasaliou.entity.CreditClientEntity credit =
+                creditClientService.creerCredit(venteId, clientId, dateEcheance, employe);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(CreditClientDto.fromEntity(credit));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
     @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
@@ -38,12 +60,14 @@ public class CreditController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String statut) {
-        return ResponseEntity.ok(creditClientService.obtenirCredits(page, size, search, statut));
+            @RequestParam(required = false) String statut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin) {
+        return ResponseEntity.ok(creditClientService.obtenirCredits(page, size, search, statut, dateDebut, dateFin));
     }
 
     @GetMapping("/client/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT', 'USER')")
     @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
     public ResponseEntity<List<CreditClientDto>> obtenirHistoriqueClient(
             @PathVariable Long id, Authentication auth) {

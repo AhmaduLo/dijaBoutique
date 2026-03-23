@@ -2,6 +2,8 @@ package com.example.dijasaliou.repository;
 
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -55,6 +57,11 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
      * Trouver tous les utilisateurs actifs (non supprimés)
      */
     List<UserEntity> findByDeletedFalse();
+
+    /**
+     * Version paginée — pour éviter de charger tous les utilisateurs en mémoire
+     */
+    Page<UserEntity> findByDeletedFalse(Pageable pageable);
 
     /**
      * Trouver tous les utilisateurs d'un rôle (non supprimés)

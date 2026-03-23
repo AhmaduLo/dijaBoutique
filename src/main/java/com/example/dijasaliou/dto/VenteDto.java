@@ -36,6 +36,9 @@ public class VenteDto {
     private String photoUrl;
     private String unite;
 
+    // Groupe de vente multi-produits (UUID partagé entre les articles du même panier)
+    private String groupeVenteId;
+
     // Crédit client
     private Long clientId;
     private String modePaiement;
@@ -77,6 +80,7 @@ public class VenteDto {
                 .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
+                .groupeVenteId(vente.getGroupeVenteId())
                 .clientId(vente.getClientRef() != null ? vente.getClientRef().getId() : null)
                 .modePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : "ESPECES")
                 .estSoldee(vente.getEstSoldee())
@@ -115,6 +119,7 @@ public class VenteDto {
                 .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
+                .groupeVenteId(vente.getGroupeVenteId())
                 .estRecente(vente.estRecente())
                 .mois(vente.getMois())
                 .annee(vente.getAnnee())

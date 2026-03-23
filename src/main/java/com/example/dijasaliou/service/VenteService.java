@@ -4,6 +4,7 @@ import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.ClientEntity;
+import com.example.dijasaliou.entity.CreditClientEntity;
 import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import com.example.dijasaliou.entity.PaiementCreditEntity;
 import com.example.dijasaliou.entity.TenantEntity;
@@ -16,7 +17,6 @@ import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -60,17 +60,17 @@ public class VenteService {
     }
 
     /**
-     * Récupérer toutes les ventes (utilisé pour rapports/export)
+     * Récupérer toutes les ventes du tenant courant (rapports/export)
      */
     public List<VenteEntity> obtenirToutesLesVentes() {
-        return venteRepository.findAll();
+        return venteRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
 
     /**
      * Récupérer les ventes paginées avec recherche optionnelle et filtre de dates
      */
     public PagedResponse<VenteDto> obtenirVentesPaginees(int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateVente", "id"));
+        PageRequest pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search : null;
         Page<VenteEntity> ventesPage = venteRepository.findAllWithSearch(searchParam, dateDebut, dateFin, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
@@ -81,7 +81,7 @@ public class VenteService {
      * Récupérer les ventes d'un utilisateur paginées avec recherche optionnelle et filtre de dates
      */
     public PagedResponse<VenteDto> obtenirVentesParUtilisateurPaginees(UserEntity utilisateur, int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateVente", "id"));
+        PageRequest pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search : null;
         Page<VenteEntity> ventesPage = venteRepository.findByUtilisateurWithSearch(utilisateur, searchParam, dateDebut, dateFin, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
@@ -131,6 +131,7 @@ public class VenteService {
 
         // Sauvegarder la vente
         VenteEntity venteSauvegardee = venteRepository.save(vente);
+        stockService.invalidateStockCache(venteSauvegardee.getTenant().getTenantUuid());
 
         // ALERTE DE STOCK : Vérifier le stock après la vente et envoyer une alerte si nécessaire
         // (uniquement pour les plans PREMIUM et ENTREPRISE)
@@ -169,10 +170,11 @@ public class VenteService {
     /**
      * Modifier une vente
      */
+    @org.springframework.transaction.annotation.Transactional
     public VenteEntity modifierVente(Long id, VenteEntity venteModifiee) {
         VenteEntity venteExistante = obtenirVenteParId(id);
 
-        // SÉCURITÉ : Vérifier que la vente appartient au tenant actuel (double sécurité)
+        // SÉCURITÉ : Vérifier que la vente appartient au tenant actuel
         TenantEntity tenantActuel = tenantService.getCurrentTenant();
         if (!venteExistante.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
@@ -180,9 +182,23 @@ public class VenteService {
 
         validerVente(venteModifiee);
 
-        // Vérifier si le nom du produit a changé
-        boolean produitChange = !venteExistante.getNomProduit().equalsIgnoreCase(venteModifiee.getNomProduit());
+        // Détecter la transition crédit AVANT de modifier les champs
+        boolean devientCredit = venteModifiee.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT;
+        boolean aUnCreditActif = creditClientRepository.existsByVenteIdAndStatutIn(
+                id, List.of(StatutCredit.EN_ATTENTE, StatutCredit.PARTIEL));
 
+        // Validation stock avant modification
+        boolean produitChange = !venteExistante.getNomProduit().equalsIgnoreCase(venteModifiee.getNomProduit());
+        if (produitChange) {
+            // Nouveau produit : vérifier que le stock du nouveau produit est suffisant
+            verifierStockAvantVente(venteModifiee.getNomProduit(), venteModifiee.getQuantite());
+        } else if (venteModifiee.getQuantite() > venteExistante.getQuantite()) {
+            // Même produit, quantité augmentée : seul le delta supplémentaire est consommé
+            int delta = venteModifiee.getQuantite() - venteExistante.getQuantite();
+            verifierStockAvantVente(venteModifiee.getNomProduit(), delta);
+        }
+
+        // Mettre à jour les champs de la vente
         venteExistante.setQuantite(venteModifiee.getQuantite());
         venteExistante.setNomProduit(venteModifiee.getNomProduit());
         venteExistante.setPrixUnitaire(venteModifiee.getPrixUnitaire());
@@ -192,24 +208,73 @@ public class VenteService {
         venteExistante.setAdresseClient(venteModifiee.getAdresseClient());
         venteExistante.setUtilisateur(venteModifiee.getUtilisateur());
         venteExistante.setUnite(venteModifiee.getUnite());
+        if (venteModifiee.getModePaiement() != null) {
+            venteExistante.setModePaiement(venteModifiee.getModePaiement());
+        }
 
-        // Si le produit a changé, récupérer automatiquement la photo du nouveau produit depuis le stock
+        // Photo
         if (produitChange) {
             try {
                 StockDto stock = stockService.obtenirStockParNomProduit(venteModifiee.getNomProduit());
                 venteExistante.setPhotoUrl(stock.getPhotoUrl());
             } catch (RuntimeException e) {
-                // Si le produit n'existe pas dans le stock, garder la photo fournie ou null
                 venteExistante.setPhotoUrl(venteModifiee.getPhotoUrl());
             }
         } else {
-            // Si le produit n'a pas changé, utiliser la photo fournie (permet de mettre à jour manuellement)
             venteExistante.setPhotoUrl(venteModifiee.getPhotoUrl());
         }
 
+        // Recalculer le prix AVANT la logique crédit (le montant est nécessaire pour créer/màj le crédit)
         venteExistante.calculerPrixTotal();
 
-        return venteRepository.save(venteExistante);
+        // === LOGIQUE CRÉDIT — 4 cas ===
+
+        if (aUnCreditActif && !devientCredit) {
+            // Cas 1 : CRÉDIT → ESPÈCES/WAVE/OM — solder le crédit
+            creditClientService.solderCreditsDeLaVente(id);
+            venteExistante.setEstSoldee(true);
+
+        } else if (!aUnCreditActif && devientCredit) {
+            // Cas 2 : ESPÈCES/WAVE/OM → CRÉDIT — créer un crédit
+            ClientEntity client = resoudreClientPourCredit(venteModifiee, venteExistante);
+            venteExistante.setEstSoldee(false);
+            venteExistante.setClientRef(client);
+            VenteEntity venteSauvegardee = venteRepository.save(venteExistante);
+            UserEntity employe = venteModifiee.getUtilisateur() != null
+                    ? venteModifiee.getUtilisateur()
+                    : venteExistante.getUtilisateur();
+            creditClientService.creerCreditDepuisVente(
+                    venteSauvegardee, client, employe, venteModifiee.getDateEcheance());
+            stockService.invalidateStockCache(venteSauvegardee.getTenant().getTenantUuid());
+            return venteSauvegardee;
+
+        } else if (aUnCreditActif) {
+            // Cas 3 : CRÉDIT → CRÉDIT — mettre à jour le montant du crédit existant
+            creditClientService.mettreAJourCreditDeLaVente(id, venteExistante.getPrixTotal());
+            venteExistante.setEstSoldee(false);
+
+        }
+        // Cas 4 : ESPÈCES/WAVE/OM → ESPÈCES/WAVE/OM — rien à faire sur le crédit
+
+        VenteEntity saved = venteRepository.save(venteExistante);
+        stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
+        return saved;
+    }
+
+    /**
+     * Résout le ClientEntity pour une vente à crédit lors d'une modification.
+     * Priorité : clientId du formulaire → clientRef existant.
+     */
+    private ClientEntity resoudreClientPourCredit(VenteEntity venteModifiee, VenteEntity venteExistante) {
+        if (venteModifiee.getClientId() != null) {
+            return clientRepository.findById(venteModifiee.getClientId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Client introuvable : " + venteModifiee.getClientId()));
+        }
+        if (venteExistante.getClientRef() != null) {
+            return venteExistante.getClientRef();
+        }
+        throw new IllegalArgumentException("Un client enregistré est obligatoire pour une vente à crédit");
     }
 
     /**
@@ -224,12 +289,21 @@ public class VenteService {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
 
-        // Nettoyer les crédits liés avant suppression (évite crédits orphelins et dette corrompue)
-        if (venteExistante.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT) {
-            creditClientService.supprimerCreditsDeLaVente(id);
+        // Bloquer la suppression si un crédit lié a des paiements enregistrés (incohérence comptable)
+        List<CreditClientEntity> credits = creditClientRepository.findByVenteId(id);
+        for (CreditClientEntity credit : credits) {
+            if (credit.getPaiements() != null && !credit.getPaiements().isEmpty()) {
+                throw new IllegalStateException(
+                        "Impossible de supprimer cette vente : le crédit associé a des paiements enregistrés. " +
+                        "Soldez d'abord le crédit.");
+            }
         }
 
+        // Option A : solder les crédits actifs + détacher la FK vente → historique préservé
+        creditClientService.solderEtDetacherCreditsDeLaVente(id);
+
         venteRepository.deleteById(id);
+        stockService.invalidateStockCache(tenantActuel.getTenantUuid());
     }
 
     /**
@@ -250,11 +324,8 @@ public class VenteService {
      * Calculer le chiffre d'affaires d'une période
      */
     public BigDecimal calculerChiffreAffaires(LocalDate debut, LocalDate fin) {
-        List<VenteEntity> ventes = obtenirVentesParPeriode(debut, fin);
-
-        return ventes.stream()
-                .map(VenteEntity::getPrixTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        return venteRepository.sumChiffreAffairesPeriode(debut, fin, tenantUuid);
     }
 
     /**

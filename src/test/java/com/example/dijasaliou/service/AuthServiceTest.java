@@ -91,7 +91,7 @@ class AuthServiceTest {
         when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
         when(tenantRepository.save(any())).thenReturn(tenantTest);
         when(userRepository.save(any())).thenReturn(utilisateur);
-        when(jwtService.generateToken(anyString(), anyString())).thenReturn("token123");
+        when(jwtService.generateToken(anyString(), anyString(), any())).thenReturn("token123");
 
         AuthResponse response = authService.register(registerRequest);
 
@@ -99,7 +99,7 @@ class AuthServiceTest {
         assertThat(response.getToken()).isEqualTo("token123");
         assertThat(response.getUser()).isNotNull();
         verify(userRepository).save(any());
-        verify(jwtService).generateToken(anyString(), anyString());
+        verify(jwtService).generateToken(anyString(), anyString(), any());
     }
 
     @Test
@@ -144,7 +144,7 @@ class AuthServiceTest {
         when(passwordEncoder.encode("password123")).thenReturn("encodedPassword");
         when(tenantRepository.save(any())).thenReturn(tenantTest);
         when(userRepository.save(any())).thenReturn(utilisateur);
-        when(jwtService.generateToken(anyString(), anyString())).thenReturn("token123");
+        when(jwtService.generateToken(anyString(), anyString(), any())).thenReturn("token123");
 
         authService.register(registerRequest);
 
@@ -161,7 +161,7 @@ class AuthServiceTest {
         when(userRepository.findByEmailAndDeletedFalse("amadou@example.com"))
                 .thenReturn(Optional.of(utilisateur));
         when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
-        when(jwtService.generateToken("amadou@example.com", "uuid-tenant-test")).thenReturn("token123");
+        when(jwtService.generateToken(eq("amadou@example.com"), eq("uuid-tenant-test"), any())).thenReturn("token123");
 
         AuthResponse response = authService.login(loginRequest);
 
@@ -178,7 +178,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Email ou mot de passe incorrect");
-        verify(jwtService, never()).generateToken(anyString(), any());
+        verify(jwtService, never()).generateToken(anyString(), any(), any());
     }
 
     @Test

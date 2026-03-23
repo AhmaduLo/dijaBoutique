@@ -27,7 +27,8 @@ public interface BonLivraisonRepository extends JpaRepository<BonLivraisonEntity
     @Query("SELECT b FROM BonLivraisonEntity b WHERE " +
            "(:statut IS NULL OR b.statut = :statut) AND " +
            "(:search IS NULL OR LOWER(b.clientNom) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(b.numeroBL) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "OR LOWER(b.numeroBL) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(b.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR b.createdDate >= :dateDebut) AND " +
            "(:dateFin IS NULL OR b.createdDate <= :dateFin)")
     Page<BonLivraisonEntity> findAllWithSearch(@Param("statut") BonLivraisonEntity.Statut statut,

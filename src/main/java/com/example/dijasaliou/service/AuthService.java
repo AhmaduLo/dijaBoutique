@@ -157,8 +157,8 @@ public class AuthService {
 
         UserEntity savedUser = userRepository.save(user);
 
-        // 6. Générer le token JWT avec tenant_id
-        String token = jwtService.generateToken(savedUser.getEmail(), savedTenant.getTenantUuid());
+        // 6. Générer le token JWT avec tenant_id et rôle (évite la requête BDD à chaque appel API)
+        String token = jwtService.generateToken(savedUser.getEmail(), savedTenant.getTenantUuid(), savedUser.getRole());
 
         // 8. Retourner la réponse - L'utilisateur a 14 jours d'essai gratuit
         return AuthResponse.builder()
@@ -194,7 +194,7 @@ public class AuthService {
 
         // 3. SUPER_ADMIN : pas de tenant, accès direct
         if (user.getRole() == UserEntity.Role.SUPER_ADMIN) {
-            String token = jwtService.generateToken(user.getEmail(), null);
+            String token = jwtService.generateToken(user.getEmail(), null, user.getRole());
             return AuthResponse.builder()
                     .token(token)
                     .user(user)
@@ -216,8 +216,8 @@ public class AuthService {
             throw new RuntimeException("Votre compte entreprise est désactivé. Contactez le support.");
         }
 
-        // 4. Générer le token JWT avec tenant_id
-        String token = jwtService.generateToken(user.getEmail(), tenant.getTenantUuid());
+        // 4. Générer le token JWT avec tenant_id et rôle
+        String token = jwtService.generateToken(user.getEmail(), tenant.getTenantUuid(), user.getRole());
 
         // 5. Vérifier si un paiement est requis
         // Un paiement est requis si :

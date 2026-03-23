@@ -55,15 +55,39 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
     @Query("SELECT SUM(v.quantite) FROM VenteEntity v WHERE v.nomProduit = :nomProduit AND v.tenant = :tenant")
     Integer sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
 
+    /**
+     * Récupère toutes les ventes d'un tenant (filtre explicite — évite findAll())
+     */
+    @Query("SELECT v FROM VenteEntity v WHERE v.tenant = :tenant ORDER BY v.nomProduit")
+    List<VenteEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
+
+    /**
+     * Calcule le chiffre d'affaires d'une période directement en SQL (évite le chargement en mémoire)
+     */
+    @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid")
+    BigDecimal sumChiffreAffairesPeriode(@Param("debut") LocalDate debut,
+                                         @Param("fin") LocalDate fin,
+                                         @Param("tenantUuid") String tenantUuid);
+
     @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.tenantUuid = :tenantUuid")
     long countByTenantUuid(@Param("tenantUuid") String tenantUuid);
 
     /**
      * Recherche paginée avec filtre optionnel sur nomProduit, client et plage de dates
      */
-    @Query("SELECT v FROM VenteEntity v WHERE " +
+    @Query(value = "SELECT v FROM VenteEntity v WHERE " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
+           "(:dateFin IS NULL OR v.dateVente <= :dateFin) " +
+           "ORDER BY v.dateVente DESC, v.id DESC",
+           countQuery = "SELECT COUNT(v) FROM VenteEntity v WHERE " +
+           "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
     Page<VenteEntity> findAllWithSearch(@Param("search") String search,
@@ -89,9 +113,17 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
                                                    @Param("creditMode") VenteEntity.ModePaiementVente creditMode,
                                                    @Param("tenantUuid") String tenantUuid);
 
-    @Query("SELECT v FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
+    @Query(value = "SELECT v FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
+           "(:dateFin IS NULL OR v.dateVente <= :dateFin) " +
+           "ORDER BY v.dateVente DESC, v.id DESC",
+           countQuery = "SELECT COUNT(v) FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
+           "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
     Page<VenteEntity> findByUtilisateurWithSearch(@Param("utilisateur") UserEntity utilisateur,

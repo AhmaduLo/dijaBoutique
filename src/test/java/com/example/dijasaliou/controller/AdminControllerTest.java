@@ -1,8 +1,11 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.RegisterRequest;
 import com.example.dijasaliou.dto.UserDto;
 import com.example.dijasaliou.entity.UserEntity;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import com.example.dijasaliou.service.AdminService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -118,37 +121,41 @@ class AdminControllerTest {
     void obtenirTousLesUtilisateurs_DevraitRetournerTous() throws Exception {
         // Arrange
         List<UserDto> utilisateurs = Arrays.asList(utilisateurDto1, utilisateurDto2, adminDto);
-        when(adminService.obtenirTousLesUtilisateurs(emailAdmin)).thenReturn(utilisateurs);
+        PagedResponse<UserDto> pagedResponse = PagedResponse.from(
+                new PageImpl<>(utilisateurs, PageRequest.of(0, 20), 3));
+        when(adminService.obtenirTousLesUtilisateurs(emailAdmin, 0, 20)).thenReturn(pagedResponse);
 
         // Act & Assert
         mockMvc.perform(get("/admin/utilisateurs")
                         .principal(authentication)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(3)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].nom", is("Diop")))
-                .andExpect(jsonPath("$[0].email", is("amadou@example.com")))
-                .andExpect(jsonPath("$[0].role", is("USER")))
-                .andExpect(jsonPath("$[2].role", is("ADMIN")));
+                .andExpect(jsonPath("$.content", hasSize(3)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].nom", is("Diop")))
+                .andExpect(jsonPath("$.content[0].email", is("amadou@example.com")))
+                .andExpect(jsonPath("$.content[0].role", is("USER")))
+                .andExpect(jsonPath("$.content[2].role", is("ADMIN")));
 
-        verify(adminService, times(1)).obtenirTousLesUtilisateurs(emailAdmin);
+        verify(adminService, times(1)).obtenirTousLesUtilisateurs(emailAdmin, 0, 20);
     }
 
     @Test
     @DisplayName("GET /admin/utilisateurs - Devrait retourner liste vide si aucun utilisateur")
     void obtenirTousLesUtilisateurs_DevraitRetournerListeVide() throws Exception {
         // Arrange
-        when(adminService.obtenirTousLesUtilisateurs(emailAdmin)).thenReturn(Arrays.asList());
+        PagedResponse<UserDto> pagedVide = PagedResponse.from(
+                new PageImpl<>(Arrays.asList(), PageRequest.of(0, 20), 0));
+        when(adminService.obtenirTousLesUtilisateurs(emailAdmin, 0, 20)).thenReturn(pagedVide);
 
         // Act & Assert
         mockMvc.perform(get("/admin/utilisateurs")
                         .principal(authentication)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.content", hasSize(0)));
 
-        verify(adminService, times(1)).obtenirTousLesUtilisateurs(emailAdmin);
+        verify(adminService, times(1)).obtenirTousLesUtilisateurs(emailAdmin, 0, 20);
     }
 
     // ==================== Tests pour GET /admin/utilisateurs/{id} ====================
