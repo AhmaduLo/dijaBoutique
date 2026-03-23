@@ -1,5 +1,6 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
@@ -33,6 +34,7 @@ class AchatServiceTest {
 
     @Mock private AchatRepository achatRepository;
     @Mock private TenantService tenantService;
+    @Mock private StockService stockService;
 
     @InjectMocks
     private AchatService achatService;

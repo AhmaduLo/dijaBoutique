@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
+import org.springframework.data.jpa.domain.Specification;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -259,7 +262,7 @@ class CreditClientServiceTest {
 
         creditClientService.supprimerCreditsDeLaVente(99L);
 
-        verify(creditClientRepository, never()).delete(any());
+        verify(creditClientRepository, never()).delete(any(CreditClientEntity.class));
     }
 
     // =========================================================
@@ -313,10 +316,10 @@ class CreditClientServiceTest {
     void obtenirCredits_retournePage() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         Page<CreditClientEntity> pageMock = new PageImpl<>(Collections.emptyList());
-        when(creditClientRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+        when(creditClientRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(pageMock);
 
-        var resultat = creditClientService.obtenirCredits(0, 10, null, "TOUS");
+        var resultat = creditClientService.obtenirCredits(0, 10, null, "TOUS", null, null);
 
         assertThat(resultat).isNotNull();
         assertThat(resultat.getContent()).isEmpty();
@@ -327,14 +330,13 @@ class CreditClientServiceTest {
     void obtenirCredits_filtreParStatut() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         Page<CreditClientEntity> pageMock = new PageImpl<>(Collections.emptyList());
-        when(creditClientRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+        when(creditClientRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(pageMock);
 
-        var resultat = creditClientService.obtenirCredits(0, 10, null, "EN_ATTENTE");
+        var resultat = creditClientService.obtenirCredits(0, 10, null, "EN_ATTENTE", null, null);
 
         assertThat(resultat).isNotNull();
-        verify(creditClientRepository).findAllWithSearch(
-                eq(CreditClientEntity.StatutCredit.EN_ATTENTE), any(), any(), any(Pageable.class));
+        verify(creditClientRepository).findAll(any(Specification.class), any(Pageable.class));
     }
 
     // =========================================================

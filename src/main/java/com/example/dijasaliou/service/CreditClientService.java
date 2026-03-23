@@ -48,6 +48,15 @@ public class CreditClientService {
     @Transactional
     public CreditClientEntity creerCreditDepuisVente(VenteEntity vente, ClientEntity client,
                                                       UserEntity employe, LocalDate dateEcheance) {
+        // Garde anti-doublon : retourner le crédit actif existant si présent
+        if (vente.getId() != null && creditClientRepository.existsByVenteIdAndStatutIn(
+                vente.getId(), List.of(StatutCredit.EN_ATTENTE, StatutCredit.PARTIEL))) {
+            return creditClientRepository.findByVenteId(vente.getId()).stream()
+                    .filter(c -> c.getStatut() != StatutCredit.SOLDE)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Crédit actif introuvable malgré le garde"));
+        }
+
         CreditClientEntity credit = CreditClientEntity.builder()
                 .client(client)
                 .vente(vente)

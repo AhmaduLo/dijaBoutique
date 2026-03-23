@@ -332,7 +332,7 @@ class VenteServiceTest {
 
         venteService.supprimerVente(2L);
 
-        verify(creditClientService).supprimerCreditsDeLaVente(2L);
+        verify(creditClientService).solderEtDetacherCreditsDeLaVente(2L);
         verify(venteRepository).deleteById(2L);
     }
 
@@ -560,8 +560,8 @@ class VenteServiceTest {
     void modifierVente_succes() {
         venteValide.setId(1L);
         VenteEntity modifications = VenteEntity.builder()
-                .quantite(3)
-                .nomProduit("Ordinateur") // même nom → pas d'appel au StockService
+                .quantite(1) // quantité réduite → même nom + qté ≤ ancienne → pas d'appel au StockService
+                .nomProduit("Ordinateur")
                 .prixUnitaire(new BigDecimal("600.00"))
                 .dateVente(LocalDate.now())
                 .build();

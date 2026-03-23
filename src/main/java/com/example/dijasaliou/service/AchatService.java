@@ -2,11 +2,11 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.AchatDto;
 import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.AchatRepository;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -31,13 +31,17 @@ public class AchatService {
     // MULTI-TENANT : Service pour récupérer le tenant actuel
     private final TenantService tenantService;
 
+    private final StockService stockService;
+
     /**
      * Constructeur
-     * Spring injecte automatiquement achatRepository et tenantService
+     * Spring injecte automatiquement achatRepository, tenantService et stockService
      */
-    public AchatService(AchatRepository achatRepository, TenantService tenantService) {
+    public AchatService(AchatRepository achatRepository, TenantService tenantService,
+                        StockService stockService) {
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
+        this.stockService = stockService;
     }
 
     /**
@@ -74,7 +78,6 @@ public class AchatService {
      * - Vérifications métier
      * - MULTI-TENANT : Assignation automatique du tenant
      */
-    @CacheEvict(value = "stocks", allEntries = true)
     public AchatEntity creerAchat(AchatEntity achat, UserEntity utilisateur) {
 
         // 1. VALIDATION : Vérifier que les données sont correctes
@@ -92,7 +95,9 @@ public class AchatService {
         }
 
         // 5. SAUVEGARDE : Enregistrer en base
-        return achatRepository.save(achat);
+        AchatEntity saved = achatRepository.save(achat);
+        stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
+        return saved;
     }
 
     /**
@@ -120,7 +125,6 @@ public class AchatService {
     /**
      * Modifier un achat existant
      */
-    @CacheEvict(value = "stocks", allEntries = true)
     public AchatEntity modifierAchat(Long id, AchatEntity achatModifie) {
         // 1. Vérifier que l'achat existe
         AchatEntity achatExistant = obtenirAchatParId(id);
@@ -134,7 +138,24 @@ public class AchatService {
         // 3. Valider les nouvelles données
         validerAchat(achatModifie);
 
-        // 4. Mettre à jour les champs
+        // 4. Vérifier que la réduction de quantité ne rend pas le stock négatif
+        boolean memeProduit = achatExistant.getNomProduit().equalsIgnoreCase(achatModifie.getNomProduit());
+        if (memeProduit && achatModifie.getQuantite() < achatExistant.getQuantite()) {
+            int reduction = achatExistant.getQuantite() - achatModifie.getQuantite();
+            try {
+                StockDto stock = stockService.obtenirStockParNomProduit(achatExistant.getNomProduit());
+                if (stock.getStockDisponible() - reduction < 0) {
+                    throw new IllegalArgumentException(
+                            String.format("Impossible de réduire la quantité : stock disponible %d, réduction demandée %d",
+                                    stock.getStockDisponible(), reduction));
+                }
+            } catch (RuntimeException e) {
+                if (e instanceof IllegalArgumentException) throw e;
+                // Produit non trouvé → pas de ventes → réduction toujours safe
+            }
+        }
+
+        // 5. Mettre à jour les champs
         achatExistant.setQuantite(achatModifie.getQuantite());
         achatExistant.setNomProduit(achatModifie.getNomProduit());
         achatExistant.setPrixUnitaire(achatModifie.getPrixUnitaire());
@@ -150,14 +171,15 @@ public class AchatService {
         // 5. Recalculer le prix total
         achatExistant.calculerPrixTotal();
 
-        // 6. Sauvegarder
-        return achatRepository.save(achatExistant);
+        // 6. Sauvegarder + invalider le cache tenant
+        AchatEntity saved = achatRepository.save(achatExistant);
+        stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
+        return saved;
     }
 
     /**
      * Supprimer un achat
      */
-    @CacheEvict(value = "stocks", allEntries = true)
     public void supprimerAchat(Long id) {
         // 1. Récupérer l'achat existant
         AchatEntity achatExistant = obtenirAchatParId(id);
@@ -168,8 +190,9 @@ public class AchatService {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
 
-        // 3. Supprimer
+        // 3. Supprimer + invalider le cache tenant
         achatRepository.deleteById(id);
+        stockService.invalidateStockCache(tenantActuel.getTenantUuid());
     }
 
     /**

@@ -13,11 +13,9 @@ import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
 import com.example.dijasaliou.repository.VenteRepository;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -100,7 +98,6 @@ public class VenteService {
     /**
      * Créer une nouvelle vente
      */
-    @CacheEvict(value = "stocks", allEntries = true)
     @org.springframework.transaction.annotation.Transactional
     public VenteEntity creerVente(VenteEntity vente, UserEntity utilisateur) {
         // Validation
@@ -133,6 +130,7 @@ public class VenteService {
 
         // Sauvegarder la vente
         VenteEntity venteSauvegardee = venteRepository.save(vente);
+        stockService.invalidateStockCache(venteSauvegardee.getTenant().getTenantUuid());
 
         // ALERTE DE STOCK : Vérifier le stock après la vente et envoyer une alerte si nécessaire
         // (uniquement pour les plans PREMIUM et ENTREPRISE)
@@ -171,7 +169,6 @@ public class VenteService {
     /**
      * Modifier une vente
      */
-    @CacheEvict(value = "stocks", allEntries = true)
     @org.springframework.transaction.annotation.Transactional
     public VenteEntity modifierVente(Long id, VenteEntity venteModifiee) {
         VenteEntity venteExistante = obtenirVenteParId(id);
@@ -189,8 +186,18 @@ public class VenteService {
         boolean aUnCreditActif = creditClientRepository.existsByVenteIdAndStatutIn(
                 id, List.of(StatutCredit.EN_ATTENTE, StatutCredit.PARTIEL));
 
-        // Mettre à jour les champs de la vente
+        // Validation stock avant modification
         boolean produitChange = !venteExistante.getNomProduit().equalsIgnoreCase(venteModifiee.getNomProduit());
+        if (produitChange) {
+            // Nouveau produit : vérifier que le stock du nouveau produit est suffisant
+            verifierStockAvantVente(venteModifiee.getNomProduit(), venteModifiee.getQuantite());
+        } else if (venteModifiee.getQuantite() > venteExistante.getQuantite()) {
+            // Même produit, quantité augmentée : seul le delta supplémentaire est consommé
+            int delta = venteModifiee.getQuantite() - venteExistante.getQuantite();
+            verifierStockAvantVente(venteModifiee.getNomProduit(), delta);
+        }
+
+        // Mettre à jour les champs de la vente
         venteExistante.setQuantite(venteModifiee.getQuantite());
         venteExistante.setNomProduit(venteModifiee.getNomProduit());
         venteExistante.setPrixUnitaire(venteModifiee.getPrixUnitaire());
@@ -237,6 +244,7 @@ public class VenteService {
                     : venteExistante.getUtilisateur();
             creditClientService.creerCreditDepuisVente(
                     venteSauvegardee, client, employe, venteModifiee.getDateEcheance());
+            stockService.invalidateStockCache(venteSauvegardee.getTenant().getTenantUuid());
             return venteSauvegardee;
 
         } else if (aUnCreditActif) {
@@ -247,7 +255,9 @@ public class VenteService {
         }
         // Cas 4 : ESPÈCES/WAVE/OM → ESPÈCES/WAVE/OM — rien à faire sur le crédit
 
-        return venteRepository.save(venteExistante);
+        VenteEntity saved = venteRepository.save(venteExistante);
+        stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
+        return saved;
     }
 
     /**
@@ -269,7 +279,6 @@ public class VenteService {
     /**
      * Supprimer une vente
      */
-    @CacheEvict(value = "stocks", allEntries = true)
     @org.springframework.transaction.annotation.Transactional
     public void supprimerVente(Long id) {
         VenteEntity venteExistante = obtenirVenteParId(id);
@@ -283,6 +292,7 @@ public class VenteService {
         creditClientService.solderEtDetacherCreditsDeLaVente(id);
 
         venteRepository.deleteById(id);
+        stockService.invalidateStockCache(tenantActuel.getTenantUuid());
     }
 
     /**

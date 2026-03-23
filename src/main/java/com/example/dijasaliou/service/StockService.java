@@ -200,27 +200,27 @@ public class StockService {
         // Calculer le stock disponible
         Integer stockDisponible = quantiteAchetee - quantiteVendue;
 
-        // Calculer le prix moyen d'achat
+        // Calculer le prix moyen pondéré d'achat (somme(prix × qté) / totalQté)
         BigDecimal prixMoyenAchat = BigDecimal.ZERO;
-        if (!achats.isEmpty()) {
-            BigDecimal totalAchats = achats.stream()
-                    .map(AchatEntity::getPrixUnitaire)
+        if (quantiteAchetee > 0) {
+            BigDecimal totalValeurAchats = achats.stream()
+                    .map(a -> a.getPrixUnitaire().multiply(new BigDecimal(a.getQuantite())))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            prixMoyenAchat = totalAchats.divide(
-                    new BigDecimal(achats.size()),
+            prixMoyenAchat = totalValeurAchats.divide(
+                    new BigDecimal(quantiteAchetee),
                     2,
                     RoundingMode.HALF_UP
             );
         }
 
-        // Calculer le prix moyen de vente
+        // Calculer le prix moyen pondéré de vente (somme(prix × qté) / totalQté)
         BigDecimal prixMoyenVente = BigDecimal.ZERO;
-        if (!ventes.isEmpty()) {
-            BigDecimal totalVentes = ventes.stream()
-                    .map(VenteEntity::getPrixUnitaire)
+        if (quantiteVendue > 0) {
+            BigDecimal totalValeurVentes = ventes.stream()
+                    .map(v -> v.getPrixUnitaire().multiply(new BigDecimal(v.getQuantite())))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            prixMoyenVente = totalVentes.divide(
-                    new BigDecimal(ventes.size()),
+            prixMoyenVente = totalValeurVentes.divide(
+                    new BigDecimal(quantiteVendue),
                     2,
                     RoundingMode.HALF_UP
             );

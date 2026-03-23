@@ -75,7 +75,8 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
      */
     @Query("SELECT COUNT(c), COALESCE(SUM(c.montantRestant), 0) " +
            "FROM CreditClientEntity c " +
-           "WHERE c.vente.dateVente BETWEEN :debut AND :fin " +
+           "WHERE c.vente IS NOT NULL " +
+           "AND c.vente.dateVente BETWEEN :debut AND :fin " +
            "AND c.statut <> :statut " +
            "AND c.tenant.tenantUuid = :tenantUuid")
     List<Object[]> sumCreditsRestantParPeriode(@Param("debut") LocalDate debut,
