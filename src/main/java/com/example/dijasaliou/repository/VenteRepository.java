@@ -79,7 +79,8 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
      */
     @Query("SELECT v FROM VenteEntity v WHERE " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
     Page<VenteEntity> findAllWithSearch(@Param("search") String search,
@@ -107,7 +108,8 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
 
     @Query("SELECT v FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
     Page<VenteEntity> findByUtilisateurWithSearch(@Param("utilisateur") UserEntity utilisateur,

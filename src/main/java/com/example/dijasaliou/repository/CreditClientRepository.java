@@ -35,6 +35,8 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
 
     List<CreditClientEntity> findByVenteId(Long venteId);
 
+    boolean existsByVenteIdAndStatutIn(Long venteId, List<StatutCredit> statuts);
+
     @Query("SELECT COALESCE(SUM(c.montantRestant), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     BigDecimal sumMontantRestantActif(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 

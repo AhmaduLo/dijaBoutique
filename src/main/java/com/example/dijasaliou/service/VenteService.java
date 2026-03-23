@@ -195,6 +195,21 @@ public class VenteService {
         venteExistante.setAdresseClient(venteModifiee.getAdresseClient());
         venteExistante.setUtilisateur(venteModifiee.getUtilisateur());
         venteExistante.setUnite(venteModifiee.getUnite());
+        if (venteModifiee.getModePaiement() != null) {
+            venteExistante.setModePaiement(venteModifiee.getModePaiement());
+        }
+
+        boolean devientCredit = venteModifiee.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT;
+
+        // Source de vérité : existe-t-il un crédit actif en BDD pour cette vente ?
+        boolean aUnCreditActif = creditClientRepository.existsByVenteIdAndStatutIn(
+                id, List.of(StatutCredit.EN_ATTENTE, StatutCredit.PARTIEL));
+
+        if (aUnCreditActif && !devientCredit) {
+            // Un crédit actif existe mais le mode n'est plus CREDIT → solder
+            creditClientService.solderCreditsDeLaVente(id);
+            venteExistante.setEstSoldee(true);
+        }
 
         // Si le produit a changé, récupérer automatiquement la photo du nouveau produit depuis le stock
         if (produitChange) {

@@ -67,6 +67,32 @@ public class CreditClientService {
     }
 
     /**
+     * Crée un crédit manuellement à partir d'une venteId et clientId.
+     * Utilisé quand le frontend crée le crédit séparément (ex: modification de vente).
+     */
+    @Transactional
+    public CreditClientEntity creerCredit(Long venteId, Long clientId, LocalDate dateEcheance, UserEntity employe) {
+        VenteEntity vente = venteRepository.findById(venteId)
+                .orElseThrow(() -> new RuntimeException("Vente introuvable : " + venteId));
+
+        ClientEntity client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Client introuvable : " + clientId));
+
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        if (!vente.getTenant().getTenantUuid().equals(currentTenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+
+        // Marquer la vente comme non soldée et en mode CREDIT
+        vente.setEstSoldee(false);
+        vente.setModePaiement(VenteEntity.ModePaiementVente.CREDIT);
+        vente.setClientRef(client);
+        venteRepository.save(vente);
+
+        return creerCreditDepuisVente(vente, client, employe, dateEcheance);
+    }
+
+    /**
      * Enregistre un paiement (partiel ou total) sur un crédit
      */
     @Transactional
@@ -189,6 +215,28 @@ public class CreditClientService {
         return creditClientRepository.findByClientOrderByCreatedDateAsc(client).stream()
                 .map(CreditClientDto::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Solde tous les crédits actifs liés à une vente (quand le mode de paiement passe de CREDIT à autre chose).
+     * Le crédit est conservé en historique avec statut SOLDE et montantRestant = 0.
+     */
+    @Transactional
+    public void solderCreditsDeLaVente(Long venteId) {
+        List<CreditClientEntity> credits = creditClientRepository.findByVenteId(venteId);
+        for (CreditClientEntity credit : credits) {
+            if (credit.getStatut() != StatutCredit.SOLDE) {
+                ClientEntity client = credit.getClient();
+                if (client != null) {
+                    BigDecimal nouvelleDette = client.getDetteTotale().subtract(credit.getMontantRestant());
+                    client.setDetteTotale(nouvelleDette.max(BigDecimal.ZERO));
+                    clientRepository.save(client);
+                }
+                credit.setMontantRestant(BigDecimal.ZERO);
+                credit.setStatut(StatutCredit.SOLDE);
+                creditClientRepository.save(credit);
+            }
+        }
     }
 
     @Transactional

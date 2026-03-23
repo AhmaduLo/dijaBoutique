@@ -31,6 +31,25 @@ public class CreditController {
     private final CreditClientService creditClientService;
     private final UserService userService;
 
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('USER', 'GERANT', 'ADMIN')")
+    @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
+    public ResponseEntity<CreditClientDto> creerCredit(
+            @RequestBody Map<String, Object> body,
+            Authentication auth) {
+        Long venteId = Long.valueOf(body.get("venteId").toString());
+        Long clientId = Long.valueOf(body.get("clientId").toString());
+        java.time.LocalDate dateEcheance = body.get("dateEcheance") != null
+                ? java.time.LocalDate.parse(body.get("dateEcheance").toString())
+                : null;
+        com.example.dijasaliou.entity.UserEntity employe =
+                userService.obtenirUtilisateurParEmail(auth.getName());
+        com.example.dijasaliou.entity.CreditClientEntity credit =
+                creditClientService.creerCredit(venteId, clientId, dateEcheance, employe);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(CreditClientDto.fromEntity(credit));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
     @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
@@ -43,7 +62,7 @@ public class CreditController {
     }
 
     @GetMapping("/client/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT', 'USER')")
     @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
     public ResponseEntity<List<CreditClientDto>> obtenirHistoriqueClient(
             @PathVariable Long id, Authentication auth) {
