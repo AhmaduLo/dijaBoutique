@@ -4,6 +4,7 @@ import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.ClientEntity;
+import com.example.dijasaliou.entity.CreditClientEntity;
 import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import com.example.dijasaliou.entity.PaiementCreditEntity;
 import com.example.dijasaliou.entity.TenantEntity;
@@ -286,6 +287,16 @@ public class VenteService {
         TenantEntity tenantActuel = tenantService.getCurrentTenant();
         if (!venteExistante.getTenant().getTenantUuid().equals(tenantActuel.getTenantUuid())) {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
+        }
+
+        // Bloquer la suppression si un crédit lié a des paiements enregistrés (incohérence comptable)
+        List<CreditClientEntity> credits = creditClientRepository.findByVenteId(id);
+        for (CreditClientEntity credit : credits) {
+            if (credit.getPaiements() != null && !credit.getPaiements().isEmpty()) {
+                throw new IllegalStateException(
+                        "Impossible de supprimer cette vente : le crédit associé a des paiements enregistrés. " +
+                        "Soldez d'abord le crédit.");
+            }
         }
 
         // Option A : solder les crédits actifs + détacher la FK vente → historique préservé
