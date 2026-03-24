@@ -82,7 +82,7 @@ class FileUploadControllerTest {
                 .tenantUuid("upload-tenant-001")
                 .nomEntreprise("Boutique Upload")
                 .numeroTelephone("+221770000001")
-                .plan(TenantEntity.Plan.PREMIUM)
+                .plan(TenantEntity.Plan.PRO)
                 .build();
         when(tenantService.getCurrentTenant()).thenReturn(tenant);
         when(fileStorageService.uploadPhoto(any(), eq(tenant), eq("achats")))
@@ -109,7 +109,7 @@ class FileUploadControllerTest {
                 .tenantUuid("upload-tenant-002")
                 .nomEntreprise("Boutique Upload 2")
                 .numeroTelephone("+221770000002")
-                .plan(TenantEntity.Plan.PREMIUM)
+                .plan(TenantEntity.Plan.PRO)
                 .build();
         when(tenantService.getCurrentTenant()).thenReturn(tenant);
         when(fileStorageService.uploadPhoto(any(), any(), eq("ventes")))
@@ -135,7 +135,7 @@ class FileUploadControllerTest {
                 .tenantUuid("upload-tenant-003")
                 .nomEntreprise("Boutique Upload 3")
                 .numeroTelephone("+221770000003")
-                .plan(TenantEntity.Plan.ENTREPRISE)
+                .plan(TenantEntity.Plan.BUSINESS)
                 .build();
         when(tenantService.getCurrentTenant()).thenReturn(tenant);
         when(fileStorageService.uploadPhoto(any(), any(), eq("produits")))
@@ -163,7 +163,7 @@ class FileUploadControllerTest {
                 .tenantUuid("upload-tenant-004")
                 .nomEntreprise("Boutique Upload 4")
                 .numeroTelephone("+221770000004")
-                .plan(TenantEntity.Plan.PREMIUM)
+                .plan(TenantEntity.Plan.PRO)
                 .build();
         when(tenantService.getCurrentTenant()).thenReturn(tenant);
         doNothing().when(fileStorageService).deletePhoto(any(), any());
@@ -185,7 +185,7 @@ class FileUploadControllerTest {
                 .tenantUuid("upload-tenant-005")
                 .nomEntreprise("Boutique Upload 5")
                 .numeroTelephone("+221770000005")
-                .plan(TenantEntity.Plan.PREMIUM)
+                .plan(TenantEntity.Plan.PRO)
                 .build();
         when(tenantService.getCurrentTenant()).thenReturn(tenant);
         doThrow(new SecurityException("Cette photo n'appartient pas à votre entreprise"))

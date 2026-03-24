@@ -58,7 +58,7 @@ class BonLivraisonServiceTest {
                 .tenantUuid("uuid-tenant-test")
                 .nomEntreprise("Boutique Test")
                 .numeroTelephone("771234567")
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build();
 
         blTest = BonLivraisonEntity.builder()

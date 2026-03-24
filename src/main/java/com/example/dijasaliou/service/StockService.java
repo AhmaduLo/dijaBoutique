@@ -238,7 +238,7 @@ public class StockService {
         // Vérifier si le plan ENTERPRISE est actif pour afficher les photos
         TenantEntity currentTenant = tenantService.isTenantDefined() ? tenantService.getCurrentTenant() : null;
         boolean canViewPhotos = currentTenant != null &&
-                                currentTenant.getPlan() == TenantEntity.Plan.ENTREPRISE;
+                                currentTenant.getPlan() == TenantEntity.Plan.BUSINESS;
 
         // Récupérer le dernier achat (le plus récent) pour la photo et l'unité
         AchatEntity dernierAchat = achats.stream()

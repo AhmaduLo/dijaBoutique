@@ -68,7 +68,7 @@ class TenantServiceTest {
                 .numeroTelephone("+221771234567")
                 .adresse("Dakar, Sénégal")
                 .nineaSiret("123456789")
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .utilisateurs(Arrays.asList(adminUser, vendeurUser))
                 .build();
     }

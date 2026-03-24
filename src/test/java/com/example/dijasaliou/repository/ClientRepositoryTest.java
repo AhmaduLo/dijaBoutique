@@ -35,14 +35,14 @@ class ClientRepositoryTest {
                 .tenantUuid("client-tenant-001")
                 .nomEntreprise("Boutique Client Test")
                 .numeroTelephone("+221781111111")
-                .plan(TenantEntity.Plan.PREMIUM)
+                .plan(TenantEntity.Plan.PRO)
                 .build());
 
         autreTenant = entityManager.persistAndFlush(TenantEntity.builder()
                 .tenantUuid("client-tenant-002")
                 .nomEntreprise("Autre Boutique Client")
                 .numeroTelephone("+221782222222")
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build());
     }
 

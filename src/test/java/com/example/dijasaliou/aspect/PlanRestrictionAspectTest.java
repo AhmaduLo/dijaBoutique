@@ -47,13 +47,13 @@ class PlanRestrictionAspectTest {
 
     // ── Méthodes annotées utilisées comme cibles de test ──────────────────────
 
-    @RequiresPlan(plans = {TenantEntity.Plan.PREMIUM, TenantEntity.Plan.ENTREPRISE})
+    @RequiresPlan(plans = {TenantEntity.Plan.PRO, TenantEntity.Plan.BUSINESS})
     private void methodeReserveePremiumEntreprise() {}
 
-    @RequiresPlan(plans = {TenantEntity.Plan.BASIC, TenantEntity.Plan.PREMIUM, TenantEntity.Plan.ENTREPRISE})
+    @RequiresPlan(plans = {TenantEntity.Plan.STARTER, TenantEntity.Plan.PRO, TenantEntity.Plan.BUSINESS})
     private void methodeReserveeBasicEtPlus() {}
 
-    @RequiresPlan(plans = {TenantEntity.Plan.PREMIUM}, message = "Accès réservé au plan Premium.")
+    @RequiresPlan(plans = {TenantEntity.Plan.PRO}, message = "Accès réservé au plan Pro.")
     private void methodeAvecMessagePersonnalise() {}
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -92,28 +92,28 @@ class PlanRestrictionAspectTest {
     // ── Plan autorisé ─────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("Plan PREMIUM → méthode réservée PREMIUM/ENTREPRISE → autorisé")
-    void planPREMIUM_methodePremiumEntreprise_autorise() throws NoSuchMethodException {
+    @DisplayName("Plan PRO → méthode réservée PRO/BUSINESS → autorisé")
+    void planPRO_methodeProBusiness_autorise() throws NoSuchMethodException {
         configurerMethode("methodeReserveePremiumEntreprise");
-        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.PREMIUM));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.PRO));
 
         assertThatNoException().isThrownBy(() -> aspect.checkPlanRestriction(joinPoint));
     }
 
     @Test
-    @DisplayName("Plan ENTREPRISE → méthode réservée PREMIUM/ENTREPRISE → autorisé")
-    void planENTREPRISE_methodePremiumEntreprise_autorise() throws NoSuchMethodException {
+    @DisplayName("Plan BUSINESS → méthode réservée PRO/BUSINESS → autorisé")
+    void planBUSINESS_methodeProBusiness_autorise() throws NoSuchMethodException {
         configurerMethode("methodeReserveePremiumEntreprise");
-        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.ENTREPRISE));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.BUSINESS));
 
         assertThatNoException().isThrownBy(() -> aspect.checkPlanRestriction(joinPoint));
     }
 
     @Test
-    @DisplayName("Plan BASIC → méthode réservée BASIC/PREMIUM/ENTREPRISE → autorisé")
-    void planBASIC_methodeBasicEtPlus_autorise() throws NoSuchMethodException {
+    @DisplayName("Plan STARTER → méthode réservée STARTER/PRO/BUSINESS → autorisé")
+    void planSTARTER_methodeStarterEtPlus_autorise() throws NoSuchMethodException {
         configurerMethode("methodeReserveeBasicEtPlus");
-        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.BASIC));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.STARTER));
 
         assertThatNoException().isThrownBy(() -> aspect.checkPlanRestriction(joinPoint));
     }
@@ -121,18 +121,18 @@ class PlanRestrictionAspectTest {
     // ── Plan refusé ───────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("Plan BASIC → méthode réservée PREMIUM/ENTREPRISE → PlanRestrictionException")
-    void planBASIC_methodePremiumEntreprise_refuse() throws NoSuchMethodException {
+    @DisplayName("Plan STARTER → méthode réservée PRO/BUSINESS → PlanRestrictionException")
+    void planSTARTER_methodeProBusiness_refuse() throws NoSuchMethodException {
         configurerMethode("methodeReserveePremiumEntreprise");
-        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.BASIC));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.STARTER));
 
         assertThatThrownBy(() -> aspect.checkPlanRestriction(joinPoint))
                 .isInstanceOf(PlanRestrictionAspect.PlanRestrictionException.class);
     }
 
     @Test
-    @DisplayName("Plan GRATUIT → méthode réservée BASIC/PREMIUM/ENTREPRISE → PlanRestrictionException")
-    void planGRATUIT_methodeBasicEtPlus_refuse() throws NoSuchMethodException {
+    @DisplayName("Plan GRATUIT → méthode réservée STARTER/PRO/BUSINESS → PlanRestrictionException")
+    void planGRATUIT_methodeStarterEtPlus_refuse() throws NoSuchMethodException {
         configurerMethode("methodeReserveeBasicEtPlus");
         when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.GRATUIT));
 
@@ -146,23 +146,23 @@ class PlanRestrictionAspectTest {
     @DisplayName("Message par défaut mentionne les plans autorisés et le plan actuel")
     void messageDefaut_contientPlansEtPlanActuel() throws NoSuchMethodException {
         configurerMethode("methodeReserveePremiumEntreprise");
-        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.BASIC));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.STARTER));
 
         assertThatThrownBy(() -> aspect.checkPlanRestriction(joinPoint))
                 .isInstanceOf(PlanRestrictionAspect.PlanRestrictionException.class)
-                .hasMessageContaining("Premium")   // libellé du plan PREMIUM
-                .hasMessageContaining("Entreprise") // libellé du plan ENTREPRISE
-                .hasMessageContaining("Basic");     // libellé du plan actuel BASIC
+                .hasMessageContaining("Pro")       // libellé du plan PRO
+                .hasMessageContaining("Business")  // libellé du plan BUSINESS
+                .hasMessageContaining("Starter");  // libellé du plan actuel STARTER
     }
 
     @Test
     @DisplayName("Message personnalisé dans l'annotation → utilisé à la place du message par défaut")
     void messagePersonnalise_utiliseLeMessageAnnotation() throws NoSuchMethodException {
         configurerMethode("methodeAvecMessagePersonnalise");
-        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.BASIC));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantAvecPlan(TenantEntity.Plan.STARTER));
 
         assertThatThrownBy(() -> aspect.checkPlanRestriction(joinPoint))
                 .isInstanceOf(PlanRestrictionAspect.PlanRestrictionException.class)
-                .hasMessage("Accès réservé au plan Premium.");
+                .hasMessage("Accès réservé au plan Pro.");
     }
 }

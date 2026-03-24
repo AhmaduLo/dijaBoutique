@@ -50,7 +50,7 @@ class ClientServiceTest {
                 .tenantUuid("uuid-boutique-test")
                 .nomEntreprise("Boutique Dija")
                 .numeroTelephone("778899001")
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build();
 
         clientTest = ClientEntity.builder()

@@ -139,9 +139,9 @@ public class TenantEntity {
      */
     public enum Plan {
         GRATUIT("Plan Gratuit", "Paiement requis - Aucun accès aux fonctionnalités", 0, 0, 0, false),
-        BASIC("Plan Basic", "Gestion complète boutique - 3 utilisateurs", 9.99, 5000, 3, true),
-        PREMIUM("Plan Premium", "Pour moyennes entreprises", 29.99, 15000, 10, true),
-        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 99.99, 25000, Integer.MAX_VALUE, true);
+        STARTER("Plan Starter", "Gestion complète boutique - 3 utilisateurs", 9.99, 5000, 3, true),
+        PRO("Plan Pro", "Pour moyennes entreprises", 29.99, 15000, 10, true),
+        BUSINESS("Plan Business", "Pour grandes entreprises", 99.99, 25000, Integer.MAX_VALUE, true);
 
         private final String libelle;
         private final String description;

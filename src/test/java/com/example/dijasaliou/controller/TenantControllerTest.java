@@ -68,7 +68,7 @@ class TenantControllerTest {
                 .adresse("Dakar, Sénégal")
                 .nineaSiret("12345678")
                 .actif(true)
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build();
 
         adminTest = UserEntity.builder()
@@ -149,7 +149,7 @@ class TenantControllerTest {
                 .numeroTelephone("+221779999999")
                 .adresse("Thiès, Sénégal")
                 .actif(true)
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build();
 
         when(tenantService.updateTenant(any(UpdateTenantRequest.class))).thenReturn(tenantModifie);

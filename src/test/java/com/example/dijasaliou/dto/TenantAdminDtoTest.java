@@ -28,7 +28,7 @@ class TenantAdminDtoTest {
         TenantEntity tenant = TenantEntity.builder()
                 .tenantUuid("t1").nomEntreprise("B").numeroTelephone("0")
                 .actif(false)
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .dateExpiration(LocalDateTime.now().plusDays(30))
                 .build();
 
@@ -90,7 +90,7 @@ class TenantAdminDtoTest {
         TenantEntity tenant = TenantEntity.builder()
                 .tenantUuid("t5").nomEntreprise("B").numeroTelephone("0")
                 .actif(true)
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .essaiUtilise(true)
                 .dateExpiration(LocalDateTime.now().minusDays(1))
                 .build();
@@ -107,7 +107,7 @@ class TenantAdminDtoTest {
         TenantEntity tenant = TenantEntity.builder()
                 .tenantUuid("t6").nomEntreprise("B").numeroTelephone("0")
                 .actif(true)
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .essaiUtilise(true)
                 .dateExpiration(null)
                 .build();
@@ -122,7 +122,7 @@ class TenantAdminDtoTest {
         TenantEntity tenant = TenantEntity.builder()
                 .tenantUuid("t7").nomEntreprise("B").numeroTelephone("0")
                 .actif(true)
-                .plan(TenantEntity.Plan.PREMIUM)
+                .plan(TenantEntity.Plan.PRO)
                 .essaiUtilise(true)
                 .dateExpiration(LocalDateTime.now().plusDays(1))
                 .build();
@@ -138,7 +138,7 @@ class TenantAdminDtoTest {
     void fromEntity_adminNull_champsAdminNull() {
         TenantEntity tenant = TenantEntity.builder()
                 .tenantUuid("t8").nomEntreprise("B").numeroTelephone("0")
-                .actif(true).plan(TenantEntity.Plan.BASIC).build();
+                .actif(true).plan(TenantEntity.Plan.STARTER).build();
 
         TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 0L, null);
 
@@ -153,7 +153,7 @@ class TenantAdminDtoTest {
     void fromEntity_avecAdmin_infosAdminMappees() {
         TenantEntity tenant = TenantEntity.builder()
                 .tenantUuid("t9").nomEntreprise("Boutique Test").numeroTelephone("0")
-                .actif(true).plan(TenantEntity.Plan.BASIC)
+                .actif(true).plan(TenantEntity.Plan.STARTER)
                 .essaiUtilise(true).build();
 
         TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 2L, admin);
