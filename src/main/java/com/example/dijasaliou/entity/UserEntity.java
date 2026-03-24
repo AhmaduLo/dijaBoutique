@@ -24,7 +24,7 @@ import java.util.List;
 @Builder
 @ToString
 @EqualsAndHashCode(callSuper = false)
-public class UserEntity extends BaseEntity {
+public class UserEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

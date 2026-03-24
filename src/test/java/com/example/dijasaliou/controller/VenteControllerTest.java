@@ -102,7 +102,7 @@ class VenteControllerTest {
                 .client("Mme Ndiaye")
                 .utilisateur(utilisateurTest)
                 .build();
-        venteTest.setId(1L);
+        venteTest.setId("test-id-1");
 
         // Création d'une deuxième vente de test
         venteTest2 = VenteEntity.builder()
@@ -114,7 +114,7 @@ class VenteControllerTest {
                 .client("M. Sow")
                 .utilisateur(utilisateurTest)
                 .build();
-        venteTest2.setId(2L);
+        venteTest2.setId("test-id-2");
     }
 
     // ==================== Tests pour GET /ventes ====================
@@ -135,11 +135,11 @@ class VenteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].nomProduit", is("Collier en or")))
                 .andExpect(jsonPath("$.content[0].quantite", is(5)))
                 .andExpect(jsonPath("$.content[0].client", is("Mme Ndiaye")))
-                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$.content[1].nomProduit", is("Bracelet en argent")));
 
         verify(venteService, times(1)).obtenirVentesPaginees(0, 20, null, null, null);
@@ -169,14 +169,14 @@ class VenteControllerTest {
     @DisplayName("GET /ventes/{id} - Devrait retourner une vente par son ID")
     void obtenirParId_DevraitRetournerVente() throws Exception {
         // Arrange
-        Long venteId = 1L;
+        String venteId = "test-id-1";
         when(venteService.obtenirVenteParId(venteId)).thenReturn(venteTest);
 
         // Act & Assert
         mockMvc.perform(get("/ventes/{id}", venteId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or")))
                 .andExpect(jsonPath("$.quantite", is(5)))
                 .andExpect(jsonPath("$.prixUnitaire", is(150000.00)))
@@ -190,7 +190,7 @@ class VenteControllerTest {
     @DisplayName("GET /ventes/{id} - Devrait lancer une exception si vente inexistante")
     void obtenirParId_DevraitLancerExceptionSiVenteInexistante() throws Exception {
         // Arrange
-        Long venteId = 999L;
+        String venteId = "999";
         when(venteService.obtenirVenteParId(venteId))
                 .thenThrow(new RuntimeException("Vente non trouvée"));
 
@@ -226,7 +226,7 @@ class VenteControllerTest {
                 .client("Mme Ba")
                 .utilisateur(utilisateurTest)
                 .build();
-        venteCreee.setId(3L);
+        venteCreee.setId("test-id-3");
 
         when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(venteService.creerVente(any(VenteEntity.class), eq(utilisateurTest)))
@@ -238,7 +238,7 @@ class VenteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelleVente)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id", is(3)))
+                .andExpect(jsonPath("$.id", is("test-id-3")))
                 .andExpect(jsonPath("$.nomProduit", is("Bague en diamant")))
                 .andExpect(jsonPath("$.quantite", is(10)))
                 .andExpect(jsonPath("$.prixTotal", is(2000000.00)))
@@ -254,7 +254,7 @@ class VenteControllerTest {
     @DisplayName("PUT /ventes/{id} - Devrait modifier une vente existante")
     void modifier_DevraitModifierVente() throws Exception {
         // Arrange
-        Long venteId = 1L;
+        String venteId = "test-id-1";
         Long utilisateurId = 1L;
 
         VenteEntity venteModifiee = VenteEntity.builder()
@@ -286,7 +286,7 @@ class VenteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(venteModifiee)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or - Mise à jour")))
                 .andExpect(jsonPath("$.quantite", is(8)))
                 .andExpect(jsonPath("$.prixTotal", is(1280000.00)));
@@ -299,7 +299,7 @@ class VenteControllerTest {
     @DisplayName("PUT /ventes/{id} - Devrait lancer une exception si vente inexistante")
     void modifier_DevraitLancerExceptionSiVenteInexistante() throws Exception {
         // Arrange
-        Long venteId = 999L;
+        String venteId = "999";
 
         VenteEntity venteModifiee = VenteEntity.builder()
                 .quantite(5)
@@ -328,7 +328,7 @@ class VenteControllerTest {
     @DisplayName("DELETE /ventes/{id} - Devrait supprimer une vente avec succès")
     void supprimer_DevraitSupprimerVente() throws Exception {
         // Arrange
-        Long venteId = 1L;
+        String venteId = "test-id-1";
         doNothing().when(venteService).supprimerVente(venteId);
 
         // Act & Assert
@@ -343,7 +343,7 @@ class VenteControllerTest {
     @DisplayName("DELETE /ventes/{id} - Devrait lancer une exception si vente inexistante")
     void supprimer_DevraitLancerExceptionSiVenteInexistante() throws Exception {
         // Arrange
-        Long venteId = 999L;
+        String venteId = "999";
         doThrow(new RuntimeException("Vente non trouvée"))
                 .when(venteService).supprimerVente(venteId);
 
@@ -373,9 +373,9 @@ class VenteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$.content[1].nomProduit", is("Bracelet en argent")));
 
         verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
@@ -530,7 +530,7 @@ class VenteControllerTest {
                 .client(null) // Pas de client
                 .utilisateur(utilisateurTest)
                 .build();
-        venteSansClient.setId(3L);
+        venteSansClient.setId("test-id-3");
 
         PagedResponse<VenteDto> page = PagedResponse.<VenteDto>builder()
                 .content(Arrays.asList(VenteDto.fromEntity(venteSansClient)))
@@ -567,7 +567,7 @@ class VenteControllerTest {
                 .dateVente(LocalDate.now())
                 .utilisateur(utilisateurTest)
                 .build();
-        venteCreee.setId(4L);
+        venteCreee.setId("test-id-4");
 
         when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(venteService.creerVente(any(VenteEntity.class), eq(utilisateurTest)))

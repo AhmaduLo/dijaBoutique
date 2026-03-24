@@ -52,7 +52,7 @@ public class BonLivraisonController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BonLivraisonDto> getParId(@PathVariable Long id, Authentication auth) {
+    public ResponseEntity<BonLivraisonDto> getParId(@PathVariable String id, Authentication auth) {
         log.info("[BL] {} consulte le BL {}", auth.getName(), id);
         return ResponseEntity.ok(bonLivraisonService.getParId(id));
     }
@@ -67,19 +67,19 @@ public class BonLivraisonController {
     }
 
     @PutMapping("/{id}/livrer")
-    public ResponseEntity<BonLivraisonDto> marquerLivre(@PathVariable Long id, Authentication auth) {
+    public ResponseEntity<BonLivraisonDto> marquerLivre(@PathVariable String id, Authentication auth) {
         log.info("[BL] {} marque le BL {} comme livré", auth.getName(), id);
         return ResponseEntity.ok(bonLivraisonService.marquerLivre(id));
     }
 
     @PutMapping("/{id}/annuler")
-    public ResponseEntity<BonLivraisonDto> annuler(@PathVariable Long id, Authentication auth) {
+    public ResponseEntity<BonLivraisonDto> annuler(@PathVariable String id, Authentication auth) {
         log.info("[BL] {} annule le BL {}", auth.getName(), id);
         return ResponseEntity.ok(bonLivraisonService.annuler(id));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> supprimer(@PathVariable Long id, Authentication auth) {
+    public ResponseEntity<Map<String, String>> supprimer(@PathVariable String id, Authentication auth) {
         log.info("[BL] {} supprime le BL {}", auth.getName(), id);
         bonLivraisonService.supprimer(id);
         return ResponseEntity.ok(Map.of("message", "Bon de livraison supprimé"));

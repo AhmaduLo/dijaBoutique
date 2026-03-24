@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class BonLivraisonDto {
 
-    private Long id;
+    private String id;
     private String numeroBL;
     private String statut;
     private LocalDateTime dateCreation;
@@ -52,7 +52,7 @@ public class BonLivraisonDto {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class LigneBLDto {
-        private Long id;
+        private String id;
         private String nomProduit;
         private Double quantite;
         private String unite;

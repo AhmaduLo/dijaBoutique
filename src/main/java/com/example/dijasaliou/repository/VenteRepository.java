@@ -15,7 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
+public interface VenteRepository extends JpaRepository<VenteEntity, String> {
 
     // Recherche par produit
     List<VenteEntity> findByNomProduit(String nomProduit);

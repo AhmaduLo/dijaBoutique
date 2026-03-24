@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-public interface BonLivraisonRepository extends JpaRepository<BonLivraisonEntity, Long> {
+public interface BonLivraisonRepository extends JpaRepository<BonLivraisonEntity, String> {
 
     List<BonLivraisonEntity> findAllByOrderByCreatedDateDesc();
 

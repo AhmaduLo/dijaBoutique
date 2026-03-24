@@ -97,21 +97,21 @@ class VenteServiceTest {
     @Test
     @DisplayName("obtenirVenteParId() — retourne la vente si elle existe")
     void obtenirVenteParId_retourneVente() {
-        venteValide.setId(1L);
-        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        venteValide.setId("test-id-1");
+        when(venteRepository.findById("test-id-1")).thenReturn(Optional.of(venteValide));
 
-        VenteEntity resultat = venteService.obtenirVenteParId(1L);
+        VenteEntity resultat = venteService.obtenirVenteParId("test-id-1");
 
-        assertThat(resultat.getId()).isEqualTo(1L);
+        assertThat(resultat.getId()).isEqualTo("test-id-1");
         assertThat(resultat.getNomProduit()).isEqualTo("Ordinateur");
     }
 
     @Test
     @DisplayName("obtenirVenteParId() — lève RuntimeException si non trouvée")
     void obtenirVenteParId_leveExceptionSiAbsente() {
-        when(venteRepository.findById(999L)).thenReturn(Optional.empty());
+        when(venteRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> venteService.obtenirVenteParId(999L))
+        assertThatThrownBy(() -> venteService.obtenirVenteParId("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Vente non trouvée");
     }
@@ -251,7 +251,7 @@ class VenteServiceTest {
     @DisplayName("creerVente() — mode CREDIT avec client enregistré crée un crédit")
     void creerVente_modeCREDIT_creeCredit() {
         ClientEntity client = new ClientEntity();
-        client.setId(10L);
+        client.setId("test-id-10");
         client.setNom("Client Test");
 
         VenteEntity venteCredit = VenteEntity.builder()
@@ -309,39 +309,39 @@ class VenteServiceTest {
     @Test
     @DisplayName("supprimerVente() — supprime une vente ESPECES")
     void supprimerVente_supprimeSansCredit() {
-        venteValide.setId(1L);
+        venteValide.setId("test-id-1");
         venteValide.setModePaiement(VenteEntity.ModePaiementVente.ESPECES);
 
-        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        when(venteRepository.findById("test-id-1")).thenReturn(Optional.of(venteValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
-        venteService.supprimerVente(1L);
+        venteService.supprimerVente("test-id-1");
 
-        verify(venteRepository).deleteById(1L);
+        verify(venteRepository).deleteById("test-id-1");
         verify(creditClientService, never()).supprimerCreditsDeLaVente(any());
     }
 
     @Test
     @DisplayName("supprimerVente() — supprime les crédits liés si mode CREDIT")
     void supprimerVente_supprimeCreditLies() {
-        venteValide.setId(2L);
+        venteValide.setId("test-id-2");
         venteValide.setModePaiement(VenteEntity.ModePaiementVente.CREDIT);
 
-        when(venteRepository.findById(2L)).thenReturn(Optional.of(venteValide));
+        when(venteRepository.findById("test-id-2")).thenReturn(Optional.of(venteValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
-        venteService.supprimerVente(2L);
+        venteService.supprimerVente("test-id-2");
 
-        verify(creditClientService).solderEtDetacherCreditsDeLaVente(2L);
-        verify(venteRepository).deleteById(2L);
+        verify(creditClientService).solderEtDetacherCreditsDeLaVente("test-id-2");
+        verify(venteRepository).deleteById("test-id-2");
     }
 
     @Test
     @DisplayName("supprimerVente() — lève exception si vente non trouvée")
     void supprimerVente_leveExceptionSiAbsente() {
-        when(venteRepository.findById(999L)).thenReturn(Optional.empty());
+        when(venteRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> venteService.supprimerVente(999L))
+        assertThatThrownBy(() -> venteService.supprimerVente("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Vente non trouvée");
     }
@@ -351,12 +351,12 @@ class VenteServiceTest {
     void supprimerVente_leveSecurityExceptionTenantDifferent() {
         TenantEntity autretenant = new TenantEntity();
         autretenant.setTenantUuid("uuid-autre-tenant");
-        venteValide.setId(3L);
+        venteValide.setId("test-id-3");
 
-        when(venteRepository.findById(3L)).thenReturn(Optional.of(venteValide));
+        when(venteRepository.findById("test-id-3")).thenReturn(Optional.of(venteValide));
         when(tenantService.getCurrentTenant()).thenReturn(autreenant());
 
-        assertThatThrownBy(() -> venteService.supprimerVente(3L))
+        assertThatThrownBy(() -> venteService.supprimerVente("test-id-3"))
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("Accès refusé");
     }
@@ -558,7 +558,7 @@ class VenteServiceTest {
     @Test
     @DisplayName("modifierVente() — modifie et sauvegarde la vente")
     void modifierVente_succes() {
-        venteValide.setId(1L);
+        venteValide.setId("test-id-1");
         VenteEntity modifications = VenteEntity.builder()
                 .quantite(1) // quantité réduite → même nom + qté ≤ ancienne → pas d'appel au StockService
                 .nomProduit("Ordinateur")
@@ -566,11 +566,11 @@ class VenteServiceTest {
                 .dateVente(LocalDate.now())
                 .build();
 
-        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        when(venteRepository.findById("test-id-1")).thenReturn(Optional.of(venteValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(venteRepository.save(any())).thenReturn(venteValide);
 
-        VenteEntity resultat = venteService.modifierVente(1L, modifications);
+        VenteEntity resultat = venteService.modifierVente("test-id-1", modifications);
 
         assertThat(resultat).isNotNull();
         verify(venteRepository).save(venteValide);
@@ -580,17 +580,17 @@ class VenteServiceTest {
     @Test
     @DisplayName("modifierVente() — lève SecurityException si tenant différent")
     void modifierVente_leveSecurityExceptionTenantDifferent() {
-        venteValide.setId(1L);
+        venteValide.setId("test-id-1");
         VenteEntity modifications = VenteEntity.builder()
                 .quantite(3).nomProduit("Ordinateur")
                 .prixUnitaire(new BigDecimal("600.00"))
                 .dateVente(LocalDate.now())
                 .build();
 
-        when(venteRepository.findById(1L)).thenReturn(Optional.of(venteValide));
+        when(venteRepository.findById("test-id-1")).thenReturn(Optional.of(venteValide));
         when(tenantService.getCurrentTenant()).thenReturn(autreenant());
 
-        assertThatThrownBy(() -> venteService.modifierVente(1L, modifications))
+        assertThatThrownBy(() -> venteService.modifierVente("test-id-1", modifications))
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("Accès refusé");
     }

@@ -24,7 +24,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class VenteDto {
-    private Long id;
+    private String id;
     private Integer quantite;
     private String nomProduit;
     private BigDecimal prixUnitaire;
@@ -40,7 +40,7 @@ public class VenteDto {
     private String groupeVenteId;
 
     // Crédit client
-    private Long clientId;
+    private String clientId;
     private String modePaiement;
     private Boolean estSoldee;
 

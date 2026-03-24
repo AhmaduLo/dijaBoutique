@@ -34,6 +34,11 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = false)
 public class VenteEntity  extends BaseEntity{
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
+    private String id;
+
     @NotNull(message = "La quantité est obligatoire")
     @Positive(message = "La quantité doit être positive")
     @Column(name = "quantite", nullable = false)
@@ -130,7 +135,7 @@ public class VenteEntity  extends BaseEntity{
      * Résolu en ClientEntity dans VenteService avant la création du crédit
      */
     @Transient
-    private Long clientId;
+    private String clientId;
 
     /**
      * Date d'échéance pour les ventes à crédit — champ transient pour la désérialisation JSON

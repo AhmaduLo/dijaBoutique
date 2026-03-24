@@ -55,7 +55,7 @@ public class VenteController {
      * GET /api/ventes/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<VenteDto> obtenirParId(@PathVariable Long id) {
+    public ResponseEntity<VenteDto> obtenirParId(@PathVariable String id) {
         VenteEntity vente = venteService.obtenirVenteParId(id);
         return ResponseEntity.ok(VenteDto.fromEntity(vente));
     }
@@ -83,7 +83,7 @@ public class VenteController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<VenteDto> modifier(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody VenteEntity venteModifiee,
             Authentication authentication) {
 
@@ -113,7 +113,7 @@ public class VenteController {
      * DELETE /api/ventes/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> supprimer(@PathVariable Long id) {
+    public ResponseEntity<Void> supprimer(@PathVariable String id) {
         venteService.supprimerVente(id);
         return ResponseEntity.noContent().build();
     }

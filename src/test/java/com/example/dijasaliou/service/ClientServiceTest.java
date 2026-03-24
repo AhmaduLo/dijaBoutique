@@ -152,11 +152,11 @@ class ClientServiceTest {
     @Test
     @DisplayName("obtenirClientParId() — retourne le DTO si client trouvé")
     void obtenirClientParId_retourneDtoSiTrouvé() {
-        when(clientRepository.findById(1L)).thenReturn(Optional.of(clientTest));
+        when(clientRepository.findById("test-id-1")).thenReturn(Optional.of(clientTest));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(creditClientRepository.countCreditsActifsByClientId(any(), any(), any())).thenReturn(2L);
 
-        ClientDto dto = clientService.obtenirClientParId(1L);
+        ClientDto dto = clientService.obtenirClientParId("test-id-1");
 
         assertThat(dto).isNotNull();
         assertThat(dto.getNom()).isEqualTo("Ousmane Ndiaye");
@@ -166,9 +166,9 @@ class ClientServiceTest {
     @Test
     @DisplayName("obtenirClientParId() — lève RuntimeException si client non trouvé")
     void obtenirClientParId_leveExceptionSiAbsent() {
-        when(clientRepository.findById(99L)).thenReturn(Optional.empty());
+        when(clientRepository.findById("99")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> clientService.obtenirClientParId(99L))
+        assertThatThrownBy(() -> clientService.obtenirClientParId("99"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("99");
     }

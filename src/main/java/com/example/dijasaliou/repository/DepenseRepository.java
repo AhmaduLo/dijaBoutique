@@ -15,7 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface DepenseRepository extends JpaRepository<DepenseEntity, Long> {
+public interface DepenseRepository extends JpaRepository<DepenseEntity, String> {
 
     // Recherche par utilisateur
     List<DepenseEntity> findByUtilisateur(UserEntity utilisateur);

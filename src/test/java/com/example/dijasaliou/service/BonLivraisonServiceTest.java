@@ -194,11 +194,11 @@ class BonLivraisonServiceTest {
     @Test
     @DisplayName("marquerLivre() — statut LIVRE et dateLivraisonEffective renseignée")
     void marquerLivre_statutLivreEtDateEffective() {
-        when(bonLivraisonRepository.findById(1L)).thenReturn(Optional.of(blTest));
+        when(bonLivraisonRepository.findById("test-id-1")).thenReturn(Optional.of(blTest));
         when(bonLivraisonRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.findFirstByTenantAndRole(any(), any())).thenReturn(Optional.empty());
 
-        BonLivraisonDto dto = bonLivraisonService.marquerLivre(1L);
+        BonLivraisonDto dto = bonLivraisonService.marquerLivre("test-id-1");
 
         assertThat(blTest.getStatut()).isEqualTo(BonLivraisonEntity.Statut.LIVRE);
         assertThat(blTest.getDateLivraisonEffective()).isNotNull();
@@ -208,9 +208,9 @@ class BonLivraisonServiceTest {
     @Test
     @DisplayName("marquerLivre() — lève RuntimeException si BL non trouvé")
     void marquerLivre_leveExceptionSiAbsent() {
-        when(bonLivraisonRepository.findById(99L)).thenReturn(Optional.empty());
+        when(bonLivraisonRepository.findById("99")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> bonLivraisonService.marquerLivre(99L))
+        assertThatThrownBy(() -> bonLivraisonService.marquerLivre("99"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("99");
     }
@@ -222,11 +222,11 @@ class BonLivraisonServiceTest {
     @Test
     @DisplayName("annuler() — statut ANNULE")
     void annuler_statutAnnule() {
-        when(bonLivraisonRepository.findById(1L)).thenReturn(Optional.of(blTest));
+        when(bonLivraisonRepository.findById("test-id-1")).thenReturn(Optional.of(blTest));
         when(bonLivraisonRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.findFirstByTenantAndRole(any(), any())).thenReturn(Optional.empty());
 
-        BonLivraisonDto dto = bonLivraisonService.annuler(1L);
+        BonLivraisonDto dto = bonLivraisonService.annuler("test-id-1");
 
         assertThat(blTest.getStatut()).isEqualTo(BonLivraisonEntity.Statut.ANNULE);
         assertThat(dto.getStatut()).isEqualTo("ANNULE");
@@ -235,9 +235,9 @@ class BonLivraisonServiceTest {
     @Test
     @DisplayName("annuler() — lève RuntimeException si BL non trouvé")
     void annuler_leveExceptionSiAbsent() {
-        when(bonLivraisonRepository.findById(99L)).thenReturn(Optional.empty());
+        when(bonLivraisonRepository.findById("99")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> bonLivraisonService.annuler(99L))
+        assertThatThrownBy(() -> bonLivraisonService.annuler("99"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("99");
     }
@@ -249,9 +249,9 @@ class BonLivraisonServiceTest {
     @Test
     @DisplayName("supprimer() — appelle delete sur le repository")
     void supprimer_appelleDelete() {
-        when(bonLivraisonRepository.findById(1L)).thenReturn(Optional.of(blTest));
+        when(bonLivraisonRepository.findById("test-id-1")).thenReturn(Optional.of(blTest));
 
-        bonLivraisonService.supprimer(1L);
+        bonLivraisonService.supprimer("test-id-1");
 
         verify(bonLivraisonRepository).delete(blTest);
     }
@@ -259,9 +259,9 @@ class BonLivraisonServiceTest {
     @Test
     @DisplayName("supprimer() — lève RuntimeException si BL non trouvé")
     void supprimer_leveExceptionSiAbsent() {
-        when(bonLivraisonRepository.findById(99L)).thenReturn(Optional.empty());
+        when(bonLivraisonRepository.findById("99")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> bonLivraisonService.supprimer(99L))
+        assertThatThrownBy(() -> bonLivraisonService.supprimer("99"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("99");
         verify(bonLivraisonRepository, never()).delete(any());
@@ -274,10 +274,10 @@ class BonLivraisonServiceTest {
     @Test
     @DisplayName("getParId() — retourne le DTO si BL trouvé")
     void getParId_retourneDtoSiTrouvé() {
-        when(bonLivraisonRepository.findById(1L)).thenReturn(Optional.of(blTest));
+        when(bonLivraisonRepository.findById("test-id-1")).thenReturn(Optional.of(blTest));
         when(userRepository.findFirstByTenantAndRole(any(), any())).thenReturn(Optional.empty());
 
-        BonLivraisonDto dto = bonLivraisonService.getParId(1L);
+        BonLivraisonDto dto = bonLivraisonService.getParId("test-id-1");
 
         assertThat(dto).isNotNull();
         assertThat(dto.getClientNom()).isEqualTo("Fatou Diallo");
@@ -286,9 +286,9 @@ class BonLivraisonServiceTest {
     @Test
     @DisplayName("getParId() — lève RuntimeException si BL non trouvé")
     void getParId_leveExceptionSiAbsent() {
-        when(bonLivraisonRepository.findById(55L)).thenReturn(Optional.empty());
+        when(bonLivraisonRepository.findById("55")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> bonLivraisonService.getParId(55L))
+        assertThatThrownBy(() -> bonLivraisonService.getParId("55"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("55");
     }

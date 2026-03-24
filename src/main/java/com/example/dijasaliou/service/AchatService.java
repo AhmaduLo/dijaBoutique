@@ -65,7 +65,7 @@ public class AchatService {
     /**
      * Récupérer un achat par son ID
      */
-    public AchatEntity obtenirAchatParId(Long id) {
+    public AchatEntity obtenirAchatParId(String id) {
         return achatRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Achat non trouvé avec l'ID : " + id));
     }
@@ -125,7 +125,7 @@ public class AchatService {
     /**
      * Modifier un achat existant
      */
-    public AchatEntity modifierAchat(Long id, AchatEntity achatModifie) {
+    public AchatEntity modifierAchat(String id, AchatEntity achatModifie) {
         // 1. Vérifier que l'achat existe
         AchatEntity achatExistant = obtenirAchatParId(id);
 
@@ -180,7 +180,7 @@ public class AchatService {
     /**
      * Supprimer un achat
      */
-    public void supprimerAchat(Long id) {
+    public void supprimerAchat(String id) {
         // 1. Récupérer l'achat existant
         AchatEntity achatExistant = obtenirAchatParId(id);
 

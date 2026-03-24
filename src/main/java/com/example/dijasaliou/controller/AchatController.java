@@ -65,7 +65,7 @@ public class AchatController {
      *           → id = 5
      */
     @GetMapping("/{id}")
-    public ResponseEntity<AchatDto> obtenirParId(@PathVariable Long id) {
+    public ResponseEntity<AchatDto> obtenirParId(@PathVariable String id) {
         AchatEntity achat = achatService.obtenirAchatParId(id);
         return ResponseEntity.ok(AchatDto.fromEntity(achat));
     }
@@ -114,7 +114,7 @@ public class AchatController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<AchatDto> modifier(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody AchatEntity achatModifie,
             Authentication authentication) {
 
@@ -162,7 +162,7 @@ public class AchatController {
      * Exemple : DELETE /api/achats/5
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> supprimer(@PathVariable Long id) {
+    public ResponseEntity<Void> supprimer(@PathVariable String id) {
         achatService.supprimerAchat(id);
 
         // Retourner 204 No Content (succès sans contenu)

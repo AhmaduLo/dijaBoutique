@@ -38,8 +38,9 @@ public class PaiementCreditEntity {
     }
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
+    private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "credit_id", nullable = false, foreignKey = @ForeignKey(name = "fk_paiement_credit"))

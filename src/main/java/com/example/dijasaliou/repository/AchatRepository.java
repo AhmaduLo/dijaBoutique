@@ -14,7 +14,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface AchatRepository extends JpaRepository<AchatEntity, Long> {
+public interface AchatRepository extends JpaRepository<AchatEntity, String> {
 
     /**Trouver tous les achats d'un produit*/
     List<AchatEntity> findByNomProduit(String nomProduit);

@@ -24,7 +24,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class AchatDto {
-    private Long id;
+    private String id;
     private Integer quantite;
     private String nomProduit;
     private BigDecimal prixUnitaire;

@@ -40,8 +40,8 @@ public class CreditController {
     public ResponseEntity<CreditClientDto> creerCredit(
             @RequestBody Map<String, Object> body,
             Authentication auth) {
-        Long venteId = Long.valueOf(body.get("venteId").toString());
-        Long clientId = Long.valueOf(body.get("clientId").toString());
+        String venteId = body.get("venteId").toString();
+        String clientId = body.get("clientId").toString();
         java.time.LocalDate dateEcheance = body.get("dateEcheance") != null
                 ? java.time.LocalDate.parse(body.get("dateEcheance").toString())
                 : null;
@@ -70,7 +70,7 @@ public class CreditController {
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT', 'USER')")
     @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
     public ResponseEntity<List<CreditClientDto>> obtenirHistoriqueClient(
-            @PathVariable Long id, Authentication auth) {
+            @PathVariable String id, Authentication auth) {
         log.info("Historique crédits client #{} demandé par {}", id, auth.getName());
         return ResponseEntity.ok(creditClientService.obtenirHistoriqueClient(id));
     }
@@ -79,7 +79,7 @@ public class CreditController {
     @PreAuthorize("isAuthenticated()")
     @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
     public ResponseEntity<CreditClientDto> enregistrerPaiement(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody PaiementCreditRequest request,
             Authentication auth) {
         UserEntity employe = userService.obtenirUtilisateurParEmail(auth.getName());
@@ -97,7 +97,7 @@ public class CreditController {
     @GetMapping("/{id}/paiements")
     @PreAuthorize("isAuthenticated()")
     @RequiresPlan(plans = {TenantEntity.Plan.ENTREPRISE})
-    public ResponseEntity<List<PaiementCreditDto>> obtenirPaiements(@PathVariable Long id) {
+    public ResponseEntity<List<PaiementCreditDto>> obtenirPaiements(@PathVariable String id) {
         return ResponseEntity.ok(creditClientService.obtenirPaiements(id));
     }
 

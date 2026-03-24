@@ -96,7 +96,6 @@ class AchatControllerTest {
 
         // Création d'un premier achat de test
         achatTest = AchatEntity.builder()
-                .id(1L)
                 .quantite(10)
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("50.00"))
@@ -105,10 +104,10 @@ class AchatControllerTest {
                 .fournisseur("Fournisseur A")
                 .utilisateur(utilisateurTest)
                 .build();
+        achatTest.setId("test-id-1");
 
         // Création d'un deuxième achat de test
         achatTest2 = AchatEntity.builder()
-                .id(2L)
                 .quantite(5)
                 .nomProduit("Bracelet en argent")
                 .prixUnitaire(new BigDecimal("30.00"))
@@ -117,6 +116,7 @@ class AchatControllerTest {
                 .fournisseur("Fournisseur B")
                 .utilisateur(utilisateurTest)
                 .build();
+        achatTest2.setId("test-id-2");
     }
 
     // ==================== Tests pour GET /achats ====================
@@ -135,10 +135,10 @@ class AchatControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].nomProduit", is("Collier en or")))
                 .andExpect(jsonPath("$.content[0].quantite", is(10)))
-                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$.content[1].nomProduit", is("Bracelet en argent")));
 
         verify(achatService, times(1)).obtenirAchatsPagines(0, 20, null, null, null);
@@ -168,14 +168,14 @@ class AchatControllerTest {
     @DisplayName("GET /achats/{id} - Devrait retourner un achat par son ID")
     void obtenirParId_DevraitRetournerAchat() throws Exception {
         // Arrange
-        Long achatId = 1L;
+        String achatId = "test-id-1";
         when(achatService.obtenirAchatParId(achatId)).thenReturn(achatTest);
 
         // Act & Assert
         mockMvc.perform(get("/achats/{id}", achatId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or")))
                 .andExpect(jsonPath("$.quantite", is(10)))
                 .andExpect(jsonPath("$.prixUnitaire", is(50.00)))
@@ -189,7 +189,7 @@ class AchatControllerTest {
     @DisplayName("GET /achats/{id} - Devrait lancer une exception si achat inexistant")
     void obtenirParId_DevraitLancerExceptionSiAchatInexistant() throws Exception {
         // Arrange
-        Long achatId = 999L;
+        String achatId = "id-inexistant";
         when(achatService.obtenirAchatParId(achatId))
                 .thenThrow(new RuntimeException("Achat non trouvé"));
 
@@ -217,9 +217,9 @@ class AchatControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$[0].nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$[1].id", is(2)))
+                .andExpect(jsonPath("$[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$[1].nomProduit", is("Bracelet en argent")));
 
         verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
@@ -260,7 +260,6 @@ class AchatControllerTest {
                 .build();
 
         AchatEntity achatCree = AchatEntity.builder()
-                .id(3L)
                 .quantite(15)
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("100.00"))
@@ -269,6 +268,7 @@ class AchatControllerTest {
                 .fournisseur("Fournisseur C")
                 .utilisateur(utilisateurTest)
                 .build();
+        achatCree.setId("test-id-3");
 
         when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(achatService.creerAchat(any(AchatEntity.class), eq(utilisateurTest)))
@@ -280,7 +280,7 @@ class AchatControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelAchat)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id", is(3)))
+                .andExpect(jsonPath("$.id", is("test-id-3")))
                 .andExpect(jsonPath("$.nomProduit", is("Bague en diamant")))
                 .andExpect(jsonPath("$.quantite", is(15)))
                 .andExpect(jsonPath("$.prixTotal", is(1500.00)));
@@ -320,7 +320,7 @@ class AchatControllerTest {
     @DisplayName("PUT /achats/{id} - Devrait modifier un achat existant")
     void modifier_DevraitModifierAchat() throws Exception {
         // Arrange
-        Long achatId = 1L;
+        String achatId = "test-id-1";
 
         AchatEntity achatModifie = AchatEntity.builder()
                 .quantite(20)
@@ -332,7 +332,6 @@ class AchatControllerTest {
                 .build();
 
         AchatEntity achatMiseAJour = AchatEntity.builder()
-                .id(achatId)
                 .quantite(20)
                 .nomProduit("Collier en or modifié")
                 .prixUnitaire(new BigDecimal("60.00"))
@@ -341,6 +340,7 @@ class AchatControllerTest {
                 .fournisseur("Fournisseur A modifié")
                 .utilisateur(utilisateurTest)
                 .build();
+        achatMiseAJour.setId(achatId);
 
         when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(achatService.modifierAchat(eq(achatId), any(AchatEntity.class)))
@@ -353,7 +353,7 @@ class AchatControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(achatModifie)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or modifié")))
                 .andExpect(jsonPath("$.quantite", is(20)))
                 .andExpect(jsonPath("$.prixUnitaire", is(60.00)))
@@ -367,7 +367,7 @@ class AchatControllerTest {
     @DisplayName("PUT /achats/{id} - Devrait lancer une exception si achat inexistant")
     void modifier_DevraitLancerExceptionSiAchatInexistant() throws Exception {
         // Arrange
-        Long achatId = 999L;
+        String achatId = "id-inexistant";
 
         AchatEntity achatModifie = AchatEntity.builder()
                 .quantite(20)
@@ -391,6 +391,8 @@ class AchatControllerTest {
 
         verify(achatService, times(1)).modifierAchat(eq(achatId), any(AchatEntity.class));
     }
+
+
 
     // ==================== Tests pour GET /achats/statistiques ====================
 
@@ -467,7 +469,7 @@ class AchatControllerTest {
     @DisplayName("DELETE /achats/{id} - Devrait supprimer un achat avec succès")
     void supprimer_DevraitSupprimerAchat() throws Exception {
         // Arrange
-        Long achatId = 1L;
+        String achatId = "test-id-1";
         doNothing().when(achatService).supprimerAchat(achatId);
 
         // Act & Assert
@@ -482,7 +484,7 @@ class AchatControllerTest {
     @DisplayName("DELETE /achats/{id} - Devrait lancer une exception si achat inexistant")
     void supprimer_DevraitLancerExceptionSiAchatInexistant() throws Exception {
         // Arrange
-        Long achatId = 999L;
+        String achatId = "id-inexistant";
         doThrow(new RuntimeException("Achat non trouvé"))
                 .when(achatService).supprimerAchat(achatId);
 
@@ -501,7 +503,6 @@ class AchatControllerTest {
     void obtenirTous_DevraitGererFournisseurNull() throws Exception {
         // Arrange
         AchatEntity achatSansFournisseur = AchatEntity.builder()
-                .id(3L)
                 .quantite(8)
                 .nomProduit("Montre")
                 .prixUnitaire(new BigDecimal("80.00"))
@@ -510,6 +511,7 @@ class AchatControllerTest {
                 .fournisseur(null) // Pas de fournisseur
                 .utilisateur(utilisateurTest)
                 .build();
+        achatSansFournisseur.setId("test-id-3");
 
         PagedResponse<AchatDto> page = PagedResponse.<AchatDto>builder()
                 .content(Arrays.asList(AchatDto.fromEntity(achatSansFournisseur)))
@@ -539,7 +541,6 @@ class AchatControllerTest {
                 .build();
 
         AchatEntity achatCree = AchatEntity.builder()
-                .id(4L)
                 .quantite(12)
                 .nomProduit("Boucles d'oreilles")
                 .prixUnitaire(new BigDecimal("25.00"))
@@ -547,6 +548,7 @@ class AchatControllerTest {
                 .dateAchat(LocalDate.now())
                 .utilisateur(utilisateurTest)
                 .build();
+        achatCree.setId("test-id-4");
 
         when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(achatService.creerAchat(any(AchatEntity.class), eq(utilisateurTest)))
