@@ -88,6 +88,9 @@ public class UserEntity {
     @Column(name = "date_suppression")
     private LocalDateTime dateSuppression;
 
+    @Column(name = "derniere_connexion")
+    private LocalDateTime derniereConnexion;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "deleted_by_user_id")
     @JsonIgnore

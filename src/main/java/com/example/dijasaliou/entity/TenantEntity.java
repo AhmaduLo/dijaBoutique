@@ -35,8 +35,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"utilisateurs"})
-@EqualsAndHashCode(exclude = {"utilisateurs"})
+@ToString(exclude = {"utilisateurs", "notes"})
+@EqualsAndHashCode(exclude = {"utilisateurs", "notes"})
 public class TenantEntity {
 
     @Id
@@ -125,10 +125,18 @@ public class TenantEntity {
      * Relation One-to-Many avec UserEntity
      * Un tenant (entreprise) peut avoir plusieurs utilisateurs
      */
+    @Column(name = "source_acquisition", length = 100)
+    private String sourceAcquisition;
+
     @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     @JsonIgnore
     private List<UserEntity> utilisateurs = new ArrayList<>();
+
+    @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @JsonIgnore
+    private List<NoteInterne> notes = new ArrayList<>();
 
     /**
      * Enum pour les plans de paiement

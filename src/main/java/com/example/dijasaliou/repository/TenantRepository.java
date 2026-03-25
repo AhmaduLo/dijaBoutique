@@ -63,4 +63,8 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
      * Version paginée de findAll() — pour SuperAdmin
      */
     Page<TenantEntity> findAll(Pageable pageable);
+
+    long countByEssaiUtiliseTrue();
+
+    long countByEssaiUtiliseTrueAndPlanNot(TenantEntity.Plan plan);
 }

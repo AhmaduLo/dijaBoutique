@@ -5,8 +5,11 @@ import com.example.dijasaliou.entity.UserEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -83,4 +86,9 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
      * Utilisé pour trouver l'admin d'un tenant pour les notifications
      */
     Optional<UserEntity> findFirstByTenantAndRole(TenantEntity tenant, UserEntity.Role role);
+
+    List<UserEntity> findByTenantIdAndDeletedFalse(Long tenantId);
+
+    @Query("SELECT MAX(u.derniereConnexion) FROM UserEntity u WHERE u.tenant.id = :tenantId AND u.deleted = false")
+    Optional<LocalDateTime> findDerniereActiviteByTenantId(@Param("tenantId") Long tenantId);
 }

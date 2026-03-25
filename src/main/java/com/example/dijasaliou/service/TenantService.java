@@ -114,6 +114,14 @@ public class TenantService {
             log.info("Mise à jour adresse: {} -> {}", tenantActuel.getAdresse(), request.getAdresse());
         }
 
+        if (request.getVille() != null) {
+            tenant.setVille(request.getVille().trim().isEmpty() ? null : request.getVille().trim());
+        }
+
+        if (request.getPays() != null) {
+            tenant.setPays(request.getPays().trim().isEmpty() ? null : request.getPays().trim());
+        }
+
         // Mise à jour du NINEA/SIRET (optionnel - peut être null ou vide)
         if (request.getNineaSiret() != null) {
             String nineaSiret = request.getNineaSiret().trim().isEmpty() ? null : request.getNineaSiret().trim();

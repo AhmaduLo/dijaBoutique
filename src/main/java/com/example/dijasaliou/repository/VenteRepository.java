@@ -74,6 +74,9 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.tenantUuid = :tenantUuid")
     long countByTenantUuid(@Param("tenantUuid") String tenantUuid);
 
+    @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.id = :tenantId")
+    long countByTenantId(@Param("tenantId") Long tenantId);
+
     /**
      * Recherche paginée avec filtre optionnel sur nomProduit, client et plage de dates
      */

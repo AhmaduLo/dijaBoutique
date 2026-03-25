@@ -28,6 +28,8 @@ public class UpdateTenantRequest {
     private String nomEntreprise;
     private String numeroTelephone;
     private String adresse;
+    private String ville;
+    private String pays;
 
     /**
      * Numéro NINEA (Sénégal) ou SIRET (France) - OPTIONNEL
