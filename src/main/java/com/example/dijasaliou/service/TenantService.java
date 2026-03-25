@@ -150,6 +150,14 @@ public class TenantService {
         return tenantSauvegarde;
     }
 
+    @Transactional
+    public void clearLogoUrl(TenantEntity tenant) {
+        TenantEntity t = tenantRepository.findById(tenant.getId())
+                .orElseThrow(() -> new IllegalStateException("Tenant introuvable"));
+        t.setLogoUrl(null);
+        tenantRepository.save(t);
+    }
+
     /**
      * Récupère l'administrateur (propriétaire) qui a créé le tenant
      *

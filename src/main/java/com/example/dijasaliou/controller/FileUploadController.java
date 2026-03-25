@@ -103,6 +103,11 @@ public class FileUploadController {
             TenantEntity tenant = tenantService.getCurrentTenant();
             fileStorageService.deletePhoto(photoUrl, tenant);
 
+            // Si l'URL supprimée est le logo du tenant, vider logo_url en base
+            if (photoUrl.equals(tenant.getLogoUrl())) {
+                tenantService.clearLogoUrl(tenant);
+            }
+
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", "Photo supprimée avec succès"
