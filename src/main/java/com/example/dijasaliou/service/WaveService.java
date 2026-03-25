@@ -36,16 +36,16 @@ import java.util.UUID;
 @Slf4j
 public class WaveService {
 
-    @Value("${wave.api.key:}")
+    @Value("${wave.api.key:disabled}")
     private String waveApiKey;
 
-    @Value("${wave.api.secret:}")
+    @Value("${wave.api.secret:disabled}")
     private String waveApiSecret;
 
     @Value("${wave.api.url:https://api.wave.com/v1}")
     private String waveApiUrl;
 
-    @Value("${wave.webhook.url:http://localhost:8080/api/payment/wave/webhook}")
+    @Value("${wave.webhook.url:disabled}")
     private String waveWebhookUrl;
 
     private final RestTemplate restTemplate;

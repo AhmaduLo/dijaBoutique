@@ -139,21 +139,11 @@ public class PaymentController {
      */
     @PostMapping("/wave/initiate")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<WavePaymentResponse> initiateWavePayment(
+    public ResponseEntity<Map<String, String>> initiateWavePayment(
             @Valid @RequestBody WavePaymentRequest request,
             Authentication authentication) {
-
-        String emailUser = authentication.getName();
-        TenantEntity tenant = tenantService.getCurrentTenant();
-
-        log.info("Admin {} (Tenant: {}) initie un paiement Wave pour le plan {}",
-                emailUser, tenant.getTenantUuid(), request.getPlan());
-
-        WavePaymentResponse response = waveService.initiatePayment(request, tenant.getTenantUuid());
-
-        log.info("Paiement Wave initié: Transaction ID = {}", response.getWaveTransactionId());
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.status(503)
+                .body(Map.of("message", "Paiement en ligne indisponible. Contactez l'administrateur pour upgrader."));
     }
 
     /**
@@ -165,72 +155,8 @@ public class PaymentController {
     public ResponseEntity<Map<String, String>> confirmWavePayment(
             @Valid @RequestBody WavePaymentConfirmRequest request,
             Authentication authentication) {
-
-        String emailAdmin = authentication.getName();
-        log.info("Admin {} confirme le paiement Wave {} pour le plan {}",
-                emailAdmin, request.getWaveTransactionId(), request.getPlan());
-
-        boolean isPaymentValid = waveService.verifyPayment(request.getWaveTransactionId());
-
-        if (!isPaymentValid) {
-            log.error("Paiement Wave {} non valide ou non confirmé", request.getWaveTransactionId());
-            throw new RuntimeException("Le paiement n'a pas été confirmé par Wave. Veuillez réessayer ou contacter le support.");
-        }
-
-        TenantEntity tenant = tenantService.getCurrentTenant();
-
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime dateExpiration = now.plusDays(30);
-
-        tenant.setPlan(request.getPlan());
-        tenant.setDateExpiration(dateExpiration);
-        tenant.setActif(true);
-
-        if (!tenant.getEssaiUtilise()) {
-            tenant.setEssaiUtilise(true);
-            log.info("Essai gratuit marqué comme utilisé pour le tenant {}", tenant.getTenantUuid());
-        }
-
-        tenantRepository.save(tenant);
-
-        log.info("Abonnement {} activé via Wave pour le tenant {} jusqu'au {}",
-                request.getPlan(), tenant.getTenantUuid(), dateExpiration);
-
-        // Créer une facture PAYEE (paiement Wave du client lui-même)
-        factureService.creerFacture(tenant, request.getPlan(), 30,
-                FactureEntity.StatutFacture.PAYEE, request.getWaveTransactionId());
-
-        UserEntity user = userRepository.findByEmailAndDeletedFalse(emailAdmin)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-        String userName = user.getPrenom() + " " + user.getNom();
-        String nomEntreprise = tenant.getNomEntreprise();
-        String planLibelle = request.getPlan().getLibelle();
-        double montant = request.getPlan().getPrixCFA();
-        String devise = "XOF";
-        String dateExpirationFormatee = dateExpiration.toLocalDate().toString();
-
-        try {
-            emailService.sendPaymentConfirmationEmail(
-                    user.getEmail(),
-                    userName,
-                    nomEntreprise,
-                    planLibelle,
-                    montant,
-                    devise,
-                    dateExpirationFormatee
-            );
-            log.info("Email de confirmation de paiement Wave envoyé à {}", user.getEmail());
-        } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email de confirmation : {}", e.getMessage());
-        }
-
-        Map<String, String> responseWave = new HashMap<>();
-        responseWave.put("message", "Paiement Wave confirmé ! Votre abonnement " + request.getPlan().getLibelle() + " est maintenant actif.");
-        responseWave.put("plan", request.getPlan().name());
-        responseWave.put("dateExpiration", dateExpiration.toString());
-
-        return ResponseEntity.ok(responseWave);
+        return ResponseEntity.status(503)
+                .body(Map.of("message", "Paiement en ligne indisponible. Contactez l'administrateur pour upgrader."));
     }
 
     /**
