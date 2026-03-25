@@ -36,7 +36,7 @@ import java.util.Collections;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${app.frontend.url:http://localhost:4200}")
+    @Value("${APP_FRONTEND_URL:https://heasystock.vercel.app}")
     private String frontendUrl;
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -159,8 +159,10 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:4200",
                 "http://localhost:64390",
+                "https://heasystock.vercel.app",
                 frontendUrl
         ));
+        configuration.setAllowedOriginPatterns(List.of("https://*.vercel.app"));
 
         // Méthodes HTTP autorisées (strictement nécessaires)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
