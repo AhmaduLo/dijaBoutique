@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ClientDto {
 
-    private Long id;
+    private String id;
     private String nom;
     private String telephone;
     private BigDecimal detteTotale;

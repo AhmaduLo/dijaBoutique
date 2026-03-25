@@ -12,14 +12,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-public interface BonLivraisonRepository extends JpaRepository<BonLivraisonEntity, Long> {
+public interface BonLivraisonRepository extends JpaRepository<BonLivraisonEntity, String> {
 
     List<BonLivraisonEntity> findAllByOrderByCreatedDateDesc();
 
     List<BonLivraisonEntity> findByStatutOrderByCreatedDateDesc(BonLivraisonEntity.Statut statut);
 
-    @Query("SELECT COUNT(b) FROM BonLivraisonEntity b WHERE b.numeroBL LIKE :prefix%")
-    long countByNumeroBLStartingWith(String prefix);
+    @Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(numero_bl, LENGTH(:prefix) + 1) AS UNSIGNED)), 0) FROM bons_livraison WHERE numero_bl LIKE CONCAT(:prefix, '%')", nativeQuery = true)
+    int findMaxSequenceForPrefix(@Param("prefix") String prefix);
 
     /**
      * Recherche paginée avec filtre optionnel sur clientNom, numeroBL, statut et plage de dates

@@ -38,7 +38,7 @@ public class ClientController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT', 'USER')")
-    public ResponseEntity<ClientDto> obtenirParId(@PathVariable Long id) {
+    public ResponseEntity<ClientDto> obtenirParId(@PathVariable String id) {
         return ResponseEntity.ok(clientService.obtenirClientParId(id));
     }
 

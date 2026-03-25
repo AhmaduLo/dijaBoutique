@@ -16,7 +16,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface CreditClientRepository extends JpaRepository<CreditClientEntity, Long>,
+public interface CreditClientRepository extends JpaRepository<CreditClientEntity, String>,
         JpaSpecificationExecutor<CreditClientEntity> {
 
     @Query(value = "SELECT c FROM CreditClientEntity c WHERE " +
@@ -35,9 +35,9 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
 
     List<CreditClientEntity> findByClientOrderByCreatedDateAsc(ClientEntity client);
 
-    List<CreditClientEntity> findByVenteId(Long venteId);
+    List<CreditClientEntity> findByVenteId(String venteId);
 
-    boolean existsByVenteIdAndStatutIn(Long venteId, List<StatutCredit> statuts);
+    boolean existsByVenteIdAndStatutIn(String venteId, List<StatutCredit> statuts);
 
     @Query("SELECT COALESCE(SUM(c.montantRestant), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     BigDecimal sumMontantRestantActif(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
@@ -55,7 +55,7 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
     long countCreditsEnRetard(@Param("statut") StatutCredit statut, @Param("today") LocalDate today, @Param("tenantUuid") String tenantUuid);
 
     @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.client.id = :clientId AND c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
-    long countCreditsActifsByClientId(@Param("clientId") Long clientId, @Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
+    long countCreditsActifsByClientId(@Param("clientId") String clientId, @Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
     /**
      * Compte les crédits actifs pour une liste de clients en une seule requête.
@@ -65,7 +65,7 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
     @Query("SELECT c.client.id, COUNT(c) FROM CreditClientEntity c " +
            "WHERE c.client.id IN :clientIds AND c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid " +
            "GROUP BY c.client.id")
-    List<Object[]> countCreditsActifsByClientIds(@Param("clientIds") List<Long> clientIds,
+    List<Object[]> countCreditsActifsByClientIds(@Param("clientIds") List<String> clientIds,
                                                   @Param("statut") StatutCredit statut,
                                                   @Param("tenantUuid") String tenantUuid);
 

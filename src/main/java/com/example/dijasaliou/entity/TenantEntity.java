@@ -35,8 +35,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"utilisateurs"})
-@EqualsAndHashCode(exclude = {"utilisateurs"})
+@ToString(exclude = {"utilisateurs", "notes"})
+@EqualsAndHashCode(exclude = {"utilisateurs", "notes"})
 public class TenantEntity {
 
     @Id
@@ -80,6 +80,9 @@ public class TenantEntity {
     @Column(name = "ninea_siret", length = 50)
     private String nineaSiret;
 
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
     /**
      * Permet de désactiver un tenant (soft delete)
      * Si actif = false, l'entreprise ne peut plus se connecter
@@ -122,10 +125,18 @@ public class TenantEntity {
      * Relation One-to-Many avec UserEntity
      * Un tenant (entreprise) peut avoir plusieurs utilisateurs
      */
+    @Column(name = "source_acquisition", length = 100)
+    private String sourceAcquisition;
+
     @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     @JsonIgnore
     private List<UserEntity> utilisateurs = new ArrayList<>();
+
+    @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    @JsonIgnore
+    private List<NoteInterne> notes = new ArrayList<>();
 
     /**
      * Enum pour les plans de paiement
@@ -139,9 +150,9 @@ public class TenantEntity {
      */
     public enum Plan {
         GRATUIT("Plan Gratuit", "Paiement requis - Aucun accès aux fonctionnalités", 0, 0, 0, false),
-        BASIC("Plan Basic", "Gestion complète boutique - 3 utilisateurs", 9.99, 5000, 3, true),
-        PREMIUM("Plan Premium", "Pour moyennes entreprises", 29.99, 15000, 10, true),
-        ENTREPRISE("Plan Entreprise", "Pour grandes entreprises", 99.99, 25000, Integer.MAX_VALUE, true);
+        STARTER("Plan Starter", "Gestion complète boutique - 3 utilisateurs", 9.99, 5000, 3, true),
+        PRO("Plan Pro", "Pour moyennes entreprises", 29.99, 15000, 10, true),
+        BUSINESS("Plan Business", "Pour grandes entreprises", 99.99, 25000, Integer.MAX_VALUE, true);
 
         private final String libelle;
         private final String description;

@@ -92,7 +92,6 @@ class DepenseControllerTest {
 
         // Création d'une première dépense de test
         depenseTest = DepenseEntity.builder()
-                .id(1L)
                 .libelle("Loyer du magasin")
                 .montant(new BigDecimal("500000.00"))
                 .dateDepense(LocalDate.of(2025, 10, 15))
@@ -101,10 +100,10 @@ class DepenseControllerTest {
                 .estRecurrente(true)
                 .utilisateur(utilisateurTest)
                 .build();
+        depenseTest.setId("test-id-1");
 
         // Création d'une deuxième dépense de test
         depenseTest2 = DepenseEntity.builder()
-                .id(2L)
                 .libelle("Facture électricité")
                 .montant(new BigDecimal("75000.00"))
                 .dateDepense(LocalDate.of(2025, 10, 20))
@@ -113,6 +112,7 @@ class DepenseControllerTest {
                 .estRecurrente(true)
                 .utilisateur(utilisateurTest)
                 .build();
+        depenseTest2.setId("test-id-2");
     }
 
     // ==================== Tests pour GET /depenses ====================
@@ -121,10 +121,10 @@ class DepenseControllerTest {
     @DisplayName("GET /depenses - Devrait retourner toutes les dépenses avec succès")
     void obtenirTous_DevraitRetournerToutesLesDepenses() throws Exception {
         // Arrange
-        DepenseDto dto1 = DepenseDto.builder().id(1L).libelle("Loyer du magasin")
+        DepenseDto dto1 = DepenseDto.builder().id("test-id-1").libelle("Loyer du magasin")
                 .montant(new BigDecimal("500000.00")).categorie(DepenseEntity.CategorieDepense.LOYER)
                 .notes("Loyer mensuel").estRecurrente(true).build();
-        DepenseDto dto2 = DepenseDto.builder().id(2L).libelle("Facture électricité")
+        DepenseDto dto2 = DepenseDto.builder().id("test-id-2").libelle("Facture électricité")
                 .montant(new BigDecimal("75000.00")).categorie(DepenseEntity.CategorieDepense.ELECTRICITE)
                 .notes("Facture mensuelle").estRecurrente(true).build();
         PagedResponse<DepenseDto> page = PagedResponse.<DepenseDto>builder()
@@ -137,11 +137,11 @@ class DepenseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].libelle", is("Loyer du magasin")))
                 .andExpect(jsonPath("$.content[0].categorie", is("LOYER")))
                 .andExpect(jsonPath("$.content[0].estRecurrente", is(true)))
-                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$.content[1].libelle", is("Facture électricité")));
 
         verify(depenseService, times(1)).obtenirDepensesPaginees(0, 10, null, null);
@@ -171,14 +171,14 @@ class DepenseControllerTest {
     @DisplayName("GET /depenses/{id} - Devrait retourner une dépense par son ID")
     void obtenirParId_DevraitRetournerDepense() throws Exception {
         // Arrange
-        Long depenseId = 1L;
+        String depenseId = "test-id-1";
         when(depenseService.obtenirDepenseParId(depenseId)).thenReturn(depenseTest);
 
         // Act & Assert
         mockMvc.perform(get("/depenses/{id}", depenseId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.libelle", is("Loyer du magasin")))
                 .andExpect(jsonPath("$.montant", is(500000.00)))
                 .andExpect(jsonPath("$.categorie", is("LOYER")))
@@ -191,7 +191,7 @@ class DepenseControllerTest {
     @DisplayName("GET /depenses/{id} - Devrait lancer une exception si dépense inexistante")
     void obtenirParId_DevraitLancerExceptionSiDepenseInexistante() throws Exception {
         // Arrange
-        Long depenseId = 999L;
+        String depenseId = "999";
         when(depenseService.obtenirDepenseParId(depenseId))
                 .thenThrow(new RuntimeException("Dépense non trouvée"));
 
@@ -219,9 +219,9 @@ class DepenseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$[0].libelle", is("Loyer du magasin")))
-                .andExpect(jsonPath("$[1].id", is(2)))
+                .andExpect(jsonPath("$[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$[1].libelle", is("Facture électricité")));
 
         verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
@@ -263,7 +263,6 @@ class DepenseControllerTest {
                 .build();
 
         DepenseEntity depenseCreee = DepenseEntity.builder()
-                .id(3L)
                 .libelle("Assurance locale")
                 .montant(new BigDecimal("120000.00"))
                 .dateDepense(LocalDate.now())
@@ -272,6 +271,7 @@ class DepenseControllerTest {
                 .estRecurrente(false)
                 .utilisateur(utilisateurTest)
                 .build();
+        depenseCreee.setId("test-id-3");
 
         when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
         when(depenseService.creerDepense(any(DepenseEntity.class), eq(utilisateurTest)))
@@ -283,7 +283,7 @@ class DepenseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelleDepense)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id", is(3)))
+                .andExpect(jsonPath("$.id", is("test-id-3")))
                 .andExpect(jsonPath("$.libelle", is("Assurance locale")))
                 .andExpect(jsonPath("$.montant", is(120000.00)))
                 .andExpect(jsonPath("$.categorie", is("ASSURANCE")));
@@ -298,7 +298,7 @@ class DepenseControllerTest {
     @DisplayName("PUT /depenses/{id} - Devrait modifier une dépense existante")
     void modifier_DevraitModifierDepense() throws Exception {
         // Arrange
-        Long depenseId = 1L;
+        String depenseId = "test-id-1";
         Long utilisateurId = 1L;
 
         DepenseEntity depenseModifiee = DepenseEntity.builder()
@@ -311,7 +311,6 @@ class DepenseControllerTest {
                 .build();
 
         DepenseEntity depenseMiseAJour = DepenseEntity.builder()
-                .id(depenseId)
                 .libelle("Loyer du magasin - Mise à jour")
                 .montant(new BigDecimal("550000.00"))
                 .dateDepense(LocalDate.of(2025, 11, 15))
@@ -320,6 +319,7 @@ class DepenseControllerTest {
                 .estRecurrente(true)
                 .utilisateur(utilisateurTest)
                 .build();
+        depenseMiseAJour.setId(depenseId);
 
         when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
         when(depenseService.modifierDepense(eq(depenseId), any(DepenseEntity.class)))
@@ -331,7 +331,7 @@ class DepenseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(depenseModifiee)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.libelle", is("Loyer du magasin - Mise à jour")))
                 .andExpect(jsonPath("$.montant", is(550000.00)));
 
@@ -343,7 +343,7 @@ class DepenseControllerTest {
     @DisplayName("PUT /depenses/{id} - Devrait lancer une exception si dépense inexistante")
     void modifier_DevraitLancerExceptionSiDepenseInexistante() throws Exception {
         // Arrange
-        Long depenseId = 999L;
+        String depenseId = "999";
         Long utilisateurId = 1L;
 
         DepenseEntity depenseModifiee = DepenseEntity.builder()
@@ -373,7 +373,7 @@ class DepenseControllerTest {
     @DisplayName("DELETE /depenses/{id} - Devrait supprimer une dépense avec succès")
     void supprimer_DevraitSupprimerDepense() throws Exception {
         // Arrange
-        Long depenseId = 1L;
+        String depenseId = "test-id-1";
         doNothing().when(depenseService).supprimerDepense(depenseId);
 
         // Act & Assert
@@ -388,7 +388,7 @@ class DepenseControllerTest {
     @DisplayName("DELETE /depenses/{id} - Devrait lancer une exception si dépense inexistante")
     void supprimer_DevraitLancerExceptionSiDepenseInexistante() throws Exception {
         // Arrange
-        Long depenseId = 999L;
+        String depenseId = "999";
         doThrow(new RuntimeException("Dépense non trouvée"))
                 .when(depenseService).supprimerDepense(depenseId);
 
@@ -415,7 +415,7 @@ class DepenseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$[0].libelle", is("Loyer du magasin")))
                 .andExpect(jsonPath("$[0].categorie", is("LOYER")));
 
@@ -558,7 +558,6 @@ class DepenseControllerTest {
     void obtenirTous_DevraitGererNotesNull() throws Exception {
         // Arrange
         DepenseEntity depenseSansNotes = DepenseEntity.builder()
-                .id(3L)
                 .libelle("Transport")
                 .montant(new BigDecimal("25000.00"))
                 .dateDepense(LocalDate.now())
@@ -568,7 +567,7 @@ class DepenseControllerTest {
                 .utilisateur(utilisateurTest)
                 .build();
 
-        DepenseDto dtoSansNotes = DepenseDto.builder().id(3L).libelle("Transport")
+        DepenseDto dtoSansNotes = DepenseDto.builder().id("test-id-3").libelle("Transport")
                 .montant(new BigDecimal("25000.00")).categorie(DepenseEntity.CategorieDepense.TRANSPORT)
                 .notes(null).estRecurrente(false).build();
         PagedResponse<DepenseDto> page = PagedResponse.<DepenseDto>builder()
@@ -600,7 +599,6 @@ class DepenseControllerTest {
                 .build();
 
         DepenseEntity depenseCreee = DepenseEntity.builder()
-                .id(4L)
                 .libelle("Achat ponctuel")
                 .montant(new BigDecimal("50000.00"))
                 .dateDepense(LocalDate.now())

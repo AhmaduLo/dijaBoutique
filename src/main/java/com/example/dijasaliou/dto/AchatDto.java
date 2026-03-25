@@ -24,7 +24,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class AchatDto {
-    private Long id;
+    private String id;
     private Integer quantite;
     private String nomProduit;
     private BigDecimal prixUnitaire;
@@ -55,8 +55,8 @@ public class AchatDto {
 
         // Vérifier si le plan PREMIUM ou ENTREPRISE est actif pour afficher les photos
         boolean canViewPhotos = achat.getTenant() != null &&
-                                (achat.getTenant().getPlan() == TenantEntity.Plan.PREMIUM ||
-                                 achat.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE);
+                                (achat.getTenant().getPlan() == TenantEntity.Plan.PRO ||
+                                 achat.getTenant().getPlan() == TenantEntity.Plan.BUSINESS);
 
         return AchatDto.builder()
                 .id(achat.getId())
@@ -88,8 +88,8 @@ public class AchatDto {
 
         // Vérifier si le plan PREMIUM ou ENTREPRISE est actif pour afficher les photos
         boolean canViewPhotos = achat.getTenant() != null &&
-                                (achat.getTenant().getPlan() == TenantEntity.Plan.PREMIUM ||
-                                 achat.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE);
+                                (achat.getTenant().getPlan() == TenantEntity.Plan.PRO ||
+                                 achat.getTenant().getPlan() == TenantEntity.Plan.BUSINESS);
 
         return AchatDto.builder()
                 .id(achat.getId())

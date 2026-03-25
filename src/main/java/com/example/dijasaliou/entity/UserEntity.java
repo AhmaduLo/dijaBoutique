@@ -24,7 +24,7 @@ import java.util.List;
 @Builder
 @ToString
 @EqualsAndHashCode(callSuper = false)
-public class UserEntity extends BaseEntity {
+public class UserEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -87,6 +87,9 @@ public class UserEntity extends BaseEntity {
 
     @Column(name = "date_suppression")
     private LocalDateTime dateSuppression;
+
+    @Column(name = "derniere_connexion")
+    private LocalDateTime derniereConnexion;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "deleted_by_user_id")

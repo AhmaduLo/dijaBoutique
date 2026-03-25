@@ -1,18 +1,26 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.AuditLogDto;
 import com.example.dijasaliou.dto.FactureDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.TenantAdminDto;
+import com.example.dijasaliou.dto.UtilisateurTenantDto;
+import com.example.dijasaliou.entity.AuditLog;
 import com.example.dijasaliou.entity.FactureEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.entity.NoteInterne;
+import com.example.dijasaliou.repository.AuditLogRepository;
 import com.example.dijasaliou.repository.FactureRepository;
+import com.example.dijasaliou.repository.NoteInterneRepository;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.repository.UserRepository;
+import com.example.dijasaliou.repository.VenteRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,17 +46,26 @@ public class SuperAdminService {
 
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final VenteRepository venteRepository;
+    private final NoteInterneRepository noteInterneRepository;
+    private final AuditLogRepository auditLogRepository;
     private final FactureService factureService;
     private final FactureRepository factureRepository;
     private final TenantCacheService tenantCacheService;
 
     public SuperAdminService(TenantRepository tenantRepository,
                              UserRepository userRepository,
+                             VenteRepository venteRepository,
+                             NoteInterneRepository noteInterneRepository,
+                             AuditLogRepository auditLogRepository,
                              FactureService factureService,
                              FactureRepository factureRepository,
                              TenantCacheService tenantCacheService) {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
+        this.venteRepository = venteRepository;
+        this.noteInterneRepository = noteInterneRepository;
+        this.auditLogRepository = auditLogRepository;
         this.factureService = factureService;
         this.factureRepository = factureRepository;
         this.tenantCacheService = tenantCacheService;
@@ -90,6 +107,7 @@ public class SuperAdminService {
         tenantRepository.save(tenant);
         tenantCacheService.evict(tenant.getTenantUuid());
         log.info("[SUPER_ADMIN] Tenant {} activé", tenant.getTenantUuid());
+        saveLog("ACTIVATE", "Tenant activé", tenant);
     }
 
     /**
@@ -103,6 +121,7 @@ public class SuperAdminService {
         tenantRepository.save(tenant);
         tenantCacheService.evict(tenant.getTenantUuid());
         log.info("[SUPER_ADMIN] Tenant {} désactivé", tenant.getTenantUuid());
+        saveLog("DEACTIVATE", "Tenant suspendu", tenant);
     }
 
     /**
@@ -117,6 +136,7 @@ public class SuperAdminService {
         TenantEntity tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + id));
 
+        TenantEntity.Plan ancienPlan = tenant.getPlan();
         LocalDateTime ancienPlanExpiration = tenant.getDateExpiration();
         tenant.setPlan(plan);
         tenant.setDateExpiration(LocalDateTime.now().plusDays(jours));
@@ -129,10 +149,12 @@ public class SuperAdminService {
         tenantRepository.save(tenant);
         tenantCacheService.evict(tenant.getTenantUuid());
         log.info("[SUPER_ADMIN] Tenant {} : plan {} → {} (expire dans {} jours, était: {})",
-                tenant.getTenantUuid(), ancienPlanExpiration, plan, jours, ancienPlanExpiration);
+                tenant.getTenantUuid(), ancienPlan, plan, jours, ancienPlanExpiration);
 
         // Créer une facture pour tracer ce changement de plan
         factureService.creerFacture(tenant, plan, jours, FactureEntity.StatutFacture.MANUELLE, null);
+
+        saveLog("CHANGE_PLAN", ancienPlan + " → " + plan + " (" + jours + " jours)", tenant);
 
         return toDto(tenant);
     }
@@ -186,6 +208,7 @@ public class SuperAdminService {
 
         log.info("[SUPER_ADMIN] Tenant {} supprimé ({} utilisateurs désactivés)",
                 tenant.getTenantUuid(), users.size());
+        saveLog("DELETE", users.size() + " utilisateurs désactivés", tenant);
     }
 
     /**
@@ -233,14 +256,89 @@ public class SuperAdminService {
         stats.put("expirantBientot", expirantBientot);
         stats.put("totalUtilisateurs", totalUtilisateurs);
 
+        // Taux de conversion essai → payant
+        long totalEssaiHistorique = tenantRepository.countByEssaiUtiliseTrue();
+        long totalConvertis = tenantRepository.countByEssaiUtiliseTrueAndPlanNot(TenantEntity.Plan.GRATUIT);
+        double tauxConversion = totalEssaiHistorique > 0 ? (totalConvertis * 100.0 / totalEssaiHistorique) : 0;
+        stats.put("totalEssaiHistorique", totalEssaiHistorique);
+        stats.put("totalConvertis", totalConvertis);
+        stats.put("tauxConversion", Math.round(tauxConversion * 10.0) / 10.0);
+
         return stats;
+    }
+
+    public List<UtilisateurTenantDto> getUtilisateursByTenant(Long tenantId) {
+        return userRepository.findByTenantIdAndDeletedFalse(tenantId)
+                .stream()
+                .map(UtilisateurTenantDto::fromEntity)
+                .toList();
+    }
+
+    // ==================== NOTES INTERNES ====================
+
+    public List<NoteInterne> getNotesByTenant(Long tenantId) {
+        return noteInterneRepository.findByTenantIdOrderByDateCreationDesc(tenantId);
+    }
+
+    @Transactional
+    public NoteInterne ajouterNote(Long tenantId, String contenu, String auteur) {
+        TenantEntity tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + tenantId));
+        NoteInterne note = NoteInterne.builder()
+                .tenant(tenant)
+                .contenu(contenu)
+                .auteur(auteur)
+                .dateCreation(LocalDateTime.now())
+                .build();
+        return noteInterneRepository.save(note);
+    }
+
+    @Transactional
+    public void supprimerNote(Long tenantId, Long noteId) {
+        NoteInterne note = noteInterneRepository.findById(noteId)
+                .orElseThrow(() -> new RuntimeException("Note non trouvée : " + noteId));
+        if (!note.getTenant().getId().equals(tenantId)) {
+            throw new RuntimeException("Note n'appartient pas au tenant " + tenantId);
+        }
+        noteInterneRepository.delete(note);
+    }
+
+    @Transactional
+    public TenantAdminDto mettreAJourSourceAcquisition(Long tenantId, String sourceAcquisition) {
+        TenantEntity tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + tenantId));
+        tenant.setSourceAcquisition(sourceAcquisition);
+        tenantRepository.save(tenant);
+        return toDto(tenant);
+    }
+
+    // ==================== AUDIT LOGS ====================
+
+    public List<AuditLogDto> getAuditLogs(Long tenantId) {
+        return auditLogRepository.findByTenantIdOrderByDateActionDesc(tenantId)
+                .stream()
+                .map(AuditLogDto::fromEntity)
+                .toList();
     }
 
     // ==================== MÉTHODES PRIVÉES ====================
 
+    private void saveLog(String action, String details, TenantEntity tenant) {
+        String auteur = SecurityContextHolder.getContext().getAuthentication().getName();
+        auditLogRepository.save(AuditLog.builder()
+                .action(action)
+                .details(details)
+                .auteur(auteur)
+                .tenant(tenant)
+                .dateAction(LocalDateTime.now())
+                .build());
+    }
+
     private TenantAdminDto toDto(TenantEntity tenant) {
         long nbUsers = userRepository.countByTenantAndDeletedFalse(tenant);
+        long nbVentes = venteRepository.countByTenantId(tenant.getId());
         UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
-        return TenantAdminDto.fromEntity(tenant, nbUsers, admin);
+        LocalDateTime derniereActivite = userRepository.findDerniereActiviteByTenantId(tenant.getId()).orElse(null);
+        return TenantAdminDto.fromEntity(tenant, nbUsers, nbVentes, admin, derniereActivite);
     }
 }

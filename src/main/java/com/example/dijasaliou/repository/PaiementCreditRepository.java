@@ -11,7 +11,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEntity, Long> {
+public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEntity, String> {
 
     List<PaiementCreditEntity> findByCreditOrderByCreatedDateDesc(CreditClientEntity credit);
 

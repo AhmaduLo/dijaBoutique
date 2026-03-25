@@ -54,7 +54,6 @@ class DepenseServiceTest {
                 .build();
 
         depenseValide = DepenseEntity.builder()
-                .id(1L)
                 .libelle("Loyer bureau")
                 .montant(new BigDecimal("500.00"))
                 .dateDepense(LocalDate.now())
@@ -64,6 +63,7 @@ class DepenseServiceTest {
                 .utilisateur(utilisateurTest)
                 .tenant(tenantTest)
                 .build();
+        depenseValide.setId("test-id-1");
 
         dateDebut = LocalDate.of(2025, 1, 1);
         dateFin = LocalDate.of(2025, 12, 31);
@@ -76,8 +76,9 @@ class DepenseServiceTest {
     @Test
     @DisplayName("obtenirToutesLesDepenses() — retourne toutes les dépenses")
     void obtenirToutesLesDepenses_retourneListe() {
-        DepenseEntity d2 = DepenseEntity.builder().id(2L).libelle("Electricité")
+        DepenseEntity d2 = DepenseEntity.builder().libelle("Electricité")
                 .montant(new BigDecimal("150.00")).categorie(DepenseEntity.CategorieDepense.ELECTRICITE).build();
+        d2.setId("test-id-2");
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(depenseRepository.findAllByTenant(tenantTest)).thenReturn(Arrays.asList(depenseValide, d2));
 
@@ -103,20 +104,20 @@ class DepenseServiceTest {
     @Test
     @DisplayName("obtenirDepenseParId() — retourne la dépense si trouvée")
     void obtenirDepenseParId_retourneDepense() {
-        when(depenseRepository.findById(1L)).thenReturn(Optional.of(depenseValide));
+        when(depenseRepository.findById("test-id-1")).thenReturn(Optional.of(depenseValide));
 
-        DepenseEntity resultat = depenseService.obtenirDepenseParId(1L);
+        DepenseEntity resultat = depenseService.obtenirDepenseParId("test-id-1");
 
-        assertThat(resultat.getId()).isEqualTo(1L);
+        assertThat(resultat.getId()).isEqualTo("test-id-1");
         assertThat(resultat.getLibelle()).isEqualTo("Loyer bureau");
     }
 
     @Test
     @DisplayName("obtenirDepenseParId() — lève exception si non trouvée")
     void obtenirDepenseParId_leveException() {
-        when(depenseRepository.findById(999L)).thenReturn(Optional.empty());
+        when(depenseRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> depenseService.obtenirDepenseParId(999L))
+        assertThatThrownBy(() -> depenseService.obtenirDepenseParId("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Dépense non trouvée avec l'ID : 999");
     }
@@ -191,11 +192,11 @@ class DepenseServiceTest {
                 .montant(new BigDecimal("600.00")).dateDepense(LocalDate.now())
                 .categorie(DepenseEntity.CategorieDepense.LOYER).utilisateur(utilisateurTest).build();
 
-        when(depenseRepository.findById(1L)).thenReturn(Optional.of(depenseValide));
+        when(depenseRepository.findById("test-id-1")).thenReturn(Optional.of(depenseValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(depenseRepository.save(any())).thenReturn(depenseValide);
 
-        DepenseEntity resultat = depenseService.modifierDepense(1L, modifiee);
+        DepenseEntity resultat = depenseService.modifierDepense("test-id-1", modifiee);
 
         assertThat(resultat).isNotNull();
         verify(depenseRepository).save(any());
@@ -206,9 +207,9 @@ class DepenseServiceTest {
     void modifierDepense_leveExceptionSiAbsente() {
         DepenseEntity modifiee = DepenseEntity.builder().libelle("Test")
                 .montant(new BigDecimal("100.00")).categorie(DepenseEntity.CategorieDepense.AUTRE).build();
-        when(depenseRepository.findById(999L)).thenReturn(Optional.empty());
+        when(depenseRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> depenseService.modifierDepense(999L, modifiee))
+        assertThatThrownBy(() -> depenseService.modifierDepense("999", modifiee))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Dépense non trouvée avec l'ID : 999");
     }
@@ -222,10 +223,10 @@ class DepenseServiceTest {
         DepenseEntity modifiee = DepenseEntity.builder().libelle("Test")
                 .montant(new BigDecimal("100.00")).categorie(DepenseEntity.CategorieDepense.AUTRE).build();
 
-        when(depenseRepository.findById(1L)).thenReturn(Optional.of(depenseValide));
+        when(depenseRepository.findById("test-id-1")).thenReturn(Optional.of(depenseValide));
         when(tenantService.getCurrentTenant()).thenReturn(autreTenant);
 
-        assertThatThrownBy(() -> depenseService.modifierDepense(1L, modifiee))
+        assertThatThrownBy(() -> depenseService.modifierDepense("test-id-1", modifiee))
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("Accès refusé");
     }
@@ -237,20 +238,20 @@ class DepenseServiceTest {
     @Test
     @DisplayName("supprimerDepense() — supprime une dépense du même tenant")
     void supprimerDepense_succes() {
-        when(depenseRepository.findById(1L)).thenReturn(Optional.of(depenseValide));
+        when(depenseRepository.findById("test-id-1")).thenReturn(Optional.of(depenseValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
-        depenseService.supprimerDepense(1L);
+        depenseService.supprimerDepense("test-id-1");
 
-        verify(depenseRepository).deleteById(1L);
+        verify(depenseRepository).deleteById("test-id-1");
     }
 
     @Test
     @DisplayName("supprimerDepense() — lève exception si non trouvée")
     void supprimerDepense_leveExceptionSiAbsente() {
-        when(depenseRepository.findById(999L)).thenReturn(Optional.empty());
+        when(depenseRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> depenseService.supprimerDepense(999L))
+        assertThatThrownBy(() -> depenseService.supprimerDepense("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Dépense non trouvée avec l'ID : 999");
         verify(depenseRepository, never()).deleteById(any());
@@ -262,10 +263,10 @@ class DepenseServiceTest {
         TenantEntity autreTenant = new TenantEntity();
         autreTenant.setTenantUuid("uuid-autre");
 
-        when(depenseRepository.findById(1L)).thenReturn(Optional.of(depenseValide));
+        when(depenseRepository.findById("test-id-1")).thenReturn(Optional.of(depenseValide));
         when(tenantService.getCurrentTenant()).thenReturn(autreTenant);
 
-        assertThatThrownBy(() -> depenseService.supprimerDepense(1L))
+        assertThatThrownBy(() -> depenseService.supprimerDepense("test-id-1"))
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("Accès refusé");
     }

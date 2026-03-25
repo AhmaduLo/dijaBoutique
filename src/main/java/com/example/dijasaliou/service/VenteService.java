@@ -91,7 +91,7 @@ public class VenteService {
     /**
      * Récupérer une vente par ID
      */
-    public VenteEntity obtenirVenteParId(Long id) {
+    public VenteEntity obtenirVenteParId(String id) {
         return venteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vente non trouvée avec l'ID : " + id));
     }
@@ -171,7 +171,7 @@ public class VenteService {
      * Modifier une vente
      */
     @org.springframework.transaction.annotation.Transactional
-    public VenteEntity modifierVente(Long id, VenteEntity venteModifiee) {
+    public VenteEntity modifierVente(String id, VenteEntity venteModifiee) {
         VenteEntity venteExistante = obtenirVenteParId(id);
 
         // SÉCURITÉ : Vérifier que la vente appartient au tenant actuel
@@ -281,7 +281,7 @@ public class VenteService {
      * Supprimer une vente
      */
     @org.springframework.transaction.annotation.Transactional
-    public void supprimerVente(Long id) {
+    public void supprimerVente(String id) {
         VenteEntity venteExistante = obtenirVenteParId(id);
 
         TenantEntity tenantActuel = tenantService.getCurrentTenant();

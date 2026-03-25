@@ -11,16 +11,16 @@ import java.lang.annotation.Target;
  * Annotation pour restreindre l'accès à certaines fonctionnalités selon le plan d'abonnement
  *
  * UTILISATION :
- * @RequiresPlan(plans = {Plan.PREMIUM, Plan.ENTREPRISE})
+ * @RequiresPlan(plans = {Plan.PRO, Plan.BUSINESS})
  * public ResponseEntity<byte[]> exporterAchats() { ... }
  *
- * → Cette méthode sera accessible uniquement aux plans PREMIUM et ENTREPRISE
- * → Les utilisateurs avec plan BASIC recevront une erreur 403 avec message explicite
+ * → Cette méthode sera accessible uniquement aux plans PRO et BUSINESS
+ * → Les utilisateurs avec plan STARTER recevront une erreur 403 avec message explicite
  *
  * EXEMPLE D'UTILISATION DANS LE PROJET :
- * - Export individuel des achats : @RequiresPlan(plans = {Plan.PREMIUM, Plan.ENTREPRISE})
- * - Export individuel des ventes : @RequiresPlan(plans = {Plan.PREMIUM, Plan.ENTREPRISE})
- * - Export individuel des dépenses : @RequiresPlan(plans = {Plan.PREMIUM, Plan.ENTREPRISE})
+ * - Export individuel des achats : @RequiresPlan(plans = {Plan.PRO, Plan.BUSINESS})
+ * - Export individuel des ventes : @RequiresPlan(plans = {Plan.PRO, Plan.BUSINESS})
+ * - Export individuel des dépenses : @RequiresPlan(plans = {Plan.PRO, Plan.BUSINESS})
  * - Export des rapports globaux : Pas d'annotation (accessible à tous les plans payants)
  */
 @Target(ElementType.METHOD) // S'applique uniquement aux méthodes

@@ -51,7 +51,7 @@ public class DepenseController {
      * GET /api/depenses/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<DepenseDto> obtenirParId(@PathVariable Long id) {
+    public ResponseEntity<DepenseDto> obtenirParId(@PathVariable String id) {
         DepenseEntity depense = depenseService.obtenirDepenseParId(id);
         return ResponseEntity.ok(DepenseDto.fromEntity(depense));
     }
@@ -93,7 +93,7 @@ public class DepenseController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<DepenseDto> modifier(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody DepenseEntity depenseModifiee,
             @RequestParam Long utilisateurId) {
 
@@ -112,7 +112,7 @@ public class DepenseController {
      * DELETE /api/depenses/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> supprimer(@PathVariable Long id) {
+    public ResponseEntity<Void> supprimer(@PathVariable String id) {
         depenseService.supprimerDepense(id);
         return ResponseEntity.noContent().build();
     }

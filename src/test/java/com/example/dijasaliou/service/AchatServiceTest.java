@@ -54,7 +54,6 @@ class AchatServiceTest {
                 .build();
 
         achatValide = AchatEntity.builder()
-                .id(1L)
                 .nomProduit("Ordinateur portable")
                 .quantite(5)
                 .prixUnitaire(new BigDecimal("500.00"))
@@ -64,6 +63,7 @@ class AchatServiceTest {
                 .utilisateur(utilisateurTest)
                 .tenant(tenantTest)
                 .build();
+        achatValide.setId("test-id-1");
     }
 
     // =========================================================
@@ -73,8 +73,9 @@ class AchatServiceTest {
     @Test
     @DisplayName("obtenirTousLesAchats() — retourne tous les achats")
     void obtenirTousLesAchats_retourneListe() {
-        AchatEntity achat2 = AchatEntity.builder().id(2L).nomProduit("Souris")
+        AchatEntity achat2 = AchatEntity.builder().nomProduit("Souris")
                 .quantite(10).prixUnitaire(new BigDecimal("15.00")).build();
+        achat2.setId("test-id-2");
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.findAllByTenant(tenantTest)).thenReturn(Arrays.asList(achatValide, achat2));
 
@@ -100,20 +101,20 @@ class AchatServiceTest {
     @Test
     @DisplayName("obtenirAchatParId() — retourne l'achat si trouvé")
     void obtenirAchatParId_retourneAchat() {
-        when(achatRepository.findById(1L)).thenReturn(Optional.of(achatValide));
+        when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
 
-        AchatEntity resultat = achatService.obtenirAchatParId(1L);
+        AchatEntity resultat = achatService.obtenirAchatParId("test-id-1");
 
-        assertThat(resultat.getId()).isEqualTo(1L);
+        assertThat(resultat.getId()).isEqualTo("test-id-1");
         assertThat(resultat.getNomProduit()).isEqualTo("Ordinateur portable");
     }
 
     @Test
     @DisplayName("obtenirAchatParId() — lève exception si non trouvé")
     void obtenirAchatParId_leveException() {
-        when(achatRepository.findById(999L)).thenReturn(Optional.empty());
+        when(achatRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> achatService.obtenirAchatParId(999L))
+        assertThatThrownBy(() -> achatService.obtenirAchatParId("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Achat non trouvé avec l'ID : 999");
     }
@@ -216,11 +217,11 @@ class AchatServiceTest {
                 .prixUnitaire(new BigDecimal("450.00"))
                 .fournisseur("HP").dateAchat(LocalDate.now()).build();
 
-        when(achatRepository.findById(1L)).thenReturn(Optional.of(achatValide));
+        when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.save(any())).thenReturn(achatValide);
 
-        AchatEntity resultat = achatService.modifierAchat(1L, modifie);
+        AchatEntity resultat = achatService.modifierAchat("test-id-1", modifie);
 
         assertThat(resultat).isNotNull();
         verify(achatRepository).save(any());
@@ -233,9 +234,9 @@ class AchatServiceTest {
                 .nomProduit("Produit").quantite(1)
                 .prixUnitaire(new BigDecimal("100.00")).build();
 
-        when(achatRepository.findById(999L)).thenReturn(Optional.empty());
+        when(achatRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> achatService.modifierAchat(999L, modifie))
+        assertThatThrownBy(() -> achatService.modifierAchat("999", modifie))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Achat non trouvé avec l'ID : 999");
     }
@@ -250,10 +251,10 @@ class AchatServiceTest {
                 .nomProduit("Produit").quantite(1)
                 .prixUnitaire(new BigDecimal("100.00")).build();
 
-        when(achatRepository.findById(1L)).thenReturn(Optional.of(achatValide));
+        when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
         when(tenantService.getCurrentTenant()).thenReturn(autreTenant);
 
-        assertThatThrownBy(() -> achatService.modifierAchat(1L, modifie))
+        assertThatThrownBy(() -> achatService.modifierAchat("test-id-1", modifie))
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("Accès refusé");
     }
@@ -265,20 +266,20 @@ class AchatServiceTest {
     @Test
     @DisplayName("supprimerAchat() — supprime un achat du même tenant")
     void supprimerAchat_succes() {
-        when(achatRepository.findById(1L)).thenReturn(Optional.of(achatValide));
+        when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
-        achatService.supprimerAchat(1L);
+        achatService.supprimerAchat("test-id-1");
 
-        verify(achatRepository).deleteById(1L);
+        verify(achatRepository).deleteById("test-id-1");
     }
 
     @Test
     @DisplayName("supprimerAchat() — lève exception si achat non trouvé")
     void supprimerAchat_leveExceptionSiAbsent() {
-        when(achatRepository.findById(999L)).thenReturn(Optional.empty());
+        when(achatRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> achatService.supprimerAchat(999L))
+        assertThatThrownBy(() -> achatService.supprimerAchat("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Achat non trouvé avec l'ID : 999");
     }
@@ -289,10 +290,10 @@ class AchatServiceTest {
         TenantEntity autreTenant = new TenantEntity();
         autreTenant.setTenantUuid("uuid-autre");
 
-        when(achatRepository.findById(1L)).thenReturn(Optional.of(achatValide));
+        when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
         when(tenantService.getCurrentTenant()).thenReturn(autreTenant);
 
-        assertThatThrownBy(() -> achatService.supprimerAchat(1L))
+        assertThatThrownBy(() -> achatService.supprimerAchat("test-id-1"))
                 .isInstanceOf(SecurityException.class)
                 .hasMessageContaining("Accès refusé");
     }

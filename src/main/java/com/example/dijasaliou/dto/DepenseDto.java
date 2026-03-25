@@ -23,7 +23,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class DepenseDto {
-    private Long id;
+    private String id;
     private String libelle;
     private BigDecimal montant;
     private LocalDate dateDepense;

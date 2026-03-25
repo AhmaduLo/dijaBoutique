@@ -76,7 +76,7 @@ class CreditControllerTest {
                 .build();
 
         creditDto = CreditClientDto.builder()
-                .id(1L)
+                .id("test-id-1")
                 .clientNom("Mme Ndiaye")
                 .montantInitial(new BigDecimal("200000.00"))
                 .montantRestant(new BigDecimal("100000.00"))
@@ -87,8 +87,8 @@ class CreditControllerTest {
                 .build();
 
         paiementDto = PaiementCreditDto.builder()
-                .id(1L)
-                .creditId(1L)
+                .id("test-id-1")
+                .creditId("test-id-1")
                 .montantPaye(new BigDecimal("100000.00"))
                 .modePaiement("ESPECES")
                 .employeNom("Amadou Diop")
@@ -119,7 +119,7 @@ class CreditControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
-                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].clientNom", is("Mme Ndiaye")))
                 .andExpect(jsonPath("$.content[0].statut", is("PARTIEL")))
                 .andExpect(jsonPath("$.totalElements", is(1)))
@@ -185,7 +185,7 @@ class CreditControllerTest {
     @Test
     @DisplayName("GET /credits/client/{id} — retourne 200 avec l'historique du client")
     void obtenirHistoriqueClient_retourne200() throws Exception {
-        when(creditClientService.obtenirHistoriqueClient(10L))
+        when(creditClientService.obtenirHistoriqueClient("10"))
                 .thenReturn(List.of(creditDto));
 
         mockMvc.perform(get("/credits/client/10")
@@ -193,16 +193,16 @@ class CreditControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$[0].clientNom", is("Mme Ndiaye")));
 
-        verify(creditClientService).obtenirHistoriqueClient(10L);
+        verify(creditClientService).obtenirHistoriqueClient("10");
     }
 
     @Test
     @DisplayName("GET /credits/client/{id} — retourne 200 liste vide si aucun crédit")
     void obtenirHistoriqueClient_retourneListeVide() throws Exception {
-        when(creditClientService.obtenirHistoriqueClient(99L))
+        when(creditClientService.obtenirHistoriqueClient("99"))
                 .thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/credits/client/99")
@@ -224,28 +224,28 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq(1L), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
                 .thenReturn(creditDto);
 
-        mockMvc.perform(post("/credits/1/payer")
+        mockMvc.perform(post("/credits/test-id-1/payer")
                         .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null, List.of(new SimpleGrantedAuthority("ADMIN"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.statut", is("PARTIEL")))
                 .andExpect(jsonPath("$.employeNom", is("Amadou Diop")));
 
         verify(userService).obtenirUtilisateurParEmail("amadou@example.com");
         verify(creditClientService).enregistrerPaiement(
-                eq(1L), any(), any(), any(), eq(utilisateurTest));
+                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest));
     }
 
     @Test
     @DisplayName("POST /credits/{id}/payer — paiement total : statut SOLDE")
     void enregistrerPaiement_paiementTotal_statutSolde() throws Exception {
         CreditClientDto creditSolde = CreditClientDto.builder()
-                .id(1L)
+                .id("test-id-1")
                 .clientNom("Mme Ndiaye")
                 .montantInitial(new BigDecimal("200000.00"))
                 .montantRestant(BigDecimal.ZERO)
@@ -260,10 +260,10 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq(1L), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
                 .thenReturn(creditSolde);
 
-        mockMvc.perform(post("/credits/1/payer")
+        mockMvc.perform(post("/credits/test-id-1/payer")
                         .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null, List.of(new SimpleGrantedAuthority("ADMIN"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -281,10 +281,10 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq(1L), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
                 .thenThrow(new IllegalArgumentException("Le montant dépasse le restant dû"));
 
-        mockMvc.perform(post("/credits/1/payer")
+        mockMvc.perform(post("/credits/test-id-1/payer")
                         .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null, List.of(new SimpleGrantedAuthority("ADMIN"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -299,23 +299,23 @@ class CreditControllerTest {
     @Test
     @DisplayName("GET /credits/{id}/paiements — retourne 200 avec la liste des paiements")
     void obtenirPaiements_retourne200() throws Exception {
-        when(creditClientService.obtenirPaiements(1L))
+        when(creditClientService.obtenirPaiements("test-id-1"))
                 .thenReturn(List.of(paiementDto));
 
-        mockMvc.perform(get("/credits/1/paiements")
+        mockMvc.perform(get("/credits/test-id-1/paiements")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$[0].modePaiement", is("ESPECES")));
 
-        verify(creditClientService).obtenirPaiements(1L);
+        verify(creditClientService).obtenirPaiements("test-id-1");
     }
 
     @Test
     @DisplayName("GET /credits/{id}/paiements — crédit inexistant → 400")
     void obtenirPaiements_creditInexistant_retourne400() throws Exception {
-        when(creditClientService.obtenirPaiements(999L))
+        when(creditClientService.obtenirPaiements("999"))
                 .thenThrow(new RuntimeException("Crédit introuvable : 999"));
 
         mockMvc.perform(get("/credits/999/paiements"))
@@ -326,7 +326,7 @@ class CreditControllerTest {
     @Test
     @DisplayName("GET /credits/{id}/paiements — liste vide si aucun paiement encore")
     void obtenirPaiements_aucunPaiement_retourneListeVide() throws Exception {
-        when(creditClientService.obtenirPaiements(2L))
+        when(creditClientService.obtenirPaiements("2"))
                 .thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/credits/2/paiements"))

@@ -59,11 +59,11 @@ class ClientControllerTest {
     @BeforeEach
     void setUp() {
         clientDto1 = ClientDto.builder()
-                .id(1L).nom("Aminata Diallo").telephone("771234567")
+                .id("test-id-1").nom("Aminata Diallo").telephone("771234567")
                 .detteTotale(new BigDecimal("15000.00")).nombreCreditsActifs(2)
                 .build();
         clientDto2 = ClientDto.builder()
-                .id(2L).nom("Moussa Traoré").telephone("781234567")
+                .id("test-id-2").nom("Moussa Traoré").telephone("781234567")
                 .detteTotale(BigDecimal.ZERO).nombreCreditsActifs(0)
                 .build();
     }
@@ -82,10 +82,10 @@ class ClientControllerTest {
         mockMvc.perform(get("/clients").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].nom", is("Aminata Diallo")))
                 .andExpect(jsonPath("$.content[0].nombreCreditsActifs", is(2)))
-                .andExpect(jsonPath("$.content[1].id", is(2)))
+                .andExpect(jsonPath("$.content[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$.totalElements", is(2)));
 
         verify(clientService, times(1)).obtenirClientsPagines(0, 20, null);
@@ -136,7 +136,7 @@ class ClientControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$[0].nom", is("Aminata Diallo")));
 
         verify(clientService, times(1)).rechercherClients("Aminata");
@@ -160,28 +160,28 @@ class ClientControllerTest {
     @Test
     @DisplayName("GET /clients/{id} - Devrait retourner le client par son ID")
     void obtenirParId_DevraitRetournerClient() throws Exception {
-        when(clientService.obtenirClientParId(1L)).thenReturn(clientDto1);
+        when(clientService.obtenirClientParId("test-id-1")).thenReturn(clientDto1);
 
-        mockMvc.perform(get("/clients/1").contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/clients/test-id-1").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nom", is("Aminata Diallo")))
                 .andExpect(jsonPath("$.telephone", is("771234567")))
                 .andExpect(jsonPath("$.detteTotale", is(15000.00)));
 
-        verify(clientService, times(1)).obtenirClientParId(1L);
+        verify(clientService, times(1)).obtenirClientParId("test-id-1");
     }
 
     @Test
     @DisplayName("GET /clients/{id} - Devrait retourner 400 si client inexistant")
     void obtenirParId_DevraitRetourner400SiInexistant() throws Exception {
-        when(clientService.obtenirClientParId(999L))
+        when(clientService.obtenirClientParId("999"))
                 .thenThrow(new RuntimeException("Client non trouvé"));
 
         mockMvc.perform(get("/clients/999").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
 
-        verify(clientService, times(1)).obtenirClientParId(999L);
+        verify(clientService, times(1)).obtenirClientParId("999");
     }
 
     // ==================== POST /clients ====================
@@ -190,7 +190,7 @@ class ClientControllerTest {
     @DisplayName("POST /clients - Devrait créer un nouveau client")
     void creer_DevraitCreerClient() throws Exception {
         ClientDto nouveauClient = ClientDto.builder()
-                .id(3L).nom("Fatou Ba").telephone("791234567")
+                .id("test-id-3").nom("Fatou Ba").telephone("791234567")
                 .detteTotale(BigDecimal.ZERO).nombreCreditsActifs(0).build();
         when(clientService.creerClient("Fatou Ba", "791234567")).thenReturn(nouveauClient);
 
@@ -200,7 +200,7 @@ class ClientControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(3)))
+                .andExpect(jsonPath("$.id", is("test-id-3")))
                 .andExpect(jsonPath("$.nom", is("Fatou Ba")))
                 .andExpect(jsonPath("$.telephone", is("791234567")));
 
@@ -211,7 +211,7 @@ class ClientControllerTest {
     @DisplayName("POST /clients - Devrait créer un client sans téléphone")
     void creer_DevraitCreerClientSansTelephone() throws Exception {
         ClientDto nouveauClient = ClientDto.builder()
-                .id(4L).nom("Ibra Sow").telephone(null)
+                .id("test-id-4").nom("Ibra Sow").telephone(null)
                 .detteTotale(BigDecimal.ZERO).nombreCreditsActifs(0).build();
         when(clientService.creerClient("Ibra Sow", null)).thenReturn(nouveauClient);
 
@@ -221,7 +221,7 @@ class ClientControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(4)))
+                .andExpect(jsonPath("$.id", is("test-id-4")))
                 .andExpect(jsonPath("$.nom", is("Ibra Sow")));
 
         verify(clientService, times(1)).creerClient("Ibra Sow", null);

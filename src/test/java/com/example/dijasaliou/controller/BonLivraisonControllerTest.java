@@ -64,7 +64,7 @@ class BonLivraisonControllerTest {
     @BeforeEach
     void setUp() {
         bl1 = BonLivraisonDto.builder()
-                .id(1L)
+                .id("test-id-1")
                 .numeroBL("BL-2025-001")
                 .statut("EN_ATTENTE")
                 .clientNom("Aminata Diallo")
@@ -75,12 +75,12 @@ class BonLivraisonControllerTest {
                 .nomEntreprise("Boutique DijaSaliou")
                 .lignes(List.of(
                         BonLivraisonDto.LigneBLDto.builder()
-                                .id(1L).nomProduit("Collier en or").quantite(2.0).unite("pièce").build()
+                                .id("test-id-1").nomProduit("Collier en or").quantite(2.0).unite("pièce").build()
                 ))
                 .build();
 
         bl2 = BonLivraisonDto.builder()
-                .id(2L)
+                .id("test-id-2")
                 .numeroBL("BL-2025-002")
                 .statut("LIVRE")
                 .clientNom("Moussa Traoré")
@@ -107,7 +107,7 @@ class BonLivraisonControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].numeroBL", is("BL-2025-001")))
                 .andExpect(jsonPath("$.content[0].statut", is("EN_ATTENTE")))
                 .andExpect(jsonPath("$.content[1].statut", is("LIVRE")));
@@ -135,25 +135,25 @@ class BonLivraisonControllerTest {
     @Test
     @DisplayName("GET /bons-de-livraison/{id} - Devrait retourner le BL par son ID")
     void getParId_DevraitRetournerBL() throws Exception {
-        when(bonLivraisonService.getParId(1L)).thenReturn(bl1);
+        when(bonLivraisonService.getParId("test-id-1")).thenReturn(bl1);
 
-        mockMvc.perform(get("/bons-de-livraison/1")
+        mockMvc.perform(get("/bons-de-livraison/test-id-1")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.numeroBL", is("BL-2025-001")))
                 .andExpect(jsonPath("$.clientNom", is("Aminata Diallo")))
                 .andExpect(jsonPath("$.lignes", hasSize(1)))
                 .andExpect(jsonPath("$.lignes[0].nomProduit", is("Collier en or")));
 
-        verify(bonLivraisonService, times(1)).getParId(1L);
+        verify(bonLivraisonService, times(1)).getParId("test-id-1");
     }
 
     @Test
     @DisplayName("GET /bons-de-livraison/{id} - Devrait retourner 400 si BL inexistant")
     void getParId_DevraitRetourner400SiInexistant() throws Exception {
-        when(bonLivraisonService.getParId(999L))
+        when(bonLivraisonService.getParId("999"))
                 .thenThrow(new RuntimeException("BL non trouvé"));
 
         mockMvc.perform(get("/bons-de-livraison/999")
@@ -186,7 +186,7 @@ class BonLivraisonControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.numeroBL", is("BL-2025-001")));
 
         verify(bonLivraisonService, times(1)).creer(any(CreateBonLivraisonRequest.class));
@@ -198,23 +198,23 @@ class BonLivraisonControllerTest {
     @DisplayName("PUT /bons-de-livraison/{id}/livrer - Devrait marquer le BL comme livré")
     void marquerLivre_DevraitMettreAJourStatut() throws Exception {
         BonLivraisonDto blLivre = BonLivraisonDto.builder()
-                .id(1L).numeroBL("BL-2025-001").statut("LIVRE")
+                .id("test-id-1").numeroBL("BL-2025-001").statut("LIVRE")
                 .clientNom("Aminata Diallo").lignes(List.of()).build();
-        when(bonLivraisonService.marquerLivre(1L)).thenReturn(blLivre);
+        when(bonLivraisonService.marquerLivre("test-id-1")).thenReturn(blLivre);
 
-        mockMvc.perform(put("/bons-de-livraison/1/livrer")
+        mockMvc.perform(put("/bons-de-livraison/test-id-1/livrer")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.statut", is("LIVRE")));
 
-        verify(bonLivraisonService, times(1)).marquerLivre(1L);
+        verify(bonLivraisonService, times(1)).marquerLivre("test-id-1");
     }
 
     @Test
     @DisplayName("PUT /bons-de-livraison/{id}/livrer - Devrait retourner 400 si BL inexistant")
     void marquerLivre_DevraitRetourner400SiInexistant() throws Exception {
-        when(bonLivraisonService.marquerLivre(999L))
+        when(bonLivraisonService.marquerLivre("999"))
                 .thenThrow(new RuntimeException("BL non trouvé"));
 
         mockMvc.perform(put("/bons-de-livraison/999/livrer")
@@ -229,26 +229,26 @@ class BonLivraisonControllerTest {
     @DisplayName("PUT /bons-de-livraison/{id}/annuler - Devrait annuler le BL")
     void annuler_DevraitMettreAJourStatut() throws Exception {
         BonLivraisonDto blAnnule = BonLivraisonDto.builder()
-                .id(1L).numeroBL("BL-2025-001").statut("ANNULE")
+                .id("test-id-1").numeroBL("BL-2025-001").statut("ANNULE")
                 .clientNom("Aminata Diallo").lignes(List.of()).build();
-        when(bonLivraisonService.annuler(1L)).thenReturn(blAnnule);
+        when(bonLivraisonService.annuler("test-id-1")).thenReturn(blAnnule);
 
-        mockMvc.perform(put("/bons-de-livraison/1/annuler")
+        mockMvc.perform(put("/bons-de-livraison/test-id-1/annuler")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.statut", is("ANNULE")));
 
-        verify(bonLivraisonService, times(1)).annuler(1L);
+        verify(bonLivraisonService, times(1)).annuler("test-id-1");
     }
 
     @Test
     @DisplayName("PUT /bons-de-livraison/{id}/annuler - Devrait retourner 400 si déjà annulé")
     void annuler_DevraitRetourner400SiDejaAnnule() throws Exception {
-        when(bonLivraisonService.annuler(1L))
+        when(bonLivraisonService.annuler("test-id-1"))
                 .thenThrow(new IllegalStateException("BL déjà annulé"));
 
-        mockMvc.perform(put("/bons-de-livraison/1/annuler")
+        mockMvc.perform(put("/bons-de-livraison/test-id-1/annuler")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
@@ -259,21 +259,21 @@ class BonLivraisonControllerTest {
     @Test
     @DisplayName("DELETE /bons-de-livraison/{id} - Devrait supprimer le BL")
     void supprimer_DevraitSupprimerBL() throws Exception {
-        doNothing().when(bonLivraisonService).supprimer(1L);
+        doNothing().when(bonLivraisonService).supprimer("test-id-1");
 
-        mockMvc.perform(delete("/bons-de-livraison/1")
+        mockMvc.perform(delete("/bons-de-livraison/test-id-1")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message", containsString("supprimé")));
 
-        verify(bonLivraisonService, times(1)).supprimer(1L);
+        verify(bonLivraisonService, times(1)).supprimer("test-id-1");
     }
 
     @Test
     @DisplayName("DELETE /bons-de-livraison/{id} - Devrait retourner 400 si BL inexistant")
     void supprimer_DevraitRetourner400SiInexistant() throws Exception {
-        doThrow(new RuntimeException("BL non trouvé")).when(bonLivraisonService).supprimer(999L);
+        doThrow(new RuntimeException("BL non trouvé")).when(bonLivraisonService).supprimer("999");
 
         mockMvc.perform(delete("/bons-de-livraison/999")
                         .principal(principal)
