@@ -165,7 +165,7 @@ public class BonLivraisonService {
 
     private String genererNumeroBL() {
         String prefix = "BL-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMM")) + "-";
-        long count = bonLivraisonRepository.countByNumeroBLStartingWith(prefix);
-        return prefix + String.format("%04d", count + 1);
+        int maxSeq = bonLivraisonRepository.findMaxSequenceForPrefix(prefix);
+        return prefix + String.format("%04d", maxSeq + 1);
     }
 }
