@@ -59,7 +59,7 @@ public class DepenseService {
     /**
      * Récupérer une dépense par ID
      */
-    public DepenseEntity obtenirDepenseParId(Long id) {
+    public DepenseEntity obtenirDepenseParId(String id) {
         return depenseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Dépense non trouvée avec l'ID : " + id));
     }
@@ -83,7 +83,7 @@ public class DepenseService {
     /**
      * Modifier une dépense
      */
-    public DepenseEntity modifierDepense(Long id, DepenseEntity depenseModifiee) {
+    public DepenseEntity modifierDepense(String id, DepenseEntity depenseModifiee) {
         DepenseEntity depenseExistante = obtenirDepenseParId(id);
 
         // SÉCURITÉ : Vérifier que la dépense appartient au tenant actuel (double sécurité)
@@ -108,7 +108,7 @@ public class DepenseService {
     /**
      * Supprimer une dépense
      */
-    public void supprimerDepense(Long id) {
+    public void supprimerDepense(String id) {
         // Récupérer la dépense existante
         DepenseEntity depenseExistante = obtenirDepenseParId(id);
 

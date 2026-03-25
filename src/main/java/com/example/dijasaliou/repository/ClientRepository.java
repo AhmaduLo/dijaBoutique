@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface ClientRepository extends JpaRepository<ClientEntity, Long> {
+public interface ClientRepository extends JpaRepository<ClientEntity, String> {
 
     @Query("SELECT c FROM ClientEntity c WHERE " +
            "(:search IS NULL OR LOWER(c.nom) LIKE LOWER(CONCAT('%', :search, '%')) " +

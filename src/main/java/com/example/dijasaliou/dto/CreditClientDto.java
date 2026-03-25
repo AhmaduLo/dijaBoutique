@@ -19,11 +19,11 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class CreditClientDto {
 
-    private Long id;
-    private Long clientId;
+    private String id;
+    private String clientId;
     private String clientNom;
     private String clientTelephone;
-    private Long venteId;
+    private String venteId;
     private BigDecimal montantInitial;
     private BigDecimal montantRestant;
     private BigDecimal montantPaye;

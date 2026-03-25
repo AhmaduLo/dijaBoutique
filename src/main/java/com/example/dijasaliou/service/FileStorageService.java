@@ -78,8 +78,7 @@ public class FileStorageService {
                     "crop", "limit"
             );
 
-            // Utilise InputStream pour éviter de charger le fichier entier en RAM
-            Map result = cloudinary.uploader().upload(file.getInputStream(), params);
+            Map result = cloudinary.uploader().upload(file.getBytes(), params);
             String url = (String) result.get("secure_url");
 
             log.info("Photo uploadée sur Cloudinary : {} (Tenant: {}, Type: {})", url, tenantUuid, type);

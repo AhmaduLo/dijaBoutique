@@ -15,7 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
+public interface VenteRepository extends JpaRepository<VenteEntity, String> {
 
     // Recherche par produit
     List<VenteEntity> findByNomProduit(String nomProduit);
@@ -73,6 +73,9 @@ public interface VenteRepository extends JpaRepository<VenteEntity, Long> {
 
     @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.tenantUuid = :tenantUuid")
     long countByTenantUuid(@Param("tenantUuid") String tenantUuid);
+
+    @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.id = :tenantId")
+    long countByTenantId(@Param("tenantId") Long tenantId);
 
     /**
      * Recherche paginée avec filtre optionnel sur nomProduit, client et plage de dates

@@ -32,8 +32,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 public class AchatEntity extends BaseEntity{
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
+    private String id;
 
     @NotNull(message = "La quantité est obligatoire")
     @Positive(message = "La quantité doit être positive")

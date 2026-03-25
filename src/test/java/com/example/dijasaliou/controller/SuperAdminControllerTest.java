@@ -72,7 +72,7 @@ class SuperAdminControllerTest {
         tenantDto1 = TenantAdminDto.builder()
                 .id(1L).tenantUuid("tenant-001").nomEntreprise("Boutique Alpha")
                 .adminEmail("admin@alpha.com").adminNom("Diop").adminPrenom("Amadou")
-                .plan(TenantEntity.Plan.BASIC).actif(true).statut("ACTIF")
+                .plan(TenantEntity.Plan.STARTER).actif(true).statut("ACTIF")
                 .nbUtilisateurs(3L).dateCreation(LocalDateTime.of(2025, 1, 15, 10, 0))
                 .dateExpiration(LocalDateTime.of(2026, 1, 15, 10, 0)).build();
 
@@ -210,21 +210,21 @@ class SuperAdminControllerTest {
     void changePlan_DevraitChangerPlan() throws Exception {
         TenantAdminDto tenantMisAJour = TenantAdminDto.builder()
                 .id(1L).tenantUuid("tenant-001").nomEntreprise("Boutique Alpha")
-                .plan(TenantEntity.Plan.ENTREPRISE).actif(true).statut("ACTIF")
+                .plan(TenantEntity.Plan.BUSINESS).actif(true).statut("ACTIF")
                 .nbUtilisateurs(3L).build();
-        when(superAdminService.changerPlan(eq(1L), eq(TenantEntity.Plan.ENTREPRISE), eq(30)))
+        when(superAdminService.changerPlan(eq(1L), eq(TenantEntity.Plan.BUSINESS), eq(30)))
                 .thenReturn(tenantMisAJour);
 
-        Map<String, Object> body = Map.of("plan", "ENTREPRISE", "jours", 30);
+        Map<String, Object> body = Map.of("plan", "BUSINESS", "jours", 30);
 
         mockMvc.perform(put("/superadmin/tenants/1/plan")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.plan", is("ENTREPRISE")));
+                .andExpect(jsonPath("$.plan", is("BUSINESS")));
 
-        verify(superAdminService, times(1)).changerPlan(eq(1L), eq(TenantEntity.Plan.ENTREPRISE), eq(30));
+        verify(superAdminService, times(1)).changerPlan(eq(1L), eq(TenantEntity.Plan.BUSINESS), eq(30));
     }
 
     // ==================== DELETE /superadmin/tenants/{id} ====================

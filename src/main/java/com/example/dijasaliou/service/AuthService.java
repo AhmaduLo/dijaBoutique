@@ -216,7 +216,11 @@ public class AuthService {
             throw new RuntimeException("Votre compte entreprise est désactivé. Contactez le support.");
         }
 
-        // 4. Générer le token JWT avec tenant_id et rôle
+        // 4. Enregistrer la date de dernière connexion
+        user.setDerniereConnexion(LocalDateTime.now());
+        userRepository.save(user);
+
+        // 5. Générer le token JWT avec tenant_id et rôle
         String token = jwtService.generateToken(user.getEmail(), tenant.getTenantUuid(), user.getRole());
 
         // 5. Vérifier si un paiement est requis

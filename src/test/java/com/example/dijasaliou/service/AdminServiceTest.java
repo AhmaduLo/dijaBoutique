@@ -43,7 +43,7 @@ class AdminServiceTest {
     void setUp() {
         tenantTest = new TenantEntity();
         tenantTest.setTenantUuid("uuid-tenant-test");
-        tenantTest.setPlan(TenantEntity.Plan.PREMIUM); // PREMIUM = max 5 users
+        tenantTest.setPlan(TenantEntity.Plan.PRO); // PREMIUM = max 5 users
 
         admin = UserEntity.builder()
                 .id(1L).nom("Admin").prenom("Super")

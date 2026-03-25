@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     actif BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Statut actif/inactif du tenant',
     date_creation DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Date de creation du tenant',
     date_expiration DATETIME COMMENT 'Date d expiration (pour gestion d abonnements)',
-    plan VARCHAR(20) NOT NULL DEFAULT 'GRATUIT' COMMENT 'Plan d abonnement (GRATUIT, BASIC, PREMIUM, ENTREPRISE)',
+    plan VARCHAR(20) NOT NULL DEFAULT 'GRATUIT' COMMENT 'Plan d abonnement (GRATUIT, STARTER, PRO, BUSINESS)',
 
     INDEX idx_tenant_uuid (tenant_uuid),
     INDEX idx_tenant_actif (actif)
@@ -50,7 +50,7 @@ ON DELETE RESTRICT ON UPDATE CASCADE;
 -- IMPORTANT : Pour les données existantes, créer un tenant par défaut
 -- et assigner tous les utilisateurs existants à ce tenant
 INSERT INTO tenants (tenant_uuid, nom_entreprise, numero_telephone, actif, plan)
-VALUES (UUID(), 'Entreprise Par Defaut', '+221000000000', TRUE, 'PREMIUM')
+VALUES (UUID(), 'Entreprise Par Defaut', '+221000000000', TRUE, 'PRO')
 ON DUPLICATE KEY UPDATE id=id;
 
 -- Assigner tous les utilisateurs existants au tenant par défaut

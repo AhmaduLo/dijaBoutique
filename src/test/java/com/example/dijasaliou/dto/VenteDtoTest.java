@@ -59,21 +59,21 @@ class VenteDtoTest {
     @Test
     @DisplayName("Plan BASIC — photoUrl masquée (null) même si entité a une photo")
     void fromEntity_planBASIC_photoUrlNull() {
-        VenteDto dto = VenteDto.fromEntity(venteAvecPlan(TenantEntity.Plan.BASIC));
+        VenteDto dto = VenteDto.fromEntity(venteAvecPlan(TenantEntity.Plan.STARTER));
         assertThat(dto.getPhotoUrl()).isNull();
     }
 
     @Test
     @DisplayName("Plan PREMIUM — photoUrl visible")
     void fromEntity_planPREMIUM_photoUrlVisible() {
-        VenteDto dto = VenteDto.fromEntity(venteAvecPlan(TenantEntity.Plan.PREMIUM));
+        VenteDto dto = VenteDto.fromEntity(venteAvecPlan(TenantEntity.Plan.PRO));
         assertThat(dto.getPhotoUrl()).isEqualTo("/photos/collier.jpg");
     }
 
     @Test
     @DisplayName("Plan ENTREPRISE — photoUrl visible")
     void fromEntity_planENTREPRISE_photoUrlVisible() {
-        VenteDto dto = VenteDto.fromEntity(venteAvecPlan(TenantEntity.Plan.ENTREPRISE));
+        VenteDto dto = VenteDto.fromEntity(venteAvecPlan(TenantEntity.Plan.BUSINESS));
         assertThat(dto.getPhotoUrl()).isEqualTo("/photos/collier.jpg");
     }
 
@@ -98,7 +98,7 @@ class VenteDtoTest {
     @Test
     @DisplayName("fromEntityWithoutUser — PREMIUM retourne photo mais sans champ utilisateur")
     void fromEntityWithoutUser_planPREMIUM_photoVisibleUtilisateurAbsent() {
-        VenteDto dto = VenteDto.fromEntityWithoutUser(venteAvecPlan(TenantEntity.Plan.PREMIUM));
+        VenteDto dto = VenteDto.fromEntityWithoutUser(venteAvecPlan(TenantEntity.Plan.PRO));
 
         assertThat(dto.getPhotoUrl()).isEqualTo("/photos/collier.jpg");
         assertThat(dto.getUtilisateur()).isNull();
@@ -117,7 +117,7 @@ class VenteDtoTest {
     @DisplayName("Vente d'aujourd'hui — estRecente=true, mois et annee corrects")
     void fromEntity_venteDuJour_champsCalculesCorrects() {
         LocalDate today = LocalDate.now();
-        VenteDto dto = VenteDto.fromEntity(venteAvecPlan(TenantEntity.Plan.BASIC));
+        VenteDto dto = VenteDto.fromEntity(venteAvecPlan(TenantEntity.Plan.STARTER));
 
         assertThat(dto.getEstRecente()).isTrue();
         assertThat(dto.getMois()).isEqualTo(today.getMonthValue());
@@ -134,7 +134,7 @@ class VenteDtoTest {
                 .prixTotal(new BigDecimal("3000"))
                 .dateVente(LocalDate.now().minusDays(60))
                 .tenant(TenantEntity.builder()
-                        .plan(TenantEntity.Plan.BASIC)
+                        .plan(TenantEntity.Plan.STARTER)
                         .nomEntreprise("B").numeroTelephone("0").tenantUuid("u").build())
                 .build();
 
@@ -146,7 +146,7 @@ class VenteDtoTest {
     @Test
     @DisplayName("modePaiement null sur entité → 'ESPECES' dans le DTO (valeur par défaut)")
     void fromEntity_modePaiementNull_defaultEspeces() {
-        VenteEntity vente = venteAvecPlan(TenantEntity.Plan.BASIC);
+        VenteEntity vente = venteAvecPlan(TenantEntity.Plan.STARTER);
         vente.setModePaiement(null); // force null post-build
 
         assertThat(VenteDto.fromEntity(vente).getModePaiement()).isEqualTo("ESPECES");
@@ -163,7 +163,7 @@ class VenteDtoTest {
                 .dateVente(LocalDate.now())
                 .modePaiement(VenteEntity.ModePaiementVente.WAVE)
                 .tenant(TenantEntity.builder()
-                        .plan(TenantEntity.Plan.BASIC)
+                        .plan(TenantEntity.Plan.STARTER)
                         .nomEntreprise("B").numeroTelephone("0").tenantUuid("u").build())
                 .build();
 
@@ -183,7 +183,7 @@ class VenteDtoTest {
                 .dateVente(LocalDate.now())
                 .client("Aminata Diallo")
                 .tenant(TenantEntity.builder()
-                        .plan(TenantEntity.Plan.BASIC)
+                        .plan(TenantEntity.Plan.STARTER)
                         .nomEntreprise("B").numeroTelephone("0").tenantUuid("u").build())
                 .build();
 
@@ -201,7 +201,7 @@ class VenteDtoTest {
                 .dateVente(LocalDate.now())
                 .client(null)
                 .tenant(TenantEntity.builder()
-                        .plan(TenantEntity.Plan.BASIC)
+                        .plan(TenantEntity.Plan.STARTER)
                         .nomEntreprise("B").numeroTelephone("0").tenantUuid("u").build())
                 .build();
 

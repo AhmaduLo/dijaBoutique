@@ -35,6 +35,11 @@ import java.util.List;
 @Builder
 public class BonLivraisonEntity extends BaseEntity {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
+    private String id;
+
     public enum Statut {
         EN_ATTENTE,
         EN_COURS,

@@ -39,7 +39,7 @@ class WaveServiceTest {
     @DisplayName("initiatePayment() dev mode — retourne une réponse PENDING avec devise XOF et plan BASIC")
     void initiatePayment_devMode_retourneReponseAvecStatutPendingEtDeviseXof() {
         WavePaymentRequest request = new WavePaymentRequest();
-        request.setPlan(TenantEntity.Plan.BASIC);
+        request.setPlan(TenantEntity.Plan.STARTER);
         request.setNumeroTelephone("+221771234567");
 
         WavePaymentResponse response = waveService.initiatePayment(request, "uuid-tenant-test");
@@ -47,7 +47,7 @@ class WaveServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getStatut()).isEqualTo("PENDING");
         assertThat(response.getDevise()).isEqualTo("XOF");
-        assertThat(response.getPlan()).isEqualTo("BASIC");
+        assertThat(response.getPlan()).isEqualTo("STARTER");
         assertThat(response.getWaveTransactionId()).startsWith("wave_");
         assertThat(response.getWaveUrl()).contains(response.getWaveTransactionId());
     }
@@ -56,12 +56,12 @@ class WaveServiceTest {
     @DisplayName("initiatePayment() dev mode — le montant correspond au prixCFA du plan")
     void initiatePayment_devMode_montantEgalPrixCfaDuPlan() {
         WavePaymentRequest request = new WavePaymentRequest();
-        request.setPlan(TenantEntity.Plan.BASIC);
+        request.setPlan(TenantEntity.Plan.STARTER);
         request.setNumeroTelephone("+221771234567");
 
         WavePaymentResponse response = waveService.initiatePayment(request, "uuid-tenant-test");
 
-        assertThat(response.getMontant()).isEqualTo(TenantEntity.Plan.BASIC.getPrixCFA());
+        assertThat(response.getMontant()).isEqualTo(TenantEntity.Plan.STARTER.getPrixCFA());
         // BASIC = 5000 CFA
         assertThat(response.getMontant()).isEqualTo(5000.0);
     }

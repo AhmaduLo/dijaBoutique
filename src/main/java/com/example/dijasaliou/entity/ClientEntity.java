@@ -32,6 +32,11 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false, exclude = {"credits"})
 public class ClientEntity extends BaseEntity {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
+    private String id;
+
     @NotBlank(message = "Le nom du client est obligatoire")
     @Size(min = 2, max = 100, message = "Le nom doit faire entre 2 et 100 caractères")
     @Column(name = "nom", nullable = false, length = 100)

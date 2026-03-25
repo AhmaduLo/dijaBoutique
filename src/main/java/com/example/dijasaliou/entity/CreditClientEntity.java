@@ -31,6 +31,11 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false, exclude = {"client", "vente", "employe", "paiements"})
 public class CreditClientEntity extends BaseEntity {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
+    private String id;
+
     public enum StatutCredit {
         EN_ATTENTE,
         PARTIEL,

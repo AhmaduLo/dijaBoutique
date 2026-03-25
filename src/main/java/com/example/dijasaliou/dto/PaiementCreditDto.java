@@ -16,8 +16,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class PaiementCreditDto {
 
-    private Long id;
-    private Long creditId;
+    private String id;
+    private String creditId;
     private BigDecimal montantPaye;
     private String modePaiement;
     private LocalDate datePaiement;

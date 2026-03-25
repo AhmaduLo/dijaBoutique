@@ -62,7 +62,7 @@ class CreditClientServiceTest {
                 .email("employe@example.com").build();
 
         client = new ClientEntity();
-        client.setId(10L);
+        client.setId("test-id-10");
         client.setNom("Client Test");
         client.setDetteTotale(BigDecimal.ZERO);
         client.setTenant(tenantTest);
@@ -73,7 +73,7 @@ class CreditClientServiceTest {
                 .modePaiement(VenteEntity.ModePaiementVente.CREDIT)
                 .tenant(tenantTest)
                 .build();
-        vente.setId(5L);
+        vente.setId("test-id-5");
 
         credit = CreditClientEntity.builder()
                 .client(client)
@@ -85,7 +85,7 @@ class CreditClientServiceTest {
                 .employeNom("Amadou Diop")
                 .tenant(tenantTest)
                 .build();
-        credit.setId(20L);
+        credit.setId("test-id-20");
     }
 
     // =========================================================
@@ -128,10 +128,10 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("enregistrerPaiement() — lève exception si crédit non trouvé")
     void enregistrerPaiement_leveExceptionCreditIntrouvable() {
-        when(creditClientRepository.findById(999L)).thenReturn(Optional.empty());
+        when(creditClientRepository.findById("999")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> creditClientService.enregistrerPaiement(
-                999L, new BigDecimal("100.00"), ModePaiement.ESPECES, null, employe))
+                "999", new BigDecimal("100.00"), ModePaiement.ESPECES, null, employe))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Crédit introuvable");
     }
@@ -140,11 +140,11 @@ class CreditClientServiceTest {
     @DisplayName("enregistrerPaiement() — lève exception si crédit déjà soldé")
     void enregistrerPaiement_leveExceptionDejasSolde() {
         credit.setStatut(StatutCredit.SOLDE);
-        when(creditClientRepository.findById(20L)).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         assertThatThrownBy(() -> creditClientService.enregistrerPaiement(
-                20L, new BigDecimal("100.00"), ModePaiement.ESPECES, null, employe))
+                "test-id-20", new BigDecimal("100.00"), ModePaiement.ESPECES, null, employe))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("déjà soldé");
     }
@@ -152,11 +152,11 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("enregistrerPaiement() — lève exception si montant = 0")
     void enregistrerPaiement_leveExceptionMontantZero() {
-        when(creditClientRepository.findById(20L)).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         assertThatThrownBy(() -> creditClientService.enregistrerPaiement(
-                20L, BigDecimal.ZERO, ModePaiement.ESPECES, null, employe))
+                "test-id-20", BigDecimal.ZERO, ModePaiement.ESPECES, null, employe))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("montant doit être positif");
     }
@@ -164,11 +164,11 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("enregistrerPaiement() — lève exception si montant dépasse le restant dû")
     void enregistrerPaiement_leveExceptionMontantTropEleve() {
-        when(creditClientRepository.findById(20L)).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         assertThatThrownBy(() -> creditClientService.enregistrerPaiement(
-                20L, new BigDecimal("999.00"), ModePaiement.ESPECES, null, employe))
+                "test-id-20", new BigDecimal("999.00"), ModePaiement.ESPECES, null, employe))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dépasse le restant dû");
     }
@@ -181,14 +181,14 @@ class CreditClientServiceTest {
     @DisplayName("enregistrerPaiement() — paiement partiel : statut devient PARTIEL")
     void enregistrerPaiement_partiel_statutPartiel() {
         credit.setMontantRestant(new BigDecimal("200.00"));
-        when(creditClientRepository.findById(20L)).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(paiementCreditRepository.save(any())).thenReturn(new PaiementCreditEntity());
         when(creditClientRepository.save(any())).thenReturn(credit);
         when(clientRepository.save(any())).thenReturn(client);
 
         CreditClientDto resultat = creditClientService.enregistrerPaiement(
-                20L, new BigDecimal("100.00"), ModePaiement.ESPECES, "acompte", employe);
+                "test-id-20", new BigDecimal("100.00"), ModePaiement.ESPECES, "acompte", employe);
 
         assertThat(resultat).isNotNull();
         assertThat(credit.getStatut()).isEqualTo(StatutCredit.PARTIEL);
@@ -204,7 +204,7 @@ class CreditClientServiceTest {
     void enregistrerPaiement_total_statutSolde() {
         credit.setMontantRestant(new BigDecimal("200.00"));
         client.setDetteTotale(new BigDecimal("200.00"));
-        when(creditClientRepository.findById(20L)).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(paiementCreditRepository.save(any())).thenReturn(new PaiementCreditEntity());
         when(venteRepository.save(any())).thenReturn(vente);
@@ -212,7 +212,7 @@ class CreditClientServiceTest {
         when(clientRepository.save(any())).thenReturn(client);
 
         CreditClientDto resultat = creditClientService.enregistrerPaiement(
-                20L, new BigDecimal("200.00"), ModePaiement.ESPECES, null, employe);
+                "test-id-20", new BigDecimal("200.00"), ModePaiement.ESPECES, null, employe);
 
         assertThat(resultat).isNotNull();
         assertThat(credit.getStatut()).isEqualTo(StatutCredit.SOLDE);
@@ -232,10 +232,10 @@ class CreditClientServiceTest {
         credit.setStatut(StatutCredit.EN_ATTENTE);
         credit.setMontantRestant(new BigDecimal("200.00"));
 
-        when(creditClientRepository.findByVenteId(5L)).thenReturn(List.of(credit));
+        when(creditClientRepository.findByVenteId("test-id-5")).thenReturn(List.of(credit));
         when(clientRepository.save(any())).thenReturn(client);
 
-        creditClientService.supprimerCreditsDeLaVente(5L);
+        creditClientService.supprimerCreditsDeLaVente("test-id-5");
 
         verify(creditClientRepository).delete(credit);
         assertThat(client.getDetteTotale()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -247,9 +247,9 @@ class CreditClientServiceTest {
         client.setDetteTotale(BigDecimal.ZERO);
         credit.setStatut(StatutCredit.SOLDE);
 
-        when(creditClientRepository.findByVenteId(5L)).thenReturn(List.of(credit));
+        when(creditClientRepository.findByVenteId("test-id-5")).thenReturn(List.of(credit));
 
-        creditClientService.supprimerCreditsDeLaVente(5L);
+        creditClientService.supprimerCreditsDeLaVente("test-id-5");
 
         verify(creditClientRepository).delete(credit);
         verify(clientRepository, never()).save(any());
@@ -258,9 +258,9 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("supprimerCreditsDeLaVente() — ne fait rien si aucun crédit lié")
     void supprimerCreditsDeLaVente_sansCredits() {
-        when(creditClientRepository.findByVenteId(99L)).thenReturn(Collections.emptyList());
+        when(creditClientRepository.findByVenteId("99")).thenReturn(Collections.emptyList());
 
-        creditClientService.supprimerCreditsDeLaVente(99L);
+        creditClientService.supprimerCreditsDeLaVente("99");
 
         verify(creditClientRepository, never()).delete(any(CreditClientEntity.class));
     }
@@ -346,12 +346,12 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("obtenirPaiements() — retourne la liste des paiements d'un crédit")
     void obtenirPaiements_retourneListe() {
-        when(creditClientRepository.findById(20L)).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(paiementCreditRepository.findByCreditOrderByCreatedDateDesc(credit))
                 .thenReturn(Collections.emptyList());
 
-        List<PaiementCreditDto> resultat = creditClientService.obtenirPaiements(20L);
+        List<PaiementCreditDto> resultat = creditClientService.obtenirPaiements("test-id-20");
 
         assertThat(resultat).isNotNull().isEmpty();
     }
@@ -359,9 +359,9 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("obtenirPaiements() — lève exception si crédit introuvable")
     void obtenirPaiements_leveExceptionCreditIntrouvable() {
-        when(creditClientRepository.findById(999L)).thenReturn(Optional.empty());
+        when(creditClientRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> creditClientService.obtenirPaiements(999L))
+        assertThatThrownBy(() -> creditClientService.obtenirPaiements("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Crédit introuvable");
     }
@@ -373,12 +373,12 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("obtenirHistoriqueClient() — retourne les crédits d'un client")
     void obtenirHistoriqueClient_retourneListe() {
-        when(clientRepository.findById(10L)).thenReturn(Optional.of(client));
+        when(clientRepository.findById("test-id-10")).thenReturn(Optional.of(client));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(creditClientRepository.findByClientOrderByCreatedDateAsc(client))
                 .thenReturn(Collections.emptyList());
 
-        List<CreditClientDto> resultat = creditClientService.obtenirHistoriqueClient(10L);
+        List<CreditClientDto> resultat = creditClientService.obtenirHistoriqueClient("test-id-10");
 
         assertThat(resultat).isNotNull().isEmpty();
     }
@@ -386,9 +386,9 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("obtenirHistoriqueClient() — lève exception si client introuvable")
     void obtenirHistoriqueClient_leveExceptionClientIntrouvable() {
-        when(clientRepository.findById(999L)).thenReturn(Optional.empty());
+        when(clientRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> creditClientService.obtenirHistoriqueClient(999L))
+        assertThatThrownBy(() -> creditClientService.obtenirHistoriqueClient("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Client introuvable");
     }

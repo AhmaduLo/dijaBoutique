@@ -68,7 +68,7 @@ public class BonLivraisonService {
     /**
      * Retourne un bon de livraison par ID
      */
-    public BonLivraisonDto getParId(Long id) {
+    public BonLivraisonDto getParId(String id) {
         BonLivraisonEntity bl = bonLivraisonRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bon de livraison non trouvé : " + id));
         return toDto(bl);
@@ -115,7 +115,7 @@ public class BonLivraisonService {
      * Marque un bon de livraison comme LIVRÉ
      */
     @Transactional
-    public BonLivraisonDto marquerLivre(Long id) {
+    public BonLivraisonDto marquerLivre(String id) {
         BonLivraisonEntity bl = bonLivraisonRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bon de livraison non trouvé : " + id));
 
@@ -131,7 +131,7 @@ public class BonLivraisonService {
      * Annule un bon de livraison
      */
     @Transactional
-    public BonLivraisonDto annuler(Long id) {
+    public BonLivraisonDto annuler(String id) {
         BonLivraisonEntity bl = bonLivraisonRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bon de livraison non trouvé : " + id));
 
@@ -146,7 +146,7 @@ public class BonLivraisonService {
      * Supprime un bon de livraison
      */
     @Transactional
-    public void supprimer(Long id) {
+    public void supprimer(String id) {
         BonLivraisonEntity bl = bonLivraisonRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bon de livraison non trouvé : " + id));
 
@@ -165,7 +165,7 @@ public class BonLivraisonService {
 
     private String genererNumeroBL() {
         String prefix = "BL-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMM")) + "-";
-        long count = bonLivraisonRepository.countByNumeroBLStartingWith(prefix);
-        return prefix + String.format("%04d", count + 1);
+        int maxSeq = bonLivraisonRepository.findMaxSequenceForPrefix(prefix);
+        return prefix + String.format("%04d", maxSeq + 1);
     }
 }

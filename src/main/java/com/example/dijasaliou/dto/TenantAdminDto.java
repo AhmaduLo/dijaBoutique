@@ -33,6 +33,9 @@ public class TenantAdminDto {
     private String adminPrenom;
     private String adminTelephone;
 
+    // CRM super-admin
+    private String sourceAcquisition;
+
     // Abonnement
     private TenantEntity.Plan plan;
     private Boolean actif;
@@ -43,11 +46,13 @@ public class TenantAdminDto {
 
     // Stats
     private Long nbUtilisateurs;
+    private Long nbVentes;
+    private LocalDateTime derniereActivite;
 
     // Statut calculé : ESSAI, ACTIF, EXPIRE, SUSPENDU
     private String statut;
 
-    public static TenantAdminDto fromEntity(TenantEntity tenant, long nbUsers, UserEntity admin) {
+    public static TenantAdminDto fromEntity(TenantEntity tenant, long nbUsers, long nbVentes, UserEntity admin, LocalDateTime derniereActivite) {
         return TenantAdminDto.builder()
                 .id(tenant.getId())
                 .tenantUuid(tenant.getTenantUuid())
@@ -56,6 +61,7 @@ public class TenantAdminDto {
                 .ville(tenant.getVille())
                 .pays(tenant.getPays())
                 .nineaSiret(tenant.getNineaSiret())
+                .sourceAcquisition(tenant.getSourceAcquisition())
                 .adminEmail(admin != null ? admin.getEmail() : null)
                 .adminNom(admin != null ? admin.getNom() : null)
                 .adminPrenom(admin != null ? admin.getPrenom() : null)
@@ -67,6 +73,8 @@ public class TenantAdminDto {
                 .dateExpiration(tenant.getDateExpiration())
                 .essaiUtilise(tenant.getEssaiUtilise())
                 .nbUtilisateurs(nbUsers)
+                .nbVentes(nbVentes)
+                .derniereActivite(derniereActivite)
                 .statut(calculerStatut(tenant))
                 .build();
     }

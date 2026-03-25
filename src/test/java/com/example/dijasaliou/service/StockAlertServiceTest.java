@@ -55,21 +55,21 @@ class StockAlertServiceTest {
                 .tenantUuid("tenant-basic-001")
                 .nomEntreprise("Boutique Basic")
                 .numeroTelephone("+221770000002")
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build();
 
         tenantPremium = TenantEntity.builder()
                 .tenantUuid("tenant-premium-001")
                 .nomEntreprise("Boutique Premium")
                 .numeroTelephone("+221770000003")
-                .plan(TenantEntity.Plan.PREMIUM)
+                .plan(TenantEntity.Plan.PRO)
                 .build();
 
         tenantEntreprise = TenantEntity.builder()
                 .tenantUuid("tenant-entreprise-001")
                 .nomEntreprise("Boutique Entreprise")
                 .numeroTelephone("+221770000004")
-                .plan(TenantEntity.Plan.ENTREPRISE)
+                .plan(TenantEntity.Plan.BUSINESS)
                 .build();
 
         adminUser = UserEntity.builder()

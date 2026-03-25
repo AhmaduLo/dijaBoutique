@@ -23,8 +23,8 @@ import java.util.Arrays;
  * 5. Si autorisé → Laisse la méthode s'exécuter normalement
  *
  * EXEMPLE :
- * - Utilisateur avec plan BASIC appelle une méthode @RequiresPlan(plans = {PREMIUM, ENTREPRISE})
- * → Erreur 403 : "Fonctionnalité réservée aux plans PREMIUM, ENTREPRISE. Veuillez mettre à jour votre abonnement."
+ * - Utilisateur avec plan STARTER appelle une méthode @RequiresPlan(plans = {PRO, BUSINESS})
+ * → Erreur 403 : "Fonctionnalité réservée aux plans PRO, BUSINESS. Veuillez mettre à jour votre abonnement."
  */
 @Aspect
 @Component

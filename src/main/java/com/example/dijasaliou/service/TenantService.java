@@ -114,11 +114,24 @@ public class TenantService {
             log.info("Mise à jour adresse: {} -> {}", tenantActuel.getAdresse(), request.getAdresse());
         }
 
+        if (request.getVille() != null) {
+            tenant.setVille(request.getVille().trim().isEmpty() ? null : request.getVille().trim());
+        }
+
+        if (request.getPays() != null) {
+            tenant.setPays(request.getPays().trim().isEmpty() ? null : request.getPays().trim());
+        }
+
         // Mise à jour du NINEA/SIRET (optionnel - peut être null ou vide)
         if (request.getNineaSiret() != null) {
             String nineaSiret = request.getNineaSiret().trim().isEmpty() ? null : request.getNineaSiret().trim();
             tenant.setNineaSiret(nineaSiret);
             log.info("Mise à jour NINEA/SIRET: {} -> {}", tenantActuel.getNineaSiret(), nineaSiret);
+        }
+
+        // Mise à jour de l'URL du logo (optionnel)
+        if (request.getLogoUrl() != null) {
+            tenant.setLogoUrl(request.getLogoUrl().trim().isEmpty() ? null : request.getLogoUrl().trim());
         }
 
         // Forcer la sauvegarde du tenant
@@ -143,6 +156,14 @@ public class TenantService {
         }
 
         return tenantSauvegarde;
+    }
+
+    @Transactional
+    public void clearLogoUrl(TenantEntity tenant) {
+        TenantEntity t = tenantRepository.findById(tenant.getId())
+                .orElseThrow(() -> new IllegalStateException("Tenant introuvable"));
+        t.setLogoUrl(null);
+        tenantRepository.save(t);
     }
 
     /**

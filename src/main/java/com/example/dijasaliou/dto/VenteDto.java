@@ -24,7 +24,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class VenteDto {
-    private Long id;
+    private String id;
     private Integer quantite;
     private String nomProduit;
     private BigDecimal prixUnitaire;
@@ -40,7 +40,7 @@ public class VenteDto {
     private String groupeVenteId;
 
     // Crédit client
-    private Long clientId;
+    private String clientId;
     private String modePaiement;
     private Boolean estSoldee;
 
@@ -65,8 +65,8 @@ public class VenteDto {
 
         // Vérifier si le plan PREMIUM ou ENTREPRISE est actif pour afficher les photos
         boolean canViewPhotos = vente.getTenant() != null &&
-                                (vente.getTenant().getPlan() == TenantEntity.Plan.PREMIUM ||
-                                 vente.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE);
+                                (vente.getTenant().getPlan() == TenantEntity.Plan.PRO ||
+                                 vente.getTenant().getPlan() == TenantEntity.Plan.BUSINESS);
 
         return VenteDto.builder()
                 .id(vente.getId())
@@ -104,8 +104,8 @@ public class VenteDto {
 
         // Vérifier si le plan PREMIUM ou ENTREPRISE est actif pour afficher les photos
         boolean canViewPhotos = vente.getTenant() != null &&
-                                (vente.getTenant().getPlan() == TenantEntity.Plan.PREMIUM ||
-                                 vente.getTenant().getPlan() == TenantEntity.Plan.ENTREPRISE);
+                                (vente.getTenant().getPlan() == TenantEntity.Plan.PRO ||
+                                 vente.getTenant().getPlan() == TenantEntity.Plan.BUSINESS);
 
         return VenteDto.builder()
                 .id(vente.getId())

@@ -1,8 +1,10 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.dto.BonLivraisonDto;
 import com.example.dijasaliou.dto.CreateBonLivraisonRequest;
 import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.BonLivraisonService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +41,7 @@ public class BonLivraisonController {
     }
 
     @GetMapping
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS}, message = "Les bons de livraison sont réservés au plan BUSINESS")
     public ResponseEntity<PagedResponse<BonLivraisonDto>> getTous(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -52,12 +55,14 @@ public class BonLivraisonController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BonLivraisonDto> getParId(@PathVariable Long id, Authentication auth) {
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS}, message = "Les bons de livraison sont réservés au plan BUSINESS")
+    public ResponseEntity<BonLivraisonDto> getParId(@PathVariable String id, Authentication auth) {
         log.info("[BL] {} consulte le BL {}", auth.getName(), id);
         return ResponseEntity.ok(bonLivraisonService.getParId(id));
     }
 
     @PostMapping
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS}, message = "Les bons de livraison sont réservés au plan BUSINESS")
     public ResponseEntity<BonLivraisonDto> creer(
             @Valid @RequestBody CreateBonLivraisonRequest request,
             Authentication auth) {
@@ -67,19 +72,22 @@ public class BonLivraisonController {
     }
 
     @PutMapping("/{id}/livrer")
-    public ResponseEntity<BonLivraisonDto> marquerLivre(@PathVariable Long id, Authentication auth) {
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS}, message = "Les bons de livraison sont réservés au plan BUSINESS")
+    public ResponseEntity<BonLivraisonDto> marquerLivre(@PathVariable String id, Authentication auth) {
         log.info("[BL] {} marque le BL {} comme livré", auth.getName(), id);
         return ResponseEntity.ok(bonLivraisonService.marquerLivre(id));
     }
 
     @PutMapping("/{id}/annuler")
-    public ResponseEntity<BonLivraisonDto> annuler(@PathVariable Long id, Authentication auth) {
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS}, message = "Les bons de livraison sont réservés au plan BUSINESS")
+    public ResponseEntity<BonLivraisonDto> annuler(@PathVariable String id, Authentication auth) {
         log.info("[BL] {} annule le BL {}", auth.getName(), id);
         return ResponseEntity.ok(bonLivraisonService.annuler(id));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> supprimer(@PathVariable Long id, Authentication auth) {
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS}, message = "Les bons de livraison sont réservés au plan BUSINESS")
+    public ResponseEntity<Map<String, String>> supprimer(@PathVariable String id, Authentication auth) {
         log.info("[BL] {} supprime le BL {}", auth.getName(), id);
         bonLivraisonService.supprimer(id);
         return ResponseEntity.ok(Map.of("message", "Bon de livraison supprimé"));

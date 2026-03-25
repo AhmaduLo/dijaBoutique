@@ -34,8 +34,9 @@ import java.util.stream.Collectors;
 public class DepenseEntity  extends BaseEntity{
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(length = 36)
+    private String id;
 
     @NotBlank(message = "Le libellé est obligatoire")
     @Size(min = 3, max = 200, message = "Le libellé doit faire entre 3 et 200 caractères")

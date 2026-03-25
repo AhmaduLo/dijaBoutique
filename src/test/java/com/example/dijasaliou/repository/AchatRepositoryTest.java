@@ -38,14 +38,14 @@ class AchatRepositoryTest {
                 .tenantUuid("achat-tenant-001")
                 .nomEntreprise("Boutique Achat")
                 .numeroTelephone("+221771111111")
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build());
 
         autreTenant = entityManager.persistAndFlush(TenantEntity.builder()
                 .tenantUuid("achat-tenant-002")
                 .nomEntreprise("Autre Boutique Achat")
                 .numeroTelephone("+221772222222")
-                .plan(TenantEntity.Plan.PREMIUM)
+                .plan(TenantEntity.Plan.PRO)
                 .build());
 
         utilisateur = entityManager.persistAndFlush(UserEntity.builder()

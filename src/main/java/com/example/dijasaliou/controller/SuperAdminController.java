@@ -1,8 +1,11 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.AuditLogDto;
 import com.example.dijasaliou.dto.FactureDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.TenantAdminDto;
+import com.example.dijasaliou.dto.UtilisateurTenantDto;
+import com.example.dijasaliou.entity.NoteInterne;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.SuperAdminService;
 import lombok.extern.slf4j.Slf4j;
@@ -128,6 +131,80 @@ public class SuperAdminController {
         log.info("[SUPER_ADMIN] {} supprime le tenant {}", auth.getName(), id);
         superAdminService.supprimerTenant(id);
         return ResponseEntity.ok(Map.of("message", "Tenant supprimé avec succès"));
+    }
+
+    /**
+     * GET /superadmin/tenants/{id}/utilisateurs
+     * Liste les utilisateurs actifs d'un tenant
+     */
+    @GetMapping("/tenants/{id}/utilisateurs")
+    public ResponseEntity<List<UtilisateurTenantDto>> getUtilisateurs(@PathVariable Long id, Authentication auth) {
+        log.info("[SUPER_ADMIN] {} consulte les utilisateurs du tenant {}", auth.getName(), id);
+        return ResponseEntity.ok(superAdminService.getUtilisateursByTenant(id));
+    }
+
+    /**
+     * GET /superadmin/tenants/{id}/notes
+     * Liste les notes internes d'un tenant
+     */
+    @GetMapping("/tenants/{id}/notes")
+    public ResponseEntity<List<NoteInterne>> getNotes(@PathVariable Long id, Authentication auth) {
+        log.info("[SUPER_ADMIN] {} consulte les notes du tenant {}", auth.getName(), id);
+        return ResponseEntity.ok(superAdminService.getNotesByTenant(id));
+    }
+
+    /**
+     * POST /superadmin/tenants/{id}/notes
+     * Ajouter une note interne sur un tenant
+     * Body: { "contenu": "..." }
+     */
+    @PostMapping("/tenants/{id}/notes")
+    public ResponseEntity<NoteInterne> ajouterNote(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        String contenu = body.get("contenu");
+        log.info("[SUPER_ADMIN] {} ajoute une note sur le tenant {}", auth.getName(), id);
+        return ResponseEntity.ok(superAdminService.ajouterNote(id, contenu, auth.getName()));
+    }
+
+    /**
+     * DELETE /superadmin/tenants/{id}/notes/{noteId}
+     * Supprimer une note interne
+     */
+    @DeleteMapping("/tenants/{id}/notes/{noteId}")
+    public ResponseEntity<Map<String, String>> supprimerNote(
+            @PathVariable Long id,
+            @PathVariable Long noteId,
+            Authentication auth) {
+        log.info("[SUPER_ADMIN] {} supprime la note {} du tenant {}", auth.getName(), noteId, id);
+        superAdminService.supprimerNote(id, noteId);
+        return ResponseEntity.ok(Map.of("message", "Note supprimée avec succès"));
+    }
+
+    /**
+     * PATCH /superadmin/tenants/{id}/source
+     * Mettre à jour la source d'acquisition d'un tenant
+     * Body: { "sourceAcquisition": "..." }
+     */
+    @PatchMapping("/tenants/{id}/source")
+    public ResponseEntity<TenantAdminDto> updateSource(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        String source = body.get("sourceAcquisition");
+        log.info("[SUPER_ADMIN] {} met à jour la source d'acquisition du tenant {}", auth.getName(), id);
+        return ResponseEntity.ok(superAdminService.mettreAJourSourceAcquisition(id, source));
+    }
+
+    /**
+     * GET /superadmin/tenants/{id}/audit
+     * Historique des actions super-admin sur un tenant
+     */
+    @GetMapping("/tenants/{id}/audit")
+    public ResponseEntity<List<AuditLogDto>> getAuditLogs(@PathVariable Long id, Authentication auth) {
+        log.info("[SUPER_ADMIN] {} consulte l'audit du tenant {}", auth.getName(), id);
+        return ResponseEntity.ok(superAdminService.getAuditLogs(id));
     }
 
     /**

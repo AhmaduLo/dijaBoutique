@@ -87,7 +87,7 @@ public class CreditClientService {
      * Utilisé quand le frontend crée le crédit séparément (ex: modification de vente).
      */
     @Transactional
-    public CreditClientEntity creerCredit(Long venteId, Long clientId, LocalDate dateEcheance, UserEntity employe) {
+    public CreditClientEntity creerCredit(String venteId, String clientId, LocalDate dateEcheance, UserEntity employe) {
         VenteEntity vente = venteRepository.findById(venteId)
                 .orElseThrow(() -> new RuntimeException("Vente introuvable : " + venteId));
 
@@ -118,7 +118,7 @@ public class CreditClientService {
      * Enregistre un paiement (partiel ou total) sur un crédit
      */
     @Transactional
-    public CreditClientDto enregistrerPaiement(Long creditId, BigDecimal montant,
+    public CreditClientDto enregistrerPaiement(String creditId, BigDecimal montant,
                                                 PaiementCreditEntity.ModePaiement modePaiement,
                                                 String note, UserEntity employe) {
         // 1. Récupérer le crédit (filtre tenant actif via Hibernate)
@@ -244,7 +244,7 @@ public class CreditClientService {
         return PagedResponse.from(dtoPage);
     }
 
-    public List<PaiementCreditDto> obtenirPaiements(Long creditId) {
+    public List<PaiementCreditDto> obtenirPaiements(String creditId) {
         CreditClientEntity credit = creditClientRepository.findById(creditId)
                 .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
         TenantEntity currentTenant = tenantService.getCurrentTenant();
@@ -256,7 +256,7 @@ public class CreditClientService {
                 .collect(Collectors.toList());
     }
 
-    public List<CreditClientDto> obtenirHistoriqueClient(Long clientId) {
+    public List<CreditClientDto> obtenirHistoriqueClient(String clientId) {
         ClientEntity client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client introuvable : " + clientId));
         TenantEntity currentTenant = tenantService.getCurrentTenant();
@@ -274,7 +274,7 @@ public class CreditClientService {
      * Ajuste la dette du client en conséquence.
      */
     @Transactional
-    public void mettreAJourCreditDeLaVente(Long venteId, BigDecimal newPrixTotal) {
+    public void mettreAJourCreditDeLaVente(String venteId, BigDecimal newPrixTotal) {
         List<CreditClientEntity> credits = creditClientRepository.findByVenteId(venteId);
         for (CreditClientEntity credit : credits) {
             if (credit.getStatut() != StatutCredit.SOLDE) {
@@ -304,7 +304,7 @@ public class CreditClientService {
      * Le crédit est conservé en historique avec statut SOLDE et montantRestant = 0.
      */
     @Transactional
-    public void solderCreditsDeLaVente(Long venteId) {
+    public void solderCreditsDeLaVente(String venteId) {
         List<CreditClientEntity> credits = creditClientRepository.findByVenteId(venteId);
         for (CreditClientEntity credit : credits) {
             if (credit.getStatut() != StatutCredit.SOLDE) {
@@ -328,7 +328,7 @@ public class CreditClientService {
      * - L'historique des crédits et paiements est conservé
      */
     @Transactional
-    public void solderEtDetacherCreditsDeLaVente(Long venteId) {
+    public void solderEtDetacherCreditsDeLaVente(String venteId) {
         List<CreditClientEntity> credits = creditClientRepository.findByVenteId(venteId);
         for (CreditClientEntity credit : credits) {
             if (credit.getStatut() != StatutCredit.SOLDE) {
@@ -348,7 +348,7 @@ public class CreditClientService {
     }
 
     @Transactional
-    public void supprimerCreditsDeLaVente(Long venteId) {
+    public void supprimerCreditsDeLaVente(String venteId) {
         List<CreditClientEntity> credits = creditClientRepository.findByVenteId(venteId);
         for (CreditClientEntity credit : credits) {
             if (credit.getStatut() != StatutCredit.SOLDE) {

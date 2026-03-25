@@ -118,12 +118,12 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("handleUserLimitExceeded() — le message contient le nom du plan et les limites")
     void handleUserLimitExceeded_messageContientInfosPlan() {
-        UserLimitExceededException ex = new UserLimitExceededException("PREMIUM", 5L, 5);
+        UserLimitExceededException ex = new UserLimitExceededException("PRO", 5L, 5);
 
         ResponseEntity<Map<String, Object>> response = handler.handleUserLimitExceeded(ex);
 
         String message = response.getBody().get("message").toString();
-        assertThat(message).contains("PREMIUM").contains("5");
+        assertThat(message).contains("PRO").contains("5");
     }
 
     // =========================================================

@@ -96,7 +96,7 @@ class PaymentControllerTest {
                 .nomEntreprise("Boutique DijaSaliou")
                 .numeroTelephone("+221771234567")
                 .actif(true)
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .essaiUtilise(true)
                 .dateExpiration(LocalDateTime.now().plusDays(20))
                 .build();
@@ -118,13 +118,13 @@ class PaymentControllerTest {
         mockMvc.perform(get("/payment/plans")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.BASIC").exists())
-                .andExpect(jsonPath("$.PREMIUM").exists())
-                .andExpect(jsonPath("$.ENTREPRISE").exists())
+                .andExpect(jsonPath("$.STARTER").exists())
+                .andExpect(jsonPath("$.PRO").exists())
+                .andExpect(jsonPath("$.BUSINESS").exists())
                 // GRATUIT ne doit PAS être dans la liste (plan d'essai, pas à vendre)
                 .andExpect(jsonPath("$.GRATUIT").doesNotExist())
-                .andExpect(jsonPath("$.BASIC.libelle", notNullValue()))
-                .andExpect(jsonPath("$.BASIC.prixCFA", notNullValue()));
+                .andExpect(jsonPath("$.STARTER.libelle", notNullValue()))
+                .andExpect(jsonPath("$.STARTER.prixCFA", notNullValue()));
 
         // Aucun service appelé — données statiques de l'enum
         verifyNoInteractions(tenantService, waveService);
@@ -156,7 +156,7 @@ class PaymentControllerTest {
                         .principal(principalAdmin)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.plan", is("BASIC")))
+                .andExpect(jsonPath("$.plan", is("STARTER")))
                 .andExpect(jsonPath("$.actif", is(true)));
 
         verify(tenantService, times(1)).getCurrentTenant();
@@ -194,14 +194,14 @@ class PaymentControllerTest {
                 .waveUrl("https://pay.wave.com/wave_txn_12345")
                 .montant(6500.0)
                 .devise("XOF")
-                .plan("BASIC")
+                .plan("STARTER")
                 .statut("PENDING")
                 .build();
         when(waveService.initiatePayment(any(WavePaymentRequest.class), eq("tenant-uuid-001")))
                 .thenReturn(waveResponse);
 
         WavePaymentRequest request = WavePaymentRequest.builder()
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .numeroTelephone("+221771234567")
                 .build();
 
@@ -250,7 +250,7 @@ class PaymentControllerTest {
 
         WavePaymentConfirmRequest request = WavePaymentConfirmRequest.builder()
                 .waveTransactionId("wave_txn_12345")
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build();
 
         mockMvc.perform(post("/payment/wave/confirm")
@@ -258,7 +258,7 @@ class PaymentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.plan", is("BASIC")))
+                .andExpect(jsonPath("$.plan", is("STARTER")))
                 .andExpect(jsonPath("$.message", containsString("Paiement Wave confirmé")));
 
         verify(waveService, times(1)).verifyPayment("wave_txn_12345");
@@ -274,7 +274,7 @@ class PaymentControllerTest {
 
         WavePaymentConfirmRequest request = WavePaymentConfirmRequest.builder()
                 .waveTransactionId("wave_txn_INVALID")
-                .plan(TenantEntity.Plan.BASIC)
+                .plan(TenantEntity.Plan.STARTER)
                 .build();
 
         mockMvc.perform(post("/payment/wave/confirm")
