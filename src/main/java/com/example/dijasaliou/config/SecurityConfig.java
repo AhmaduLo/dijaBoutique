@@ -156,13 +156,13 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of(
+        configuration.setAllowedOriginPatterns(List.of(
                 "http://localhost:4200",
                 "http://localhost:64390",
                 "https://heasystock.vercel.app",
+                "https://*.vercel.app",
                 frontendUrl
         ));
-        configuration.setAllowedOriginPatterns(List.of("https://*.vercel.app"));
 
         // Méthodes HTTP autorisées (strictement nécessaires)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
