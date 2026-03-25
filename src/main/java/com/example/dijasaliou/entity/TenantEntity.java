@@ -80,6 +80,9 @@ public class TenantEntity {
     @Column(name = "ninea_siret", length = 50)
     private String nineaSiret;
 
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
     /**
      * Permet de désactiver un tenant (soft delete)
      * Si actif = false, l'entreprise ne peut plus se connecter

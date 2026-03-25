@@ -1,6 +1,5 @@
 package com.example.dijasaliou.controller;
 
-import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.FileStorageService;
 import com.example.dijasaliou.service.TenantService;
@@ -42,20 +41,30 @@ public class FileUploadController {
      */
     @PostMapping("/upload")
     @PreAuthorize("hasAuthority('ADMIN')")
-    @RequiresPlan(plans = {TenantEntity.Plan.PRO, TenantEntity.Plan.BUSINESS}, message = "Les photos sont réservées aux plans PRO et BUSINESS")
     public ResponseEntity<Map<String, Object>> uploadPhoto(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "type", defaultValue = "achats") String type) {
 
         try {
-            if (!type.matches("^(achats|ventes|produits)$")) {
+            if (!type.matches("^(achats|ventes|produits|logo)$")) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "success", false,
-                        "message", "Type invalide. Types acceptés : achats, ventes, produits"
+                        "message", "Type invalide. Types acceptés : achats, ventes, produits, logo"
                 ));
             }
 
             TenantEntity tenant = tenantService.getCurrentTenant();
+
+            // Photos produits réservées aux plans PRO et BUSINESS
+            if (!type.equals("logo")) {
+                TenantEntity.Plan plan = tenant.getPlan();
+                if (plan != TenantEntity.Plan.PRO && plan != TenantEntity.Plan.BUSINESS) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                            "success", false,
+                            "message", "Les photos de produits sont réservées aux plans PRO et BUSINESS"
+                    ));
+                }
+            }
             String photoUrl = fileStorageService.uploadPhoto(file, tenant, type);
 
             Map<String, Object> response = new HashMap<>();
@@ -89,7 +98,6 @@ public class FileUploadController {
      */
     @DeleteMapping("/photos")
     @PreAuthorize("hasAuthority('ADMIN')")
-    @RequiresPlan(plans = {TenantEntity.Plan.PRO, TenantEntity.Plan.BUSINESS}, message = "Les photos sont réservées aux plans PRO et BUSINESS")
     public ResponseEntity<Map<String, Object>> deletePhoto(@RequestParam("url") String photoUrl) {
         try {
             TenantEntity tenant = tenantService.getCurrentTenant();

@@ -121,6 +121,11 @@ public class TenantService {
             log.info("Mise à jour NINEA/SIRET: {} -> {}", tenantActuel.getNineaSiret(), nineaSiret);
         }
 
+        // Mise à jour de l'URL du logo (optionnel)
+        if (request.getLogoUrl() != null) {
+            tenant.setLogoUrl(request.getLogoUrl().trim().isEmpty() ? null : request.getLogoUrl().trim());
+        }
+
         // Forcer la sauvegarde du tenant
         TenantEntity tenantSauvegarde = tenantRepository.saveAndFlush(tenant);
         log.info("Tenant mis à jour avec succès : {} - {} - {} - {}",

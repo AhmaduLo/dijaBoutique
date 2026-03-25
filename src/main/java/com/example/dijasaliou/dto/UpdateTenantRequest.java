@@ -33,4 +33,9 @@ public class UpdateTenantRequest {
      * Numéro NINEA (Sénégal) ou SIRET (France) - OPTIONNEL
      */
     private String nineaSiret;
+
+    /**
+     * URL du logo de l'entreprise (stocké sur Cloudinary) - OPTIONNEL
+     */
+    private String logoUrl;
 }
