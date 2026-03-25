@@ -80,7 +80,7 @@ class BonLivraisonServiceTest {
     @DisplayName("creer() — le numéro BL suit le format BL-YYYYMM-XXXX")
     void creer_numeroBLSuitFormatAttendu() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(bonLivraisonRepository.countByNumeroBLStartingWith(anyString())).thenReturn(0L);
+        when(bonLivraisonRepository.findMaxSequenceForPrefix(anyString())).thenReturn(0);
         when(bonLivraisonRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.findFirstByTenantAndRole(any(), any())).thenReturn(Optional.empty());
 
@@ -98,7 +98,7 @@ class BonLivraisonServiceTest {
     @DisplayName("genererNumeroBL() — le compteur s'incrémente correctement (ex: 0001, 0005)")
     void creer_numeroBLIncrémentéCorrectement() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(bonLivraisonRepository.countByNumeroBLStartingWith(anyString())).thenReturn(4L);
+        when(bonLivraisonRepository.findMaxSequenceForPrefix(anyString())).thenReturn(4);
         when(bonLivraisonRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.findFirstByTenantAndRole(any(), any())).thenReturn(Optional.empty());
 
@@ -117,7 +117,7 @@ class BonLivraisonServiceTest {
     @DisplayName("creer() — statut EN_ATTENTE et tenant associé")
     void creer_statutEnAttenteEtTenantAssocie() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(bonLivraisonRepository.countByNumeroBLStartingWith(anyString())).thenReturn(0L);
+        when(bonLivraisonRepository.findMaxSequenceForPrefix(anyString())).thenReturn(0);
 
         ArgumentCaptor<BonLivraisonEntity> captor = ArgumentCaptor.forClass(BonLivraisonEntity.class);
         when(bonLivraisonRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
@@ -137,7 +137,7 @@ class BonLivraisonServiceTest {
     @DisplayName("creer() — unite null dans la requête → 'pièce' par défaut")
     void creer_unitePieceParDefautSiNull() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(bonLivraisonRepository.countByNumeroBLStartingWith(anyString())).thenReturn(0L);
+        when(bonLivraisonRepository.findMaxSequenceForPrefix(anyString())).thenReturn(0);
 
         ArgumentCaptor<BonLivraisonEntity> captor = ArgumentCaptor.forClass(BonLivraisonEntity.class);
         when(bonLivraisonRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
@@ -165,7 +165,7 @@ class BonLivraisonServiceTest {
     @DisplayName("creer() — unite fournie dans la requête → conservée")
     void creer_uniteConservéeSiRenseignée() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(bonLivraisonRepository.countByNumeroBLStartingWith(anyString())).thenReturn(0L);
+        when(bonLivraisonRepository.findMaxSequenceForPrefix(anyString())).thenReturn(0);
 
         ArgumentCaptor<BonLivraisonEntity> captor = ArgumentCaptor.forClass(BonLivraisonEntity.class);
         when(bonLivraisonRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));

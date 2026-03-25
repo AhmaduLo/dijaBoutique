@@ -32,7 +32,7 @@ class TenantAdminDtoTest {
                 .dateExpiration(LocalDateTime.now().plusDays(30))
                 .build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 3L, admin);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 3L, 0L, admin, null);
         assertThat(dto.getStatut()).isEqualTo("SUSPENDU");
     }
 
@@ -47,7 +47,7 @@ class TenantAdminDtoTest {
                 .essaiUtilise(false)
                 .build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 1L, admin);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 1L, 0L, admin, null);
         assertThat(dto.getStatut()).isEqualTo("SUSPENDU");
     }
 
@@ -64,7 +64,7 @@ class TenantAdminDtoTest {
                 .essaiUtilise(false)
                 .build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 1L, admin);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 1L, 0L, admin, null);
         assertThat(dto.getStatut()).isEqualTo("ESSAI");
     }
 
@@ -80,7 +80,7 @@ class TenantAdminDtoTest {
                 .essaiUtilise(true)   // essai consommé
                 .build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 1L, admin);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 1L, 0L, admin, null);
         assertThat(dto.getStatut()).isEqualTo("EXPIRE");
     }
 
@@ -95,7 +95,7 @@ class TenantAdminDtoTest {
                 .dateExpiration(LocalDateTime.now().minusDays(1))
                 .build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 2L, admin);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 2L, 0L, admin, null);
         assertThat(dto.getStatut()).isEqualTo("EXPIRE");
     }
 
@@ -112,7 +112,7 @@ class TenantAdminDtoTest {
                 .dateExpiration(null)
                 .build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 3L, admin);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 3L, 0L, admin, null);
         assertThat(dto.getStatut()).isEqualTo("ACTIF");
     }
 
@@ -127,7 +127,7 @@ class TenantAdminDtoTest {
                 .dateExpiration(LocalDateTime.now().plusDays(1))
                 .build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 5L, admin);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 5L, 0L, admin, null);
         assertThat(dto.getStatut()).isEqualTo("ACTIF");
     }
 
@@ -140,7 +140,7 @@ class TenantAdminDtoTest {
                 .tenantUuid("t8").nomEntreprise("B").numeroTelephone("0")
                 .actif(true).plan(TenantEntity.Plan.STARTER).build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 0L, null);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 0L, 0L, null, null);
 
         assertThat(dto.getAdminEmail()).isNull();
         assertThat(dto.getAdminNom()).isNull();
@@ -156,7 +156,7 @@ class TenantAdminDtoTest {
                 .actif(true).plan(TenantEntity.Plan.STARTER)
                 .essaiUtilise(true).build();
 
-        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 2L, admin);
+        TenantAdminDto dto = TenantAdminDto.fromEntity(tenant, 2L, 0L, admin, null);
 
         assertThat(dto.getAdminEmail()).isEqualTo("admin@boutique.com");
         assertThat(dto.getAdminNom()).isEqualTo("Diallo");
