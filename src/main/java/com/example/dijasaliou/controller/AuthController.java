@@ -37,6 +37,9 @@ public class AuthController {
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
 
+    @Value("${app.cookie.same-site:Strict}")
+    private String cookieSameSite;
+
     public AuthController(AuthService authService, RateLimitService rateLimitService) {
         this.authService = authService;
         this.rateLimitService = rateLimitService;
@@ -265,8 +268,8 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(cookieSecure)
                 .path("/")
-                .maxAge(24L * 60 * 60)
-                .sameSite("Strict")
+                .maxAge(7L * 24 * 60 * 60)
+                .sameSite(cookieSameSite)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
@@ -280,7 +283,7 @@ public class AuthController {
                 .secure(cookieSecure)
                 .path("/")
                 .maxAge(0L)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
