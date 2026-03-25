@@ -4,6 +4,7 @@ import com.example.dijasaliou.filter.SubscriptionExpirationFilter;
 import com.example.dijasaliou.jwt.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import java.util.List;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpMethod;
@@ -34,6 +35,9 @@ import java.util.Collections;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    @Value("${app.frontend.url:http://localhost:4200}")
+    private String frontendUrl;
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final SubscriptionExpirationFilter subscriptionExpirationFilter;
@@ -152,14 +156,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // DÉVELOPPEMENT : Autoriser localhost pour le développement local
-        // PRODUCTION : Remplacer par votre domaine (ex: https://votredomaine.com)
-        configuration.setAllowedOrigins(Arrays.asList(
+        configuration.setAllowedOrigins(List.of(
                 "http://localhost:4200",
-                "http://localhost:64390"
-                // En production, ajouter votre domaine ici :
-                // "https://votredomaine.com",
-                // "https://www.votredomaine.com"
+                "http://localhost:64390",
+                frontendUrl
         ));
 
         // Méthodes HTTP autorisées (strictement nécessaires)
