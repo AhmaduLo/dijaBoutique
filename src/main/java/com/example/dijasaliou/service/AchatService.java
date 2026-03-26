@@ -159,6 +159,7 @@ public class AchatService {
         achatExistant.setQuantite(achatModifie.getQuantite());
         achatExistant.setNomProduit(achatModifie.getNomProduit());
         achatExistant.setPrixUnitaire(achatModifie.getPrixUnitaire());
+        achatExistant.setPrixVenteSuggere(achatModifie.getPrixVenteSuggere());
         achatExistant.setDateAchat(achatModifie.getDateAchat());
         achatExistant.setFournisseur(achatModifie.getFournisseur());
         achatExistant.setUtilisateur(achatModifie.getUtilisateur());
