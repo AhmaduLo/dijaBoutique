@@ -107,7 +107,10 @@ public class SecurityConfig {
 
                         // Routes accessibles aux USER, GERANT et ADMIN : ventes, stock, bons de livraison
                         .requestMatchers("/ventes/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
                         .requestMatchers("/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers("/api/stock/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
                         .requestMatchers("/bons-de-livraison/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
 
                         // Routes clients et crédits (plan Entreprise)
