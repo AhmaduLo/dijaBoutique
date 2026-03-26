@@ -85,12 +85,6 @@ public class AuthController {
 
         AuthResponse authResponse = authService.register(request);
 
-        // Créer un cookie HttpOnly sécurisé avec le JWT
-        addJwtCookie(response, authResponse.getToken());
-
-        // Ne pas renvoyer le token dans le body (sécurité)
-        authResponse.setToken(null);
-
         return ResponseEntity.ok(authResponse);
     }
 
@@ -133,12 +127,6 @@ public class AuthController {
 
         // SÉCURITÉ : Réinitialiser le compteur après un login réussi
         rateLimitService.resetLoginAttempts(ipAddress);
-
-        // Créer un cookie HttpOnly sécurisé avec le JWT
-        addJwtCookie(response, authResponse.getToken());
-
-        // Ne pas renvoyer le token dans le body (sécurité)
-        authResponse.setToken(null);
 
         return ResponseEntity.ok(authResponse);
     }
@@ -259,21 +247,6 @@ public class AuthController {
      * Flags de sécurité :
      * - HttpOnly : JavaScript ne peut pas lire le cookie (protection XSS)
      * - Secure : Cookie envoyé uniquement en HTTPS (désactivé en dev)
-     * - SameSite=Strict : Protection CSRF (bloque les requêtes cross-site)
-     * - Path=/ : Cookie disponible pour toute l'application
-     * - MaxAge=24h : Durée de vie du cookie
-     */
-    private void addJwtCookie(HttpServletResponse response, String token) {
-        ResponseCookie cookie = ResponseCookie.from("jwt", token)
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .path("/")
-                .maxAge(7L * 24 * 60 * 60)
-                .sameSite(cookieSameSite)
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-    }
-
     /**
      * Supprime le cookie JWT (expiration immédiate)
      */
