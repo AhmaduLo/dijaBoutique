@@ -165,6 +165,35 @@ public class AuthService {
     }
 
     /**
+     * Renvoie l'email de vérification
+     */
+    @Transactional
+    public void resendVerificationEmail(String email) {
+        UserEntity user = userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> new RuntimeException("Aucun compte trouvé pour cet email."));
+
+        if (Boolean.TRUE.equals(user.getEmailVerifie())) {
+            throw new RuntimeException("Votre adresse email est déjà vérifiée.");
+        }
+
+        // Invalider les anciens tokens EMAIL_VERIFICATION
+        passwordResetTokenRepository.findByTokenAndType(
+                passwordResetTokenRepository.findByUser(user)
+                        .map(t -> t.getToken()).orElse(""), "EMAIL_VERIFICATION")
+                .ifPresent(t -> { t.markAsUsed(); passwordResetTokenRepository.save(t); });
+
+        // Créer un nouveau token
+        PasswordResetToken verificationToken = PasswordResetToken.builder()
+                .token(UUID.randomUUID().toString())
+                .user(user)
+                .type("EMAIL_VERIFICATION")
+                .expiryDate(LocalDateTime.now().plusHours(24))
+                .build();
+        passwordResetTokenRepository.save(verificationToken);
+        emailService.sendVerificationEmail(user.getEmail(), verificationToken.getToken(), user.getPrenom());
+    }
+
+    /**
      * Vérifie l'email via le token reçu par email
      */
     @Transactional

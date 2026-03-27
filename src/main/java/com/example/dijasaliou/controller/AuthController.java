@@ -179,12 +179,28 @@ public class AuthController {
 
     /**
      * GET /api/auth/verify-email?token=XXX
-     * Vérifie l'email via le token reçu par email
+     * Vérifie l'email et redirige vers le dashboard
      */
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
-        return ResponseEntity.ok(java.util.Map.of("message", "Votre adresse email a été confirmée avec succès."));
+        return ResponseEntity.status(302)
+                .location(java.net.URI.create("https://heasystock.com/dashboard?verified=true"))
+                .build();
+    }
+
+    /**
+     * POST /api/auth/resend-verification-email
+     * Renvoie l'email de vérification
+     */
+    @PostMapping("/resend-verification-email")
+    public ResponseEntity<?> resendVerificationEmail(@RequestBody java.util.Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "L'email est requis."));
+        }
+        authService.resendVerificationEmail(email);
+        return ResponseEntity.ok(java.util.Map.of("message", "Email de vérification renvoyé."));
     }
 
     /**
