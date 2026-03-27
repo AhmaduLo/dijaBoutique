@@ -197,11 +197,9 @@ public class AuthController {
             // Token déjà utilisé mais email bien vérifié (scan Brevo)
             redirectUrl = frontendUrl + "/email-confirmed";
         } catch (IllegalArgumentException e) {
-            redirectUrl = "EXPIRED".equals(e.getMessage())
-                    ? frontendUrl + "/dashboard?error=expired"
-                    : frontendUrl + "/dashboard?error=invalid";
+            redirectUrl = frontendUrl + "/email-confirmed?error=invalid";
         } catch (Exception e) {
-            redirectUrl = frontendUrl + "/dashboard?error=invalid";
+            redirectUrl = frontendUrl + "/email-confirmed?error=invalid";
         }
         log.info("=== Redirection vers: {}", redirectUrl);
         return ResponseEntity.status(302)
