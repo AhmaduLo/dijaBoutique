@@ -62,6 +62,7 @@ class ContactControllerTest {
                 "Dija Saliou",
                 "admin@boutique.com",
                 "Boutique DijaSaliou",
+                null,
                 "Demande d'assistance technique",
                 "Bonjour, j'ai besoin d'aide pour configurer mon compte correctement."
         );
@@ -102,7 +103,7 @@ class ContactControllerTest {
     @DisplayName("POST /contact - Devrait retourner 500 si données invalides (@Valid)")
     void sendContactMessage_DevraitRetourner500SiValidationEchoue() throws Exception {
         // Message trop court (<10 chars), email invalide, nom vide
-        ContactRequest invalide = new ContactRequest("", "email-invalide", "", "Sujet", "court");
+        ContactRequest invalide = new ContactRequest("", "email-invalide", "", null, "Sujet", "court");
 
         mockMvc.perform(post("/contact")
                         .principal(principal)
