@@ -184,31 +184,62 @@ public class SuperAdminService {
     }
 
     /**
-     * Supprimer un tenant et tous ses utilisateurs (soft delete)
+     * Suspendre / réactiver un tenant (bascule actif/inactif — RÉVERSIBLE)
+     * Les utilisateurs ne sont pas touchés.
+     */
+    @Transactional
+    public void basculerSuspensionTenant(Long id) {
+        TenantEntity tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + id));
+
+        if (Boolean.TRUE.equals(tenant.getDeleted())) {
+            throw new IllegalStateException("Impossible de modifier un tenant définitivement supprimé");
+        }
+
+        boolean nouvelEtat = !Boolean.TRUE.equals(tenant.getActif());
+        tenant.setActif(nouvelEtat);
+        tenantRepository.save(tenant);
+        tenantCacheService.evict(tenant.getTenantUuid());
+
+        String action = nouvelEtat ? "ACTIVATE" : "DEACTIVATE";
+        String msg = nouvelEtat ? "Tenant réactivé (suspension levée)" : "Tenant suspendu";
+        log.info("[SUPER_ADMIN] Tenant {} → actif={}", tenant.getTenantUuid(), nouvelEtat);
+        saveLog(action, msg, tenant);
+    }
+
+    /**
+     * Suppression définitive d'un tenant (IRRÉVERSIBLE depuis l'interface)
+     * - tenant.deleted = true + dateSuppression
+     * - tous les utilisateurs soft-deletés
+     * Les données restent en base.
      */
     @Transactional
     public void supprimerTenant(Long id) {
         TenantEntity tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + id));
 
-        // Désactiver tous les utilisateurs du tenant
+        // Soft-delete tous les utilisateurs du tenant
         List<UserEntity> users = userRepository.findByDeletedFalse().stream()
                 .filter(u -> tenant.equals(u.getTenant()))
                 .collect(Collectors.toList());
 
+        LocalDateTime maintenant = LocalDateTime.now();
         for (UserEntity user : users) {
             user.setDeleted(true);
-            user.setDateSuppression(LocalDateTime.now());
+            user.setDateSuppression(maintenant);
         }
         userRepository.saveAll(users);
 
-        // Désactiver le tenant
+        // Marquer le tenant comme définitivement supprimé
         tenant.setActif(false);
+        tenant.setDeleted(true);
+        tenant.setDateSuppression(maintenant);
         tenantRepository.save(tenant);
+        tenantCacheService.evict(tenant.getTenantUuid());
 
-        log.info("[SUPER_ADMIN] Tenant {} supprimé ({} utilisateurs désactivés)",
+        log.info("[SUPER_ADMIN] Tenant {} définitivement supprimé ({} utilisateurs désactivés)",
                 tenant.getTenantUuid(), users.size());
-        saveLog("DELETE", users.size() + " utilisateurs désactivés", tenant);
+        saveLog("DELETE", "Suppression définitive — " + users.size() + " utilisateurs désactivés", tenant);
     }
 
     /**

@@ -84,12 +84,23 @@ public class TenantEntity {
     private String logoUrl;
 
     /**
-     * Permet de désactiver un tenant (soft delete)
+     * Permet de désactiver un tenant temporairement (suspension réversible)
      * Si actif = false, l'entreprise ne peut plus se connecter
      */
     @Column(name = "actif", nullable = false)
     @Builder.Default
     private Boolean actif = true;
+
+    /**
+     * Suppression définitive (irréversible depuis l'interface)
+     * Les données restent en base mais le compte est inaccessible
+     */
+    @Column(name = "deleted", nullable = false)
+    @Builder.Default
+    private Boolean deleted = false;
+
+    @Column(name = "date_suppression")
+    private LocalDateTime dateSuppression;
 
     @CreationTimestamp
     @Column(name = "date_creation", nullable = false, updatable = false)

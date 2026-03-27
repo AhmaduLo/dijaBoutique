@@ -79,7 +79,7 @@ public class SuperAdminController {
 
     /**
      * PUT /superadmin/tenants/{id}/activate
-     * Activer un tenant
+     * Activer un tenant (ancien endpoint — conservé pour compatibilité)
      */
     @PutMapping("/tenants/{id}/activate")
     public ResponseEntity<Map<String, String>> activateTenant(@PathVariable Long id, Authentication auth) {
@@ -90,13 +90,37 @@ public class SuperAdminController {
 
     /**
      * PUT /superadmin/tenants/{id}/deactivate
-     * Désactiver un tenant
+     * Désactiver un tenant (ancien endpoint — conservé pour compatibilité)
      */
     @PutMapping("/tenants/{id}/deactivate")
     public ResponseEntity<Map<String, String>> deactivateTenant(@PathVariable Long id, Authentication auth) {
         log.info("[SUPER_ADMIN] {} désactive le tenant {}", auth.getName(), id);
         superAdminService.desactiverTenant(id);
         return ResponseEntity.ok(Map.of("message", "Tenant désactivé avec succès"));
+    }
+
+    /**
+     * PUT /superadmin/tenants/{id}/suspendre
+     * Bascule suspension/réactivation — RÉVERSIBLE
+     * Si actif → suspendu ; si suspendu → réactivé
+     */
+    @PutMapping("/tenants/{id}/suspendre")
+    public ResponseEntity<Map<String, String>> suspendTenant(@PathVariable Long id, Authentication auth) {
+        log.info("[SUPER_ADMIN] {} bascule suspension du tenant {}", auth.getName(), id);
+        superAdminService.basculerSuspensionTenant(id);
+        return ResponseEntity.ok(Map.of("message", "Statut du tenant mis à jour (suspension basculée)"));
+    }
+
+    /**
+     * DELETE /superadmin/tenants/{id}/supprimer
+     * Suppression définitive — IRRÉVERSIBLE depuis l'interface
+     * deleted=true + dateSuppression + tous les utilisateurs soft-deletés
+     */
+    @DeleteMapping("/tenants/{id}/supprimer")
+    public ResponseEntity<Map<String, String>> supprimerTenantDefinitif(@PathVariable Long id, Authentication auth) {
+        log.info("[SUPER_ADMIN] {} supprime définitivement le tenant {}", auth.getName(), id);
+        superAdminService.supprimerTenant(id);
+        return ResponseEntity.ok(Map.of("message", "Tenant définitivement supprimé"));
     }
 
     /**
