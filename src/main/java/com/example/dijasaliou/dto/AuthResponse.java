@@ -32,6 +32,12 @@ public class AuthResponse {
     private UserEntity user;
 
     /**
+     * Indique si l'email a été vérifié
+     * false = bannière à afficher côté frontend
+     */
+    private boolean emailVerifie;
+
+    /**
      * Indique si l'utilisateur doit payer avant d'accéder à l'application
      * true si plan = GRATUIT ou dateExpiration dépassée
      */

@@ -144,13 +144,45 @@ public class AuthService {
         // 6. Générer le token JWT avec tenant_id et rôle (évite la requête BDD à chaque appel API)
         String token = jwtService.generateToken(savedUser.getEmail(), savedTenant.getTenantUuid(), savedUser.getRole());
 
+        // 7. Créer et envoyer le token de vérification email (non bloquant)
+        PasswordResetToken verificationToken = PasswordResetToken.builder()
+                .token(UUID.randomUUID().toString())
+                .user(savedUser)
+                .type("EMAIL_VERIFICATION")
+                .expiryDate(LocalDateTime.now().plusHours(24))
+                .build();
+        passwordResetTokenRepository.save(verificationToken);
+        emailService.sendVerificationEmail(savedUser.getEmail(), verificationToken.getToken(), savedUser.getPrenom());
+
         // 8. Retourner la réponse - L'utilisateur a 14 jours d'essai gratuit
         return AuthResponse.builder()
                 .token(token)
                 .user(savedUser)
-                .requiresPayment(false) // L'utilisateur est en essai gratuit, il peut accéder au site
-                .plan(savedTenant.getPlan()) // GRATUIT
+                .emailVerifie(false)
+                .requiresPayment(false)
+                .plan(savedTenant.getPlan())
                 .build();
+    }
+
+    /**
+     * Vérifie l'email via le token reçu par email
+     */
+    @Transactional
+    public void verifyEmail(String token) {
+        PasswordResetToken verificationToken = passwordResetTokenRepository
+                .findByTokenAndType(token, "EMAIL_VERIFICATION")
+                .orElseThrow(() -> new RuntimeException("Lien de vérification invalide ou expiré."));
+
+        if (!verificationToken.isValid()) {
+            throw new RuntimeException("Ce lien de vérification a expiré. Veuillez vous reconnecter pour en recevoir un nouveau.");
+        }
+
+        UserEntity user = verificationToken.getUser();
+        user.setEmailVerifie(true);
+        userRepository.save(user);
+
+        verificationToken.markAsUsed();
+        passwordResetTokenRepository.save(verificationToken);
     }
 
     /**
@@ -182,6 +214,7 @@ public class AuthService {
             return AuthResponse.builder()
                     .token(token)
                     .user(user)
+                    .emailVerifie(true)
                     .requiresPayment(false)
                     .plan(null)
                     .build();
@@ -226,6 +259,7 @@ public class AuthService {
         return AuthResponse.builder()
                 .token(token)
                 .user(user)
+                .emailVerifie(Boolean.TRUE.equals(user.getEmailVerifie()))
                 .requiresPayment(requiresPayment)
                 .plan(tenant.getPlan())
                 .build();

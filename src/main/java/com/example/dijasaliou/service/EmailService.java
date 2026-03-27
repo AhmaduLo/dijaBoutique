@@ -43,6 +43,30 @@ public class EmailService {
     private String frontendUrl;
 
     /**
+     * Envoie un email de vérification d'adresse email
+     */
+    @Async
+    public void sendVerificationEmail(String toEmail, String token, String userName) {
+        try {
+            String verifyLink = frontendUrl + "/verify-email?token=" + token;
+            String subject = "Confirmez votre adresse email - HeasyStock";
+            String htmlContent = "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
+                    + "<h2 style='color:#2563eb'>Bienvenue sur HeasyStock, " + userName + " !</h2>"
+                    + "<p>Merci de vous être inscrit. Veuillez confirmer votre adresse email en cliquant sur le bouton ci-dessous :</p>"
+                    + "<div style='text-align:center;margin:30px 0'>"
+                    + "<a href='" + verifyLink + "' style='background-color:#2563eb;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;font-size:16px'>Confirmer mon email</a>"
+                    + "</div>"
+                    + "<p style='color:#666;font-size:14px'>Ce lien est valable 24 heures.</p>"
+                    + "<p style='color:#666;font-size:14px'>Si vous n'avez pas créé de compte sur HeasyStock, ignorez cet email.</p>"
+                    + "</div>";
+            sendHtmlEmail(toEmail, subject, htmlContent);
+            log.info("Email de vérification envoyé à : {}", toEmail);
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi de l'email de vérification à {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    /**
      * Envoie un email de réinitialisation de mot de passe
      *
      * @param toEmail Email du destinataire

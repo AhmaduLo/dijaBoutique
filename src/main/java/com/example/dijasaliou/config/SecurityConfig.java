@@ -66,7 +66,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Routes publiques (login + register + logout + réinitialisation mot de passe)
                         .requestMatchers("/auth/login", "/auth/register", "/auth/logout",
-                                "/auth/forgot-password", "/auth/reset-password").permitAll()
+                                "/auth/forgot-password", "/auth/reset-password", "/auth/verify-email").permitAll()
                         .requestMatchers("/setup/**").permitAll()
 
                         // Route de suppression de compte - ADMIN uniquement

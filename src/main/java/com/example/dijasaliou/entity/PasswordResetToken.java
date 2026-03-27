@@ -32,6 +32,13 @@ public class PasswordResetToken {
     private Long id;
 
     /**
+     * Type du token : RESET_PASSWORD ou EMAIL_VERIFICATION
+     */
+    @Column(name = "type", nullable = false, length = 30)
+    @Builder.Default
+    private String type = "RESET_PASSWORD";
+
+    /**
      * Token unique généré (UUID)
      * Sera envoyé par email à l'utilisateur
      */

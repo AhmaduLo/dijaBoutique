@@ -178,6 +178,16 @@ public class AuthController {
     }
 
     /**
+     * GET /api/auth/verify-email?token=XXX
+     * Vérifie l'email via le token reçu par email
+     */
+    @GetMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
+        authService.verifyEmail(token);
+        return ResponseEntity.ok(java.util.Map.of("message", "Votre adresse email a été confirmée avec succès."));
+    }
+
+    /**
      * POST /api/auth/reset-password
      * Réinitialisation du mot de passe avec le token
      *

@@ -88,6 +88,10 @@ public class UserEntity {
     @Column(name = "date_suppression")
     private LocalDateTime dateSuppression;
 
+    @Column(name = "email_verifie", nullable = false)
+    @Builder.Default
+    private Boolean emailVerifie = false;
+
     @Column(name = "derniere_connexion")
     private LocalDateTime derniereConnexion;
 
