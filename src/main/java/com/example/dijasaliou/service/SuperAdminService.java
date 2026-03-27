@@ -75,7 +75,7 @@ public class SuperAdminService {
      */
     public PagedResponse<TenantAdminDto> getAllTenants(int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        Page<TenantEntity> tenantsPage = tenantRepository.findAll(pageable);
+        Page<TenantEntity> tenantsPage = tenantRepository.findByDeletedFalse(pageable);
         return PagedResponse.from(tenantsPage.map(this::toDto));
     }
 
@@ -83,7 +83,7 @@ public class SuperAdminService {
      * Retourne tous les tenants sans pagination (pour les stats globales uniquement)
      */
     private List<TenantEntity> getAllTenantsForStats() {
-        return tenantRepository.findAll();
+        return tenantRepository.findByDeletedFalse();
     }
 
     /**

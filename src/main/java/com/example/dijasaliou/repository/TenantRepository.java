@@ -64,9 +64,14 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
     Optional<TenantEntity> findByNumeroTelephone(String numeroTelephone);
 
     /**
-     * Version paginée de findAll() — pour SuperAdmin
+     * Version paginée de findAll() — pour SuperAdmin (exclut les tenants supprimés)
      */
-    Page<TenantEntity> findAll(Pageable pageable);
+    Page<TenantEntity> findByDeletedFalse(Pageable pageable);
+
+    /**
+     * Liste complète sans pagination — pour les stats (exclut les tenants supprimés)
+     */
+    List<TenantEntity> findByDeletedFalse();
 
     long countByEssaiUtiliseTrue();
 
