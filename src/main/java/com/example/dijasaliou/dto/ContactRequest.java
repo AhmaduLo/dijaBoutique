@@ -56,6 +56,12 @@ public class ContactRequest {
     private String sujet;
 
     /**
+     * Numéro de téléphone (optionnel)
+     */
+    @Size(max = 20, message = "Le téléphone ne peut pas dépasser 20 caractères")
+    private String telephone;
+
+    /**
      * Message détaillé
      */
     @NotBlank(message = "Le message est obligatoire")

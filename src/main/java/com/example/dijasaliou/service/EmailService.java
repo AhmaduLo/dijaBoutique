@@ -317,6 +317,10 @@ public class EmailService {
                                 <span><a href="mailto:%s">%s</a></span>
                             </div>
                             <div class="info-row">
+                                <span class="label">Téléphone :</span>
+                                <span>%s</span>
+                            </div>
+                            <div class="info-row">
                                 <span class="label">Entreprise :</span>
                                 <span>%s</span>
                             </div>
@@ -345,6 +349,7 @@ public class EmailService {
                     request.getNom(),
                     request.getEmail(),
                     request.getEmail(),
+                    request.getTelephone() != null ? request.getTelephone() : "Non renseigné",
                     request.getEntreprise(),
                     request.getSujet(),
                     request.getMessage()
