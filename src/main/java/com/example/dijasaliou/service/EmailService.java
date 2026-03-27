@@ -2,16 +2,18 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.ContactRequest;
 import com.example.dijasaliou.entity.FactureEntity;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Service pour l'envoi d'emails
@@ -24,7 +26,12 @@ import java.time.format.DateTimeFormatter;
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${brevo.api.key:disabled}")
+    private String brevoApiKey;
 
     @Value("${app.email.from:noreply@dijasaliou.com}")
     private String fromEmail;
@@ -34,10 +41,6 @@ public class EmailService {
 
     @Value("${app.frontend.url:http://localhost:4200}")
     private String frontendUrl;
-
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
 
     /**
      * Envoie un email de réinitialisation de mot de passe
@@ -997,38 +1000,38 @@ public class EmailService {
     }
 
     /**
-     * Méthode générique pour envoyer un email HTML
+     * Méthode générique pour envoyer un email HTML via l'API Brevo (HTTPS port 443)
      */
-    private void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-        helper.setFrom(fromEmail);
-        helper.setTo(to);
-        helper.setSubject(subject);
-        helper.setText(htmlContent, true); // true = HTML
-
-        mailSender.send(message);
+    private void sendHtmlEmail(String to, String subject, String htmlContent) {
+        sendViaBrevo(to, subject, htmlContent, null);
     }
 
     /**
-     * Méthode pour envoyer un email HTML avec Reply-To personnalisé
-     *
-     * @param to Destinataire
-     * @param subject Sujet de l'email
-     * @param htmlContent Contenu HTML
-     * @param replyTo Adresse email pour les réponses
+     * Méthode pour envoyer un email HTML avec Reply-To personnalisé via Brevo
      */
-    private void sendHtmlEmailWithReplyTo(String to, String subject, String htmlContent, String replyTo) throws MessagingException {
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+    private void sendHtmlEmailWithReplyTo(String to, String subject, String htmlContent, String replyTo) {
+        sendViaBrevo(to, subject, htmlContent, replyTo);
+    }
 
-        helper.setFrom(fromEmail);
-        helper.setTo(to);
-        helper.setSubject(subject);
-        helper.setText(htmlContent, true); // true = HTML
-        helper.setReplyTo(replyTo); // Adresse pour les réponses
+    /**
+     * Appel HTTP à l'API Brevo pour l'envoi d'email
+     * Utilise HTTPS port 443 — non bloqué par Railway
+     */
+    private void sendViaBrevo(String to, String subject, String htmlContent, String replyTo) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("api-key", brevoApiKey);
 
-        mailSender.send(message);
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("sender", Map.of("name", "HeasyStock", "email", fromEmail));
+        body.put("to", List.of(Map.of("email", to)));
+        body.put("subject", subject);
+        body.put("htmlContent", htmlContent);
+        if (replyTo != null) {
+            body.put("replyTo", Map.of("email", replyTo));
+        }
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        restTemplate.postForEntity(BREVO_API_URL, request, String.class);
     }
 }
