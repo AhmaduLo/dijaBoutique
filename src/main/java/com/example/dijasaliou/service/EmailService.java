@@ -33,10 +33,10 @@ public class EmailService {
     @Value("${brevo.api.key:disabled}")
     private String brevoApiKey;
 
-    @Value("${app.email.from:gbamba123@gmail.com}")
+    @Value("${app.email.from:contact@heasystock.com}")
     private String fromEmail;
 
-    @Value("${app.email.support:gbamba123@gmail.com}")
+    @Value("${app.email.support:contact@heasystock.com}")
     private String supportEmail;
 
     @Value("${app.frontend.url:http://localhost:4200}")
