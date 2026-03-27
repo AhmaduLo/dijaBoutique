@@ -73,7 +73,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/delete-account").hasAuthority("ADMIN")
 
                         // Routes Super Admin - SUPER_ADMIN uniquement
-                        .requestMatchers("/super-admin/**").hasAuthority("SUPER_ADMIN")
+                        .requestMatchers("/superadmin/**").hasAuthority("SUPER_ADMIN")
 
                         // Routes de paiement publiques (webhook Wave)
                         .requestMatchers("/payment/wave/webhook").permitAll() // Webhook Wave
