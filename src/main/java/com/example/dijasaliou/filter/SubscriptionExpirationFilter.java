@@ -128,7 +128,7 @@ public class SubscriptionExpirationFilter extends OncePerRequestFilter {
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("error", "Paiement requis");
-        errorResponse.put("message", "Votre période d'essai gratuit de 14 jours est terminée. Veuillez souscrire à un abonnement pour continuer à accéder à l'application.");
+        errorResponse.put("message", "Votre période d'essai est terminée. Contactez-nous sur WhatsApp pour continuer.");
         errorResponse.put("code", "PAYMENT_REQUIRED");
 
         String jsonResponse = objectMapper.writeValueAsString(errorResponse);

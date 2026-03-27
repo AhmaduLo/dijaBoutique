@@ -124,7 +124,7 @@ public class GlobalExceptionHandler {
         errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         errorResponse.put("error", "Erreur interne du serveur");
         // Message générique pour le client (SÉCURITÉ : pas de fuite d'informations)
-        errorResponse.put("message", "Une erreur s'est produite. Veuillez réessayer ultérieurement.");
+        errorResponse.put("message", "Une erreur inattendue s'est produite. Veuillez réessayer ou contacter le support.");
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)

@@ -9,12 +9,9 @@ import com.example.dijasaliou.entity.PasswordResetToken;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.jwt.JwtService;
-import com.example.dijasaliou.repository.AchatRepository;
-import com.example.dijasaliou.repository.DepenseRepository;
 import com.example.dijasaliou.repository.PasswordResetTokenRepository;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.repository.UserRepository;
-import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,28 +36,19 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
-    private final AchatRepository achatRepository;
-    private final VenteRepository venteRepository;
-    private final DepenseRepository depenseRepository;
 
     public AuthService(UserRepository userRepository,
                        TenantRepository tenantRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        PasswordResetTokenRepository passwordResetTokenRepository,
-                       EmailService emailService,
-                       AchatRepository achatRepository,
-                       VenteRepository venteRepository,
-                       DepenseRepository depenseRepository) {
+                       EmailService emailService) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.emailService = emailService;
-        this.achatRepository = achatRepository;
-        this.venteRepository = venteRepository;
-        this.depenseRepository = depenseRepository;
     }
 
     /**
@@ -94,13 +82,9 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         // 1. Vérifier si l'email existe déjà (parmi les utilisateurs actifs)
         if (userRepository.existsByEmailAndDeletedFalse(request.getEmail())) {
-            throw new RuntimeException("Un utilisateur avec cet email existe déjà");
+            throw new RuntimeException("Cette adresse email est déjà utilisée. Veuillez vous connecter ou utiliser une autre adresse.");
         }
 
-        // 2. Vérifier si l'entreprise existe déjà (optionnel, mais recommandé)
-        if (tenantRepository.existsByNomEntreprise(request.getNomEntreprise())) {
-            throw new RuntimeException("Une entreprise avec ce nom existe déjà");
-        }
 
         // 3. Déterminer le rôle de l'utilisateur
         // SÉCURITÉ : À l'inscription publique, seul le rôle ADMIN est autorisé.
@@ -189,7 +173,7 @@ public class AuthService {
 
         // 2. Vérifier le mot de passe
         if (!passwordEncoder.matches(request.getMotDePasse(), user.getMotDePasse())) {
-            throw new RuntimeException("Email ou mot de passe incorrect");
+            throw new RuntimeException("Email ou mot de passe incorrect. Vérifiez vos informations et réessayez.");
         }
 
         // 3. SUPER_ADMIN : pas de tenant, accès direct
@@ -213,7 +197,7 @@ public class AuthService {
         // Le SubscriptionExpirationFilter bloquera l'accès aux routes protégées
         // Mais l'utilisateur doit pouvoir se connecter pour accéder à /payment/**
         if (!tenant.getActif()) {
-            throw new RuntimeException("Votre compte entreprise est désactivé. Contactez le support.");
+            throw new RuntimeException("Votre compte a été suspendu. Contactez le support sur WhatsApp.");
         }
 
         // 4. Enregistrer la date de dernière connexion
@@ -386,25 +370,20 @@ public class AuthService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
-        // 4. Récupérer tous les utilisateurs du tenant
-        List<UserEntity> utilisateurs = tenant.getUtilisateurs();
-
-        // 5. Pour chaque utilisateur, supprimer manuellement toutes les données associées
+        // 4. Soft delete de tous les utilisateurs du tenant
+        LocalDateTime maintenant = LocalDateTime.now();
+        List<UserEntity> utilisateurs = userRepository.findByTenantIdAndDeletedFalse(tenant.getId());
         for (UserEntity utilisateur : utilisateurs) {
-            // Supprimer tous les achats
-            achatRepository.deleteByUtilisateur(utilisateur);
-
-            // Supprimer toutes les ventes
-            venteRepository.deleteByUtilisateur(utilisateur);
-
-            // Supprimer toutes les dépenses
-            depenseRepository.deleteByUtilisateur(utilisateur);
-
-            // Supprimer tous les tokens de réinitialisation
+            utilisateur.setDeleted(true);
+            utilisateur.setDateSuppression(maintenant);
             passwordResetTokenRepository.deleteByUser(utilisateur);
         }
+        userRepository.saveAll(utilisateurs);
 
-        // 6. Supprimer le tenant (la cascade supprimera automatiquement tous les utilisateurs)
-        tenantRepository.delete(tenant);
+        // 5. Soft delete du tenant — données conservées mais inaccessibles
+        tenant.setDeleted(true);
+        tenant.setDateSuppression(maintenant);
+        tenant.setActif(false);
+        tenantRepository.save(tenant);
     }
 }
