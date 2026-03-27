@@ -1054,6 +1054,8 @@ public class EmailService {
         if (replyTo != null) {
             body.put("replyTo", Map.of("email", replyTo));
         }
+        body.put("trackClicks", false);
+        body.put("trackOpens", false);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
         restTemplate.postForEntity(BREVO_API_URL, request, String.class);
