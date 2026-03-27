@@ -130,10 +130,10 @@ public class AuthService {
                 .adresse(request.getAdresseEntreprise())
                 .nineaSiret(request.getNineaSiret()) // OPTIONNEL - peut être null
                 .actif(true)
-                .plan(TenantEntity.Plan.GRATUIT) // Plan par défaut - essai gratuit de 14 jours
-                .dateDebutEssai(now) // Début de l'essai gratuit de 14 jours
-                .essaiUtilise(false) // L'essai n'a pas encore été utilisé complètement
-                .dateExpiration(null) // Pas de date d'expiration pour l'instant (sera définie après paiement)
+                .plan(TenantEntity.Plan.BUSINESS) // Essai BUSINESS complet pendant 14 jours
+                .dateDebutEssai(now) // Début de l'essai
+                .essaiUtilise(false) // L'essai n'a pas encore été utilisé
+                .dateExpiration(now.plusDays(14)) // Expire dans 14 jours → rétrograde vers GRATUIT
                 .build();
 
         TenantEntity savedTenant = tenantRepository.save(tenant);

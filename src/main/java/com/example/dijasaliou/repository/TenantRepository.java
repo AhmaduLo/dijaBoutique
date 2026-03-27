@@ -4,8 +4,12 @@ import com.example.dijasaliou.entity.TenantEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -67,4 +71,12 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
     long countByEssaiUtiliseTrue();
 
     long countByEssaiUtiliseTrueAndPlanNot(TenantEntity.Plan plan);
+
+    /**
+     * Trouve les tenants dont l'essai BUSINESS est expiré (> 14 jours)
+     * et qui n'ont pas encore payé (essaiUtilise=false, pas supprimés)
+     * Utilisé par CleanupService pour rétrograder vers GRATUIT chaque nuit.
+     */
+    @Query("SELECT t FROM TenantEntity t WHERE t.plan = :plan AND t.essaiUtilise = false AND t.deleted = false AND t.dateDebutEssai < :cutoff")
+    List<TenantEntity> findExpiredTrials(@Param("plan") TenantEntity.Plan plan, @Param("cutoff") LocalDateTime cutoff);
 }
