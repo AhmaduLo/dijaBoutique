@@ -192,10 +192,10 @@ public class AuthController {
         String redirectUrl;
         try {
             authService.verifyEmail(token);
-            redirectUrl = frontendUrl + "/dashboard?verified=true";
+            redirectUrl = frontendUrl + "/email-confirmed";
         } catch (IllegalStateException e) {
             // Token déjà utilisé mais email bien vérifié (scan Brevo)
-            redirectUrl = frontendUrl + "/dashboard?verified=true";
+            redirectUrl = frontendUrl + "/email-confirmed";
         } catch (IllegalArgumentException e) {
             redirectUrl = "EXPIRED".equals(e.getMessage())
                     ? frontendUrl + "/dashboard?error=expired"
