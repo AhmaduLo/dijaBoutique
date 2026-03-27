@@ -226,18 +226,37 @@ public class AuthService {
     }
 
     /**
-     * Vérifie l'email via le token reçu par email
+     * Vérifie l'email via le token reçu par email.
+     * Idempotent : si Brevo a scanné le lien avant l'utilisateur,
+     * on vérifie l'état réel de l'email en base.
+     *
+     * Throws :
+     * - IllegalStateException("ALREADY_VERIFIED") → token déjà utilisé mais email bien vérifié
+     * - IllegalArgumentException("EXPIRED")       → token expiré ou introuvable
+     * - IllegalArgumentException("INVALID")       → token déjà utilisé et email non vérifié
      */
     @Transactional
     public void verifyEmail(String token) {
         PasswordResetToken verificationToken = passwordResetTokenRepository
                 .findByTokenAndType(token, "EMAIL_VERIFICATION")
-                .orElseThrow(() -> new RuntimeException("Lien de vérification invalide ou expiré."));
+                .orElseThrow(() -> new IllegalArgumentException("EXPIRED"));
 
-        if (!verificationToken.isValid()) {
-            throw new RuntimeException("Ce lien de vérification a expiré. Veuillez vous reconnecter pour en recevoir un nouveau.");
+        // Token déjà utilisé (ex: scanné par Brevo avant l'utilisateur)
+        if (verificationToken.isUsed()) {
+            UserEntity user = verificationToken.getUser();
+            if (Boolean.TRUE.equals(user.getEmailVerifie())) {
+                throw new IllegalStateException("ALREADY_VERIFIED");
+            } else {
+                throw new IllegalArgumentException("INVALID");
+            }
         }
 
+        // Token expiré
+        if (LocalDateTime.now().isAfter(verificationToken.getExpiryDate())) {
+            throw new IllegalArgumentException("EXPIRED");
+        }
+
+        // Token valide → vérifier l'email
         UserEntity user = verificationToken.getUser();
         user.setEmailVerifie(true);
         userRepository.save(user);

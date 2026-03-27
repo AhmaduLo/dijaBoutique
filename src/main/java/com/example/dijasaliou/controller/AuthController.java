@@ -182,18 +182,33 @@ public class AuthController {
 
     /**
      * GET /api/auth/verify-email?token=XXX
-     * Vérifie l'email et redirige vers le frontend dans tous les cas
+     * Idempotent : gère le scan Brevo avant l'utilisateur
      */
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         try {
             authService.verifyEmail(token);
+            // Token valide → email vérifié
             return ResponseEntity.status(302)
-                    .location(java.net.URI.create(frontendUrl + "/email-confirmed"))
+                    .location(java.net.URI.create(frontendUrl + "/dashboard?verified=true"))
+                    .build();
+        } catch (IllegalStateException e) {
+            // Token déjà utilisé mais email bien vérifié (scan Brevo)
+            return ResponseEntity.status(302)
+                    .location(java.net.URI.create(frontendUrl + "/dashboard?verified=true"))
+                    .build();
+        } catch (IllegalArgumentException e) {
+            if ("EXPIRED".equals(e.getMessage())) {
+                return ResponseEntity.status(302)
+                        .location(java.net.URI.create(frontendUrl + "/dashboard?error=expired"))
+                        .build();
+            }
+            return ResponseEntity.status(302)
+                    .location(java.net.URI.create(frontendUrl + "/dashboard?error=invalid"))
                     .build();
         } catch (Exception e) {
             return ResponseEntity.status(302)
-                    .location(java.net.URI.create(frontendUrl + "/email-confirmed?error=invalid"))
+                    .location(java.net.URI.create(frontendUrl + "/dashboard?error=invalid"))
                     .build();
         }
     }
