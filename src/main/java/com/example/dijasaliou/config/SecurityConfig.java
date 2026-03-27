@@ -166,6 +166,8 @@ public class SecurityConfig {
                 "http://localhost:64390",
                 "https://heasystock.vercel.app",
                 "https://*.vercel.app",
+                "https://heasystock.com",
+                "https://www.heasystock.com",
                 frontendUrl
         ));
 
