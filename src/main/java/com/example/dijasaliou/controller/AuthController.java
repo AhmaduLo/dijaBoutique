@@ -191,15 +191,11 @@ public class AuthController {
 
     /**
      * POST /api/auth/resend-verification-email
-     * Renvoie l'email de vérification
+     * Renvoie l'email de vérification — utilise le JWT de l'utilisateur connecté
      */
     @PostMapping("/resend-verification-email")
-    public ResponseEntity<?> resendVerificationEmail(@RequestBody java.util.Map<String, String> body) {
-        String email = body.get("email");
-        if (email == null || email.isBlank()) {
-            return ResponseEntity.badRequest().body(java.util.Map.of("message", "L'email est requis."));
-        }
-        authService.resendVerificationEmail(email);
+    public ResponseEntity<?> resendVerificationEmail(Authentication authentication) {
+        authService.resendVerificationEmail(authentication.getName());
         return ResponseEntity.ok(java.util.Map.of("message", "Email de vérification renvoyé."));
     }
 
