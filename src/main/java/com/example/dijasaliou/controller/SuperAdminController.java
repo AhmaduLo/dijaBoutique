@@ -68,6 +68,16 @@ public class SuperAdminController {
     }
 
     /**
+     * GET /superadmin/tenants/supprimes
+     * Liste les tenants supprimés (deleted = true)
+     */
+    @GetMapping("/tenants/supprimes")
+    public ResponseEntity<List<TenantAdminDto>> getTenantsSupprimés(Authentication auth) {
+        log.info("[SUPER_ADMIN] {} consulte les tenants supprimés", auth.getName());
+        return ResponseEntity.ok(superAdminService.getSupprimesTenants());
+    }
+
+    /**
      * GET /superadmin/tenants/{id}
      * Détail d'un tenant
      */

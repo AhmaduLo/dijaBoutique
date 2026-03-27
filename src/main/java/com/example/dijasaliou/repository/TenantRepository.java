@@ -73,6 +73,8 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
      */
     List<TenantEntity> findByDeletedFalse();
 
+    List<TenantEntity> findByDeletedTrue();
+
     long countByEssaiUtiliseTrue();
 
     long countByEssaiUtiliseTrueAndPlanNot(TenantEntity.Plan plan);

@@ -80,6 +80,15 @@ public class SuperAdminService {
     }
 
     /**
+     * Retourne les tenants supprimés (deleted = true)
+     */
+    public List<TenantAdminDto> getSupprimesTenants() {
+        return tenantRepository.findByDeletedTrue().stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    /**
      * Retourne tous les tenants sans pagination (pour les stats globales uniquement)
      */
     private List<TenantEntity> getAllTenantsForStats() {
