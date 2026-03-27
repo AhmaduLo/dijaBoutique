@@ -176,11 +176,8 @@ public class AuthService {
             throw new RuntimeException("Votre adresse email est déjà vérifiée.");
         }
 
-        // Invalider les anciens tokens EMAIL_VERIFICATION
-        passwordResetTokenRepository.findByTokenAndType(
-                passwordResetTokenRepository.findByUser(user)
-                        .map(t -> t.getToken()).orElse(""), "EMAIL_VERIFICATION")
-                .ifPresent(t -> { t.markAsUsed(); passwordResetTokenRepository.save(t); });
+        // Supprimer les anciens tokens EMAIL_VERIFICATION de cet utilisateur
+        passwordResetTokenRepository.deleteByUserAndType(user, "EMAIL_VERIFICATION");
 
         // Créer un nouveau token
         PasswordResetToken verificationToken = PasswordResetToken.builder()
