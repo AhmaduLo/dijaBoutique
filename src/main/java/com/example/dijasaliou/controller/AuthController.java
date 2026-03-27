@@ -188,7 +188,7 @@ public class AuthController {
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
         return ResponseEntity.status(302)
-                .location(java.net.URI.create(frontendUrl + "/dashboard?verified=true"))
+                .location(java.net.URI.create(frontendUrl + "/email-confirmed"))
                 .build();
     }
 
