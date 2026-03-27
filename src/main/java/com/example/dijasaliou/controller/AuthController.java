@@ -40,7 +40,7 @@ public class AuthController {
     @Value("${app.cookie.same-site:Strict}")
     private String cookieSameSite;
 
-    @Value("${app.frontend.url:https://heasystock.com}")
+    @Value("${app.frontend.url:https://www.heasystock.com}")
     private String frontendUrl;
 
     public AuthController(AuthService authService, RateLimitService rateLimitService) {
