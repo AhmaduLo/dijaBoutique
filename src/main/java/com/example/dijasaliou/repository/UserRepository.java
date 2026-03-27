@@ -89,6 +89,8 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
 
     List<UserEntity> findByTenantIdAndDeletedFalse(Long tenantId);
 
+    List<UserEntity> findByTenantId(Long tenantId);
+
     @Query("SELECT MAX(u.derniereConnexion) FROM UserEntity u WHERE u.tenant.id = :tenantId AND u.deleted = false")
     Optional<LocalDateTime> findDerniereActiviteByTenantId(@Param("tenantId") Long tenantId);
 }

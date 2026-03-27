@@ -49,4 +49,16 @@ public class SuperAdminDeleteController {
         superAdminService.basculerSuspensionTenant(id);
         return ResponseEntity.ok(Map.of("message", "Statut du tenant mis à jour"));
     }
+
+    /**
+     * PUT /super-admin/tenants/{id}/restaurer
+     * Restaure un tenant supprimé — remet deleted=false + actif=true + utilisateurs actifs
+     */
+    @PutMapping("/tenants/{id}/restaurer")
+    public ResponseEntity<Map<String, String>> restaurerTenant(
+            @PathVariable Long id, Authentication auth) {
+        log.info("[SUPER_ADMIN] {} restaure le tenant {}", auth.getName(), id);
+        superAdminService.restaurerTenant(id);
+        return ResponseEntity.ok(Map.of("message", "Tenant restauré avec succès"));
+    }
 }

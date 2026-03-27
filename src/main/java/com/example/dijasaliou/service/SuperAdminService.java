@@ -207,6 +207,36 @@ public class SuperAdminService {
     }
 
     /**
+     * Restaurer un tenant supprimé (soft delete → actif)
+     * - tenant.deleted = false + actif = true + dateSuppression = null
+     * - tous les utilisateurs du tenant remis actif
+     */
+    @Transactional
+    public void restaurerTenant(Long id) {
+        TenantEntity tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + id));
+
+        // Remettre le tenant actif
+        tenant.setDeleted(false);
+        tenant.setActif(true);
+        tenant.setDateSuppression(null);
+        tenantRepository.save(tenant);
+
+        // Remettre actif tous les utilisateurs du tenant
+        List<UserEntity> users = userRepository.findByTenantId(tenant.getId());
+        for (UserEntity user : users) {
+            user.setDeleted(false);
+            user.setDateSuppression(null);
+        }
+        userRepository.saveAll(users);
+
+        tenantCacheService.evict(tenant.getTenantUuid());
+        log.info("[SUPER_ADMIN] Tenant {} restauré ({} utilisateurs réactivés)",
+                tenant.getTenantUuid(), users.size());
+        saveLog("RESTORE", "Tenant restauré après suppression", tenant);
+    }
+
+    /**
      * Suppression définitive d'un tenant (IRRÉVERSIBLE depuis l'interface)
      * - tenant.deleted = true + dateSuppression
      * - tous les utilisateurs soft-deletés
