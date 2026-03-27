@@ -33,7 +33,7 @@ import java.util.Map;
  * DELETE /superadmin/tenants/{id}            → Supprimer (soft delete)
  */
 @RestController
-@RequestMapping("/superadmin")
+@RequestMapping("/super-admin")
 @PreAuthorize("hasAuthority('SUPER_ADMIN')")
 @Slf4j
 public class SuperAdminController {
