@@ -42,13 +42,17 @@ public class EmailService {
     @Value("${app.frontend.url:http://localhost:4200}")
     private String frontendUrl;
 
+    @Value("${app.backend.url:https://dijaboutique-production.up.railway.app}")
+    private String backendUrl;
+
     /**
      * Envoie un email de vérification d'adresse email
      */
     @Async
     public void sendVerificationEmail(String toEmail, String token, String userName) {
         try {
-            String verifyLink = frontendUrl + "/verify-email?token=" + token;
+            String verifyLink = backendUrl + "/api/auth/verify-email?token=" + token;
+
             String subject = "Confirmez votre adresse email - HeasyStock";
             String htmlContent = "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
                     + "<h2 style='color:#2563eb'>Bienvenue sur HeasyStock, " + userName + " !</h2>"

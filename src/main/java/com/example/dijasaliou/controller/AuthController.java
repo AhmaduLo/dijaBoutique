@@ -1,6 +1,7 @@
 package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.AuthResponse;
+import lombok.extern.slf4j.Slf4j;
 import com.example.dijasaliou.dto.ForgotPasswordRequest;
 import com.example.dijasaliou.dto.LoginRequest;
 import com.example.dijasaliou.dto.PasswordResetResponse;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
  * - POST /api/auth/register  → Inscription
  * - POST /api/auth/login     → Connexion
  */
+@Slf4j
 @RestController
 @RequestMapping("/auth")
 
@@ -186,31 +188,25 @@ public class AuthController {
      */
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
+        log.info("=== verify-email appelé avec token: {}", token);
+        String redirectUrl;
         try {
             authService.verifyEmail(token);
-            // Token valide → email vérifié
-            return ResponseEntity.status(302)
-                    .location(java.net.URI.create(frontendUrl + "/dashboard?verified=true"))
-                    .build();
+            redirectUrl = frontendUrl + "/dashboard?verified=true";
         } catch (IllegalStateException e) {
             // Token déjà utilisé mais email bien vérifié (scan Brevo)
-            return ResponseEntity.status(302)
-                    .location(java.net.URI.create(frontendUrl + "/dashboard?verified=true"))
-                    .build();
+            redirectUrl = frontendUrl + "/dashboard?verified=true";
         } catch (IllegalArgumentException e) {
-            if ("EXPIRED".equals(e.getMessage())) {
-                return ResponseEntity.status(302)
-                        .location(java.net.URI.create(frontendUrl + "/dashboard?error=expired"))
-                        .build();
-            }
-            return ResponseEntity.status(302)
-                    .location(java.net.URI.create(frontendUrl + "/dashboard?error=invalid"))
-                    .build();
+            redirectUrl = "EXPIRED".equals(e.getMessage())
+                    ? frontendUrl + "/dashboard?error=expired"
+                    : frontendUrl + "/dashboard?error=invalid";
         } catch (Exception e) {
-            return ResponseEntity.status(302)
-                    .location(java.net.URI.create(frontendUrl + "/dashboard?error=invalid"))
-                    .build();
+            redirectUrl = frontendUrl + "/dashboard?error=invalid";
         }
+        log.info("=== Redirection vers: {}", redirectUrl);
+        return ResponseEntity.status(302)
+                .location(java.net.URI.create(redirectUrl))
+                .build();
     }
 
     /**
