@@ -40,6 +40,9 @@ public class AuthController {
     @Value("${app.cookie.same-site:Strict}")
     private String cookieSameSite;
 
+    @Value("${app.frontend.url:https://heasystock.com}")
+    private String frontendUrl;
+
     public AuthController(AuthService authService, RateLimitService rateLimitService) {
         this.authService = authService;
         this.rateLimitService = rateLimitService;
@@ -185,8 +188,18 @@ public class AuthController {
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
         return ResponseEntity.status(302)
-                .location(java.net.URI.create("https://heasystock.com/dashboard?verified=true"))
+                .location(java.net.URI.create(frontendUrl + "/dashboard?verified=true"))
                 .build();
+    }
+
+    /**
+     * GET /api/auth/me
+     * Retourne les infos de l'utilisateur connecté avec emailVerifie à jour
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe(Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(authService.getMe(email));
     }
 
     /**

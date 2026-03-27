@@ -191,6 +191,41 @@ public class AuthService {
     }
 
     /**
+     * Retourne les infos à jour de l'utilisateur connecté
+     */
+    public AuthResponse getMe(String email) {
+        UserEntity user = userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable."));
+
+        if (user.getRole() == UserEntity.Role.SUPER_ADMIN) {
+            return AuthResponse.builder()
+                    .user(user)
+                    .emailVerifie(true)
+                    .requiresPayment(false)
+                    .plan(null)
+                    .build();
+        }
+
+        TenantEntity tenant = user.getTenant();
+        boolean requiresPayment = false;
+        if (tenant != null) {
+            if (tenant.getPlan() == TenantEntity.Plan.GRATUIT) {
+                requiresPayment = !tenant.essaiGratuitValide();
+            } else {
+                requiresPayment = tenant.getDateExpiration() != null &&
+                        tenant.getDateExpiration().isBefore(LocalDateTime.now());
+            }
+        }
+
+        return AuthResponse.builder()
+                .user(user)
+                .emailVerifie(Boolean.TRUE.equals(user.getEmailVerifie()))
+                .requiresPayment(requiresPayment)
+                .plan(tenant != null ? tenant.getPlan() : null)
+                .build();
+    }
+
+    /**
      * Vérifie l'email via le token reçu par email
      */
     @Transactional
