@@ -28,7 +28,6 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Service pour le Super Admin — accès cross-tenant
@@ -218,10 +217,8 @@ public class SuperAdminService {
         TenantEntity tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + id));
 
-        // Soft-delete tous les utilisateurs du tenant
-        List<UserEntity> users = userRepository.findByDeletedFalse().stream()
-                .filter(u -> tenant.equals(u.getTenant()))
-                .collect(Collectors.toList());
+        // Soft-delete tous les utilisateurs du tenant (requête ciblée, sans filtre Hibernate)
+        List<UserEntity> users = userRepository.findByTenantIdAndDeletedFalse(tenant.getId());
 
         LocalDateTime maintenant = LocalDateTime.now();
         for (UserEntity user : users) {
