@@ -182,14 +182,20 @@ public class AuthController {
 
     /**
      * GET /api/auth/verify-email?token=XXX
-     * Vérifie l'email et redirige vers le dashboard
+     * Vérifie l'email et redirige vers le frontend dans tous les cas
      */
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
-        authService.verifyEmail(token);
-        return ResponseEntity.status(302)
-                .location(java.net.URI.create(frontendUrl + "/email-confirmed"))
-                .build();
+        try {
+            authService.verifyEmail(token);
+            return ResponseEntity.status(302)
+                    .location(java.net.URI.create(frontendUrl + "/email-confirmed"))
+                    .build();
+        } catch (Exception e) {
+            return ResponseEntity.status(302)
+                    .location(java.net.URI.create(frontendUrl + "/email-confirmed?error=invalid"))
+                    .build();
+        }
     }
 
     /**
