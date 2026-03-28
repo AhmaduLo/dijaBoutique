@@ -8,6 +8,8 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.hibernate.Filter;
 import org.hibernate.Session;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -17,6 +19,8 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 public class TenantFilterAspect {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantFilterAspect.class);
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -41,11 +45,11 @@ public class TenantFilterAspect {
             session.enableFilter("tenantFilter")
                    .setParameter("tenantId", tenantId);
 
-            System.out.println("✅ [TenantFilterAspect] Filtre activé pour tenant: " + tenantId
-                + " - Méthode: " + joinPoint.getSignature().getName());
+            log.debug("[TenantFilterAspect] Filtre activé pour tenant: {} - Méthode: {}", tenantId,
+                joinPoint.getSignature().getName());
         } else {
-            System.out.println("⚠️ [TenantFilterAspect] Pas de tenant_id dans le contexte pour: "
-                + joinPoint.getSignature().getName());
+            log.debug("[TenantFilterAspect] Pas de tenant_id dans le contexte pour: {}",
+                joinPoint.getSignature().getName());
         }
     }
 }

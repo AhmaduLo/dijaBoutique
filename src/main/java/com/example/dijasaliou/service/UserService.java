@@ -2,6 +2,7 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,10 +15,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final TenantService tenantService;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, TenantService tenantService) {
+    public UserService(UserRepository userRepository, TenantService tenantService, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.tenantService = tenantService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -56,7 +59,10 @@ public class UserService {
         // Validation : Champs obligatoires
         validerUtilisateur(utilisateur);
 
-        // TODO : Hasher le mot de passe (avec BCrypt plus tard)
+        // Hasher le mot de passe avec BCrypt
+        if (utilisateur.getMotDePasse() != null && !utilisateur.getMotDePasse().isEmpty()) {
+            utilisateur.setMotDePasse(passwordEncoder.encode(utilisateur.getMotDePasse()));
+        }
 
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         utilisateur.setTenant(tenantService.getCurrentTenant());
