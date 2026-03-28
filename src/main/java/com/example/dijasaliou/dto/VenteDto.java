@@ -25,7 +25,7 @@ import java.time.LocalDate;
 @Builder
 public class VenteDto {
     private String id;
-    private Integer quantite;
+    private Double quantite;
     private String nomProduit;
     private BigDecimal prixUnitaire;
     private BigDecimal prixTotal;

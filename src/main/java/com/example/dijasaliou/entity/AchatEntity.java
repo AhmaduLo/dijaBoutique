@@ -39,7 +39,7 @@ public class AchatEntity extends BaseEntity{
     @NotNull(message = "La quantité est obligatoire")
     @Positive(message = "La quantité doit être positive")
     @Column(name = "quantite", nullable = false)
-    private Integer quantite;
+    private Double quantite;
 
     @NotBlank(message = "Le nom du produit est obligatoire")
     @Size(min = 2, max = 100, message = "Le nom doit faire entre 2 et 100 caractères")
@@ -142,7 +142,7 @@ public class AchatEntity extends BaseEntity{
      */
     public void calculerPrixTotal() {
         if (this.quantite != null && this.prixUnitaire != null) {
-            this.prixTotal = this.prixUnitaire.multiply(new BigDecimal(this.quantite)).setScale(2, RoundingMode.HALF_UP);
+            this.prixTotal = this.prixUnitaire.multiply(BigDecimal.valueOf(this.quantite)).setScale(2, RoundingMode.HALF_UP);
         }
     }
 
@@ -152,7 +152,7 @@ public class AchatEntity extends BaseEntity{
      */
     public void calculerPrixUnitaire() {
         if (this.quantite != null && this.quantite > 0 && this.prixTotal != null) {
-            this.prixUnitaire = this.prixTotal.divide(new BigDecimal(this.quantite), 2, RoundingMode.HALF_UP);
+            this.prixUnitaire = this.prixTotal.divide(BigDecimal.valueOf(this.quantite), 2, RoundingMode.HALF_UP);
         }
     }
 

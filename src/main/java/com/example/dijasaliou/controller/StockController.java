@@ -124,7 +124,7 @@ public class StockController {
     @GetMapping("/verifier")
     public ResponseEntity<Map<String, Object>> verifierStock(
             @RequestParam String nomProduit,
-            @RequestParam Integer quantite) {
+            @RequestParam Double quantite) {
 
         boolean disponible = stockService.verifierStockDisponible(nomProduit, quantite);
         StockDto stock = null;

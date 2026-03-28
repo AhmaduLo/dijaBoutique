@@ -137,7 +137,7 @@ public class StockService {
      * @param quantite Quantité demandée
      * @return true si le stock est suffisant
      */
-    public boolean verifierStockDisponible(String nomProduit, Integer quantite) {
+    public boolean verifierStockDisponible(String nomProduit, Double quantite) {
         try {
             StockDto stock = obtenirStockParNomProduit(nomProduit);
             return stock.estSuffisant(quantite);
@@ -188,26 +188,26 @@ public class StockService {
      */
     private StockDto calculerStock(String nomProduit, List<AchatEntity> achats, List<VenteEntity> ventes) {
         // Calculer la quantité totale achetée
-        Integer quantiteAchetee = achats.stream()
-                .mapToInt(AchatEntity::getQuantite)
+        Double quantiteAchetee = achats.stream()
+                .mapToDouble(AchatEntity::getQuantite)
                 .sum();
 
         // Calculer la quantité totale vendue
-        Integer quantiteVendue = ventes.stream()
-                .mapToInt(VenteEntity::getQuantite)
+        Double quantiteVendue = ventes.stream()
+                .mapToDouble(VenteEntity::getQuantite)
                 .sum();
 
         // Calculer le stock disponible
-        Integer stockDisponible = quantiteAchetee - quantiteVendue;
+        Double stockDisponible = quantiteAchetee - quantiteVendue;
 
         // Calculer le prix moyen pondéré d'achat (somme(prix × qté) / totalQté)
         BigDecimal prixMoyenAchat = BigDecimal.ZERO;
         if (quantiteAchetee > 0) {
             BigDecimal totalValeurAchats = achats.stream()
-                    .map(a -> a.getPrixUnitaire().multiply(new BigDecimal(a.getQuantite())))
+                    .map(a -> a.getPrixUnitaire().multiply(BigDecimal.valueOf(a.getQuantite())))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             prixMoyenAchat = totalValeurAchats.divide(
-                    new BigDecimal(quantiteAchetee),
+                    BigDecimal.valueOf(quantiteAchetee),
                     2,
                     RoundingMode.HALF_UP
             );
@@ -217,17 +217,17 @@ public class StockService {
         BigDecimal prixMoyenVente = BigDecimal.ZERO;
         if (quantiteVendue > 0) {
             BigDecimal totalValeurVentes = ventes.stream()
-                    .map(v -> v.getPrixUnitaire().multiply(new BigDecimal(v.getQuantite())))
+                    .map(v -> v.getPrixUnitaire().multiply(BigDecimal.valueOf(v.getQuantite())))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             prixMoyenVente = totalValeurVentes.divide(
-                    new BigDecimal(quantiteVendue),
+                    BigDecimal.valueOf(quantiteVendue),
                     2,
                     RoundingMode.HALF_UP
             );
         }
 
         // Calculer la valeur du stock
-        BigDecimal valeurStock = prixMoyenAchat.multiply(new BigDecimal(stockDisponible));
+        BigDecimal valeurStock = prixMoyenAchat.multiply(BigDecimal.valueOf(stockDisponible));
 
         // Calculer la marge unitaire
         BigDecimal margeUnitaire = prixMoyenVente.subtract(prixMoyenAchat);

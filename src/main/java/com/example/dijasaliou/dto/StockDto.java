@@ -39,17 +39,17 @@ public class StockDto {
     /**
      * Quantité totale achetée
      */
-    private Integer quantiteAchetee;
+    private Double quantiteAchetee;
 
     /**
      * Quantité totale vendue
      */
-    private Integer quantiteVendue;
+    private Double quantiteVendue;
 
     /**
      * Stock disponible (achetée - vendue)
      */
-    private Integer stockDisponible;
+    private Double stockDisponible;
 
     /**
      * Prix unitaire moyen d'achat
@@ -105,7 +105,7 @@ public class StockDto {
     /**
      * Détermine le statut du stock selon la quantité disponible
      */
-    public static StatutStock determinerStatut(Integer stockDisponible) {
+    public static StatutStock determinerStatut(Double stockDisponible) {
         if (stockDisponible == null) {
             return StatutStock.RUPTURE;
         }
@@ -124,7 +124,7 @@ public class StockDto {
     /**
      * Vérifie si le stock est suffisant pour une vente
      */
-    public boolean estSuffisant(Integer quantiteDemandee) {
+    public boolean estSuffisant(Double quantiteDemandee) {
         return stockDisponible != null && stockDisponible >= quantiteDemandee;
     }
 
@@ -135,6 +135,6 @@ public class StockDto {
         if (quantiteAchetee == null || quantiteAchetee == 0) {
             return 0.0;
         }
-        return (stockDisponible.doubleValue() / quantiteAchetee.doubleValue()) * 100;
+        return (stockDisponible / quantiteAchetee) * 100;
     }
 }

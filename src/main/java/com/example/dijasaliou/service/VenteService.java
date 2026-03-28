@@ -194,7 +194,7 @@ public class VenteService {
             verifierStockAvantVente(venteModifiee.getNomProduit(), venteModifiee.getQuantite());
         } else if (venteModifiee.getQuantite() > venteExistante.getQuantite()) {
             // Même produit, quantité augmentée : seul le delta supplémentaire est consommé
-            int delta = venteModifiee.getQuantite() - venteExistante.getQuantite();
+            Double delta = venteModifiee.getQuantite() - venteExistante.getQuantite();
             verifierStockAvantVente(venteModifiee.getNomProduit(), delta);
         }
 
@@ -436,14 +436,14 @@ public class VenteService {
      * Vérifier le stock avant une vente
      * Lance une exception si le stock est insuffisant
      */
-    private void verifierStockAvantVente(String nomProduit, Integer quantite) {
+    private void verifierStockAvantVente(String nomProduit, Double quantite) {
         try {
             StockDto stock = stockService.obtenirStockParNomProduit(nomProduit);
 
             if (!stock.estSuffisant(quantite)) {
                 throw new IllegalArgumentException(
                         String.format(
-                                "Stock insuffisant pour '%s' ! Disponible : %d, Demandé : %d",
+                                "Stock insuffisant pour '%s' ! Disponible : %.2f, Demandé : %.2f",
                                 nomProduit,
                                 stock.getStockDisponible(),
                                 quantite
