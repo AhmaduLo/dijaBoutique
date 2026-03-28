@@ -141,12 +141,12 @@ public class AchatService {
         // 4. Vérifier que la réduction de quantité ne rend pas le stock négatif
         boolean memeProduit = achatExistant.getNomProduit().equalsIgnoreCase(achatModifie.getNomProduit());
         if (memeProduit && achatModifie.getQuantite() < achatExistant.getQuantite()) {
-            int reduction = achatExistant.getQuantite() - achatModifie.getQuantite();
+            Double reduction = achatExistant.getQuantite() - achatModifie.getQuantite();
             try {
                 StockDto stock = stockService.obtenirStockParNomProduit(achatExistant.getNomProduit());
                 if (stock.getStockDisponible() - reduction < 0) {
                     throw new IllegalArgumentException(
-                            String.format("Impossible de réduire la quantité : stock disponible %d, réduction demandée %d",
+                            String.format("Impossible de réduire la quantité : stock disponible %.2f, réduction demandée %.2f",
                                     stock.getStockDisponible(), reduction));
                 }
             } catch (RuntimeException e) {

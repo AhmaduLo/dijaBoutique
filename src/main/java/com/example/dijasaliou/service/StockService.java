@@ -74,7 +74,7 @@ public class StockService {
         }
 
         // 6. Trier par stock disponible (du plus faible au plus élevé pour voir les alertes)
-        stocks.sort((s1, s2) -> Integer.compare(s1.getStockDisponible(), s2.getStockDisponible()));
+        stocks.sort((s1, s2) -> Double.compare(s1.getStockDisponible(), s2.getStockDisponible()));
 
         return stocks;
     }
