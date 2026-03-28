@@ -64,7 +64,7 @@ class VenteServiceTest {
 
         venteValide = VenteEntity.builder()
                 .nomProduit("Ordinateur")
-                .quantite(2)
+                .quantite(2.0)
                 .prixUnitaire(new BigDecimal("500.00"))
                 .prixTotal(new BigDecimal("1000.00"))
                 .client("Client A")
@@ -125,7 +125,7 @@ class VenteServiceTest {
     void creerVente_leveExceptionQuantiteZero() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("Produit")
-                .quantite(0)
+                .quantite(0.0)
                 .prixUnitaire(new BigDecimal("100.00"))
                 .build();
 
@@ -153,7 +153,7 @@ class VenteServiceTest {
     void creerVente_leveExceptionPrixZero() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("Produit")
-                .quantite(5)
+                .quantite(5.0)
                 .prixUnitaire(BigDecimal.ZERO)
                 .build();
 
@@ -167,7 +167,7 @@ class VenteServiceTest {
     void creerVente_leveExceptionNomProduitVide() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("")
-                .quantite(5)
+                .quantite(5.0)
                 .prixUnitaire(new BigDecimal("100.00"))
                 .build();
 
@@ -181,7 +181,7 @@ class VenteServiceTest {
     void creerVente_leveExceptionNomProduitNull() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit(null)
-                .quantite(5)
+                .quantite(5.0)
                 .prixUnitaire(new BigDecimal("100.00"))
                 .build();
 
@@ -256,7 +256,7 @@ class VenteServiceTest {
 
         VenteEntity venteCredit = VenteEntity.builder()
                 .nomProduit("Téléphone")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("200.00"))
                 .prixTotal(new BigDecimal("200.00"))
                 .dateVente(LocalDate.now())
@@ -282,7 +282,7 @@ class VenteServiceTest {
     void creerVente_modeCREDIT_sansClient_leveException() {
         VenteEntity venteCredit = VenteEntity.builder()
                 .nomProduit("Téléphone")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("200.00"))
                 .dateVente(LocalDate.now())
                 .modePaiement(VenteEntity.ModePaiementVente.CREDIT)
@@ -560,7 +560,7 @@ class VenteServiceTest {
     void modifierVente_succes() {
         venteValide.setId("test-id-1");
         VenteEntity modifications = VenteEntity.builder()
-                .quantite(1) // quantité réduite → même nom + qté ≤ ancienne → pas d'appel au StockService
+                .quantite(1.0) // quantité réduite → même nom + qté ≤ ancienne → pas d'appel au StockService
                 .nomProduit("Ordinateur")
                 .prixUnitaire(new BigDecimal("600.00"))
                 .dateVente(LocalDate.now())
@@ -582,7 +582,7 @@ class VenteServiceTest {
     void modifierVente_leveSecurityExceptionTenantDifferent() {
         venteValide.setId("test-id-1");
         VenteEntity modifications = VenteEntity.builder()
-                .quantite(3).nomProduit("Ordinateur")
+                .quantite(3.0).nomProduit("Ordinateur")
                 .prixUnitaire(new BigDecimal("600.00"))
                 .dateVente(LocalDate.now())
                 .build();

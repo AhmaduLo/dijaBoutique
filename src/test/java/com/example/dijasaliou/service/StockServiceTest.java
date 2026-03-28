@@ -48,21 +48,21 @@ class StockServiceTest {
 
         achat1 = AchatEntity.builder()
                 .nomProduit("Ordinateur")
-                .quantite(10)
+                .quantite(10.0)
                 .prixUnitaire(new BigDecimal("500.00"))
                 .dateAchat(LocalDate.now())
                 .build();
 
         achat2 = AchatEntity.builder()
                 .nomProduit("Souris")
-                .quantite(50)
+                .quantite(50.0)
                 .prixUnitaire(new BigDecimal("10.00"))
                 .dateAchat(LocalDate.now())
                 .build();
 
         vente1 = VenteEntity.builder()
                 .nomProduit("Ordinateur")
-                .quantite(3)
+                .quantite(3.0)
                 .prixUnitaire(new BigDecimal("700.00"))
                 .dateVente(LocalDate.now())
                 .build();
@@ -151,10 +151,10 @@ class StockServiceTest {
     void obtenirProduitsEnRupture_retourneRupture() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         AchatEntity achatRupture = AchatEntity.builder()
-                .nomProduit("Clavier").quantite(5).prixUnitaire(new BigDecimal("30.00"))
+                .nomProduit("Clavier").quantite(5.0).prixUnitaire(new BigDecimal("30.00"))
                 .dateAchat(LocalDate.now()).build();
         VenteEntity venteRupture = VenteEntity.builder()
-                .nomProduit("Clavier").quantite(5).prixUnitaire(new BigDecimal("50.00"))
+                .nomProduit("Clavier").quantite(5.0).prixUnitaire(new BigDecimal("50.00"))
                 .dateVente(LocalDate.now()).build();
 
         when(achatRepository.findAllByTenant(any())).thenReturn(Arrays.asList(achatRupture));
@@ -175,10 +175,10 @@ class StockServiceTest {
     void obtenirProduitsStockBas_retourneStockBas() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         AchatEntity achatStockBas = AchatEntity.builder()
-                .nomProduit("Ecran").quantite(15).prixUnitaire(new BigDecimal("200.00"))
+                .nomProduit("Ecran").quantite(15.0).prixUnitaire(new BigDecimal("200.00"))
                 .dateAchat(LocalDate.now()).build();
         VenteEntity venteStockBas = VenteEntity.builder()
-                .nomProduit("Ecran").quantite(10).prixUnitaire(new BigDecimal("300.00"))
+                .nomProduit("Ecran").quantite(10.0).prixUnitaire(new BigDecimal("300.00"))
                 .dateVente(LocalDate.now()).build();
 
         when(achatRepository.findAllByTenant(any())).thenReturn(Arrays.asList(achatStockBas));
