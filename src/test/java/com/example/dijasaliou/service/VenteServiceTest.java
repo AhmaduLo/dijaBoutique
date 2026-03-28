@@ -139,7 +139,7 @@ class VenteServiceTest {
     void creerVente_leveExceptionQuantiteNegative() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("Produit")
-                .quantite(-5)
+                .quantite(-5.0)
                 .prixUnitaire(new BigDecimal("100.00"))
                 .build();
 

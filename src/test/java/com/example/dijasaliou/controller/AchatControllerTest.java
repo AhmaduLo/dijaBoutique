@@ -294,7 +294,7 @@ class AchatControllerTest {
     void creer_AvecDonneesInvalides() throws Exception {
         // Arrange - données invalides : quantité négative, nom vide, prix négatif, prixTotal null
         AchatEntity achatInvalide = AchatEntity.builder()
-                .quantite(-5) // Quantité négative (invalide)
+                .quantite(-5.0) // Quantité négative (invalide)
                 .nomProduit("") // Nom vide (invalide)
                 .prixUnitaire(new BigDecimal("-10.00")) // Prix négatif (invalide)
                 .build();

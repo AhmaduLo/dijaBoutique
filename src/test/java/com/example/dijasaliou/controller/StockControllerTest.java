@@ -319,7 +319,7 @@ class StockControllerTest {
     void verifierStock_DevraitConfirmerStockSuffisant() throws Exception {
         // Arrange
         String nomProduit = "Collier en or";
-        Integer quantite = 10;
+        Double quantite = 10.0;
         when(stockService.verifierStockDisponible(nomProduit, quantite)).thenReturn(true);
         when(stockService.obtenirStockParNomProduit(nomProduit)).thenReturn(stockTest1);
 
@@ -344,7 +344,7 @@ class StockControllerTest {
     void verifierStock_DevraitIndiquerStockInsuffisant() throws Exception {
         // Arrange
         String nomProduit = "Bracelet en argent";
-        Integer quantite = 10;
+        Double quantite = 10.0;
         when(stockService.verifierStockDisponible(nomProduit, quantite)).thenReturn(false);
         when(stockService.obtenirStockParNomProduit(nomProduit)).thenReturn(stockTest2);
 
@@ -369,7 +369,7 @@ class StockControllerTest {
     void verifierStock_DevraitGererProduitInexistant() throws Exception {
         // Arrange
         String nomProduit = "Produit Inexistant";
-        Integer quantite = 5;
+        Double quantite = 5.0;
         when(stockService.verifierStockDisponible(nomProduit, quantite)).thenReturn(false);
         when(stockService.obtenirStockParNomProduit(nomProduit))
                 .thenThrow(new RuntimeException("Produit non trouvé"));

@@ -201,7 +201,7 @@ class StockServiceTest {
         when(venteRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(vente1));
 
         // Stock = 7, demande = 5
-        boolean resultat = stockService.verifierStockDisponible("Ordinateur", 5);
+        boolean resultat = stockService.verifierStockDisponible("Ordinateur", 5.0);
 
         assertThat(resultat).isTrue();
     }
@@ -213,7 +213,7 @@ class StockServiceTest {
         when(venteRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(vente1));
 
         // Stock = 7, demande = 20
-        boolean resultat = stockService.verifierStockDisponible("Ordinateur", 20);
+        boolean resultat = stockService.verifierStockDisponible("Ordinateur", 20.0);
 
         assertThat(resultat).isFalse();
     }
@@ -226,7 +226,7 @@ class StockServiceTest {
         when(achatRepository.findByNomProduitContaining("Inexistant")).thenReturn(Collections.emptyList());
         when(venteRepository.findByNomProduitContaining("Inexistant")).thenReturn(Collections.emptyList());
 
-        boolean resultat = stockService.verifierStockDisponible("Inexistant", 1);
+        boolean resultat = stockService.verifierStockDisponible("Inexistant", 1.0);
 
         assertThat(resultat).isFalse();
     }
