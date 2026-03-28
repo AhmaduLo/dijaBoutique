@@ -603,14 +603,14 @@ class VenteServiceTest {
     @DisplayName("obtenirVentesPaginees() — retourne une page de ventes")
     void obtenirVentesPaginees_retournePage() {
         Page<VenteEntity> pageMock = new PageImpl<>(Collections.emptyList());
-        when(venteRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+        when(venteRepository.findAllWithSearch(any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(pageMock);
 
         var resultat = venteService.obtenirVentesPaginees(0, 10, null, null, null);
 
         assertThat(resultat).isNotNull();
         assertThat(resultat.getContent()).isEmpty();
-        verify(venteRepository).findAllWithSearch(isNull(), isNull(), isNull(), any(Pageable.class));
+        verify(venteRepository).findAllWithSearch(anyString(), isNull(), isNull(), isNull(), any(Pageable.class));
     }
 
     @Test
@@ -618,7 +618,7 @@ class VenteServiceTest {
     void obtenirVentesParUtilisateurPaginees_retournePage() {
         Page<VenteEntity> pageMock = new PageImpl<>(Collections.emptyList());
         when(venteRepository.findByUtilisateurWithSearch(
-                eq(utilisateurTest), any(), any(), any(), any(Pageable.class)))
+                eq(utilisateurTest), any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(pageMock);
 
         var resultat = venteService.obtenirVentesParUtilisateurPaginees(
@@ -626,7 +626,7 @@ class VenteServiceTest {
 
         assertThat(resultat).isNotNull();
         verify(venteRepository).findByUtilisateurWithSearch(
-                eq(utilisateurTest), isNull(), isNull(), isNull(), any(Pageable.class));
+                eq(utilisateurTest), anyString(), isNull(), isNull(), isNull(), any(Pageable.class));
     }
 
     // =========================================================

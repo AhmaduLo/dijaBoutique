@@ -60,7 +60,8 @@ public class AchatService {
     public PagedResponse<AchatDto> obtenirAchatsPagines(int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateAchat"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
-        Page<AchatEntity> achatsPage = achatRepository.findAllWithSearch(searchParam, dateDebut, dateFin, pageable);
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        Page<AchatEntity> achatsPage = achatRepository.findAllWithSearch(tenantUuid, searchParam, dateDebut, dateFin, pageable);
         Page<AchatDto> dtoPage = achatsPage.map(AchatDto::fromEntity);
         return PagedResponse.from(dtoPage);
     }

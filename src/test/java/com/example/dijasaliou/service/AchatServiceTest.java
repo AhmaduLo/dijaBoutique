@@ -320,7 +320,7 @@ class AchatServiceTest {
     @DisplayName("obtenirAchatsPagines() — retourne une page d'achats")
     void obtenirAchatsPagines_retournePage() {
         Page<AchatEntity> pageMock = new PageImpl<>(Collections.emptyList());
-        when(achatRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
+        when(achatRepository.findAllWithSearch(any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(pageMock);
 
         var resultat = achatService.obtenirAchatsPagines(0, 10, null, null, null);

@@ -75,7 +75,8 @@ public class VenteService {
     public PagedResponse<VenteDto> obtenirVentesPaginees(int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
         PageRequest pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search : null;
-        Page<VenteEntity> ventesPage = venteRepository.findAllWithSearch(searchParam, dateDebut, dateFin, pageable);
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        Page<VenteEntity> ventesPage = venteRepository.findAllWithSearch(tenantUuid, searchParam, dateDebut, dateFin, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
         return PagedResponse.from(dtoPage);
     }
@@ -87,7 +88,8 @@ public class VenteService {
     public PagedResponse<VenteDto> obtenirVentesParUtilisateurPaginees(UserEntity utilisateur, int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
         PageRequest pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search : null;
-        Page<VenteEntity> ventesPage = venteRepository.findByUtilisateurWithSearch(utilisateur, searchParam, dateDebut, dateFin, pageable);
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        Page<VenteEntity> ventesPage = venteRepository.findByUtilisateurWithSearch(utilisateur, tenantUuid, searchParam, dateDebut, dateFin, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
         return PagedResponse.from(dtoPage);
     }

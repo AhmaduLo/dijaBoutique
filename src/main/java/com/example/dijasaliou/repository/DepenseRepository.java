@@ -52,12 +52,19 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
     List<DepenseEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
-     * Recherche paginée avec filtre optionnel sur libelle et catégorie
+     * Recherche paginée avec filtre tenant EXPLICITE.
      */
-    @Query("SELECT d FROM DepenseEntity d WHERE " +
+    @Query(value = "SELECT d FROM DepenseEntity d WHERE " +
+           "d.tenant.tenantUuid = :tenantUuid AND " +
+           "(:search IS NULL OR LOWER(d.libelle) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:categorie IS NULL OR d.categorie = :categorie) " +
+           "ORDER BY d.dateDepense DESC",
+           countQuery = "SELECT COUNT(d) FROM DepenseEntity d WHERE " +
+           "d.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(d.libelle) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:categorie IS NULL OR d.categorie = :categorie)")
-    Page<DepenseEntity> findAllWithSearch(@Param("search") String search,
+    Page<DepenseEntity> findAllWithSearch(@Param("tenantUuid") String tenantUuid,
+                                          @Param("search") String search,
                                           @Param("categorie") DepenseEntity.CategorieDepense categorie,
                                           Pageable pageable);
 }

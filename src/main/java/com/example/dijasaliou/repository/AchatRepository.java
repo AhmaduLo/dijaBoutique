@@ -76,14 +76,23 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     List<AchatEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
-     * Recherche paginée avec filtre optionnel sur nomProduit, fournisseur et plage de dates
+     * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_achat_tenant_date.
      */
-    @Query("SELECT a FROM AchatEntity a WHERE " +
+    @Query(value = "SELECT a FROM AchatEntity a WHERE " +
+           "a.tenant.tenantUuid = :tenantUuid AND " +
+           "(:search IS NULL OR LOWER(a.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:dateDebut IS NULL OR a.dateAchat >= :dateDebut) AND " +
+           "(:dateFin IS NULL OR a.dateAchat <= :dateFin) " +
+           "ORDER BY a.dateAchat DESC",
+           countQuery = "SELECT COUNT(a) FROM AchatEntity a WHERE " +
+           "a.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(a.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR a.dateAchat >= :dateDebut) AND " +
            "(:dateFin IS NULL OR a.dateAchat <= :dateFin)")
-    Page<AchatEntity> findAllWithSearch(@Param("search") String search,
+    Page<AchatEntity> findAllWithSearch(@Param("tenantUuid") String tenantUuid,
+                                        @Param("search") String search,
                                         @Param("dateDebut") LocalDate dateDebut,
                                         @Param("dateFin") LocalDate dateFin,
                                         Pageable pageable);

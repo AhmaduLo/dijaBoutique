@@ -189,28 +189,28 @@ class VenteRepositoryTest {
     // ==================== findAllWithSearch ====================
 
     @Test
-    @DisplayName("findAllWithSearch — sans filtre, retourne tout (toutes pages)")
+    @DisplayName("findAllWithSearch — sans filtre, retourne uniquement le tenant courant")
     void findAllWithSearch_SansFiltreRetourneTout() {
-        // Tous les 5 enregistrements (tenant-001 + tenant-002 — pas filtré par tenant ici)
-        Page<VenteEntity> page = repo.findAllWithSearch(null, null, null, PageRequest.of(0, 20));
+        // tenant-001 a 4 ventes (l'autreTenant est exclu par le filtre tenant explicite)
+        Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", null, null, null, PageRequest.of(0, 20));
 
-        assertThat(page.getTotalElements()).isEqualTo(5L);
+        assertThat(page.getTotalElements()).isEqualTo(4L);
     }
 
     @Test
     @DisplayName("findAllWithSearch — filtre par nomProduit (LOWER LIKE)")
     void findAllWithSearch_FiltreProduitInsensibleCasse() {
-        // "collier" → "Collier en or" : vente1 + vente3 (tenant-001) + autreTenant (1) = 3
-        Page<VenteEntity> page = repo.findAllWithSearch("collier", null, null, PageRequest.of(0, 20));
+        // "collier" → vente1 + vente3 (tenant-001 seulement, pas autreTenant)
+        Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", "collier", null, null, PageRequest.of(0, 20));
 
-        assertThat(page.getTotalElements()).isEqualTo(3L);
+        assertThat(page.getTotalElements()).isEqualTo(2L);
     }
 
     @Test
     @DisplayName("findAllWithSearch — filtre par client")
     void findAllWithSearch_FiltreClient() {
         // "aminata" → client = "Aminata Diallo" (vente 1)
-        Page<VenteEntity> page = repo.findAllWithSearch("aminata", null, null, PageRequest.of(0, 20));
+        Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", "aminata", null, null, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(1L);
     }
@@ -219,7 +219,7 @@ class VenteRepositoryTest {
     @DisplayName("findAllWithSearch — filtre dateDebut exclut les ventes antérieures")
     void findAllWithSearch_FiltreDateDebut() {
         // Ventes à partir du 1er mars 2025 → seule vente3 (10 mars)
-        Page<VenteEntity> page = repo.findAllWithSearch(null,
+        Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", null,
                 LocalDate.of(2025, 3, 1), null, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(1L);
@@ -228,21 +228,29 @@ class VenteRepositoryTest {
     @Test
     @DisplayName("findAllWithSearch — filtre dateFin exclut les ventes postérieures")
     void findAllWithSearch_FiltreDateFin() {
-        // Ventes jusqu'au 31 jan 2025 → vente1, vente2, vente4 + autreTenant = 4
-        Page<VenteEntity> page = repo.findAllWithSearch(null,
+        // Ventes jusqu'au 31 jan 2025 → vente1, vente2, vente4 (autreTenant exclu)
+        Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", null,
                 null, LocalDate.of(2025, 1, 31), PageRequest.of(0, 20));
 
-        assertThat(page.getTotalElements()).isEqualTo(4L);
+        assertThat(page.getTotalElements()).isEqualTo(3L);
     }
 
     @Test
     @DisplayName("findAllWithSearch — plage de dates combinée")
     void findAllWithSearch_PlageDesDates() {
-        // 1er–31 jan 2025 → vente1 (15 jan), vente2 (20 jan), vente4 (15 jan) + autreTenant (15 jan) = 4
-        Page<VenteEntity> page = repo.findAllWithSearch(null,
+        // 1er–31 jan 2025 → vente1 (15 jan), vente2 (20 jan), vente4 (15 jan) — autreTenant exclu
+        Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", null,
                 LocalDate.of(2025, 1, 1), LocalDate.of(2025, 1, 31), PageRequest.of(0, 20));
 
-        assertThat(page.getTotalElements()).isEqualTo(4L);
+        assertThat(page.getTotalElements()).isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("findAllWithSearch — isolation tenant : l'autreTenant ne voit pas les ventes de tenant-001")
+    void findAllWithSearch_IsolationTenant() {
+        Page<VenteEntity> pageTenant2 = repo.findAllWithSearch("tenant-vente-002", null, null, null, PageRequest.of(0, 20));
+
+        assertThat(pageTenant2.getTotalElements()).isEqualTo(1L);
     }
 
     // ==================== sumDirectVentesParModeEtPeriode ====================
@@ -306,7 +314,7 @@ class VenteRepositoryTest {
     void findByUtilisateurWithSearch_DoitFiltrerParUtilisateur() {
         // user a 3 ventes (vente1, vente2, vente4), autreUser a 1 vente dans tenant-001
         Page<VenteEntity> page = repo.findByUtilisateurWithSearch(
-                user, null, null, null, PageRequest.of(0, 20));
+                user, "tenant-vente-001", null, null, null, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(3L);
     }
@@ -316,7 +324,7 @@ class VenteRepositoryTest {
     void findByUtilisateurWithSearch_AvecFiltreProduit() {
         // user + "Collier" → vente1 (15 jan)
         Page<VenteEntity> page = repo.findByUtilisateurWithSearch(
-                user, "collier", null, null, PageRequest.of(0, 20));
+                user, "tenant-vente-001", "collier", null, null, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(1L);
     }
@@ -326,7 +334,7 @@ class VenteRepositoryTest {
     void findByUtilisateurWithSearch_AvecFiltreDate() {
         // user + entre 14 jan et 16 jan → vente1 (15 jan) + vente4 (15 jan) = 2
         Page<VenteEntity> page = repo.findByUtilisateurWithSearch(
-                user, null,
+                user, "tenant-vente-001", null,
                 LocalDate.of(2025, 1, 14),
                 LocalDate.of(2025, 1, 16),
                 PageRequest.of(0, 20));
@@ -338,7 +346,7 @@ class VenteRepositoryTest {
     @DisplayName("findByUtilisateurWithSearch — pagination fonctionne")
     void findByUtilisateurWithSearch_PaginationFonctionne() {
         Page<VenteEntity> page = repo.findByUtilisateurWithSearch(
-                user, null, null, null, PageRequest.of(0, 2));
+                user, "tenant-vente-001", null, null, null, PageRequest.of(0, 2));
 
         assertThat(page.getTotalElements()).isEqualTo(3L);
         assertThat(page.getContent()).hasSize(2);

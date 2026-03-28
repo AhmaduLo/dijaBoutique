@@ -158,8 +158,11 @@ public class StockController {
      */
     @GetMapping("/valeur-totale")
     public ResponseEntity<Map<String, Object>> obtenirValeurTotale() {
-        BigDecimal valeurTotale = stockService.obtenirValeurTotaleStock();
         List<StockDto> stocks = stockService.obtenirTousLesStocks();
+        BigDecimal valeurTotale = stocks.stream()
+                .map(StockDto::getValeurStock)
+                .filter(v -> v != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Map<String, Object> resultat = new HashMap<>();
         resultat.put("valeurTotale", valeurTotale);
@@ -184,7 +187,10 @@ public class StockController {
     @GetMapping("/resume")
     public ResponseEntity<Map<String, Object>> obtenirResume() {
         List<StockDto> stocks = stockService.obtenirTousLesStocks();
-        BigDecimal valeurTotale = stockService.obtenirValeurTotaleStock();
+        BigDecimal valeurTotale = stocks.stream()
+                .map(StockDto::getValeurStock)
+                .filter(v -> v != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         long produitsEnStock = stocks.stream()
                 .filter(s -> s.getStockDisponible() > 0)

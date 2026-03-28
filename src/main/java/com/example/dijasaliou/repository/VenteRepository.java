@@ -91,9 +91,10 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     long countByTenantId(@Param("tenantId") Long tenantId);
 
     /**
-     * Recherche paginée avec filtre optionnel sur nomProduit, client et plage de dates
+     * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_vente_tenant_date.
      */
     @Query(value = "SELECT v FROM VenteEntity v WHERE " +
+           "v.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
@@ -101,12 +102,14 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
            "(:dateFin IS NULL OR v.dateVente <= :dateFin) " +
            "ORDER BY v.dateVente DESC, v.id DESC",
            countQuery = "SELECT COUNT(v) FROM VenteEntity v WHERE " +
+           "v.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
-    Page<VenteEntity> findAllWithSearch(@Param("search") String search,
+    Page<VenteEntity> findAllWithSearch(@Param("tenantUuid") String tenantUuid,
+                                        @Param("search") String search,
                                         @Param("dateDebut") LocalDate dateDebut,
                                         @Param("dateFin") LocalDate dateFin,
                                         Pageable pageable);
@@ -130,6 +133,7 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
                                                    @Param("tenantUuid") String tenantUuid);
 
     @Query(value = "SELECT v FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
+           "v.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
@@ -137,12 +141,14 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
            "(:dateFin IS NULL OR v.dateVente <= :dateFin) " +
            "ORDER BY v.dateVente DESC, v.id DESC",
            countQuery = "SELECT COUNT(v) FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
+           "v.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
     Page<VenteEntity> findByUtilisateurWithSearch(@Param("utilisateur") UserEntity utilisateur,
+                                                  @Param("tenantUuid") String tenantUuid,
                                                   @Param("search") String search,
                                                   @Param("dateDebut") LocalDate dateDebut,
                                                   @Param("dateFin") LocalDate dateFin,

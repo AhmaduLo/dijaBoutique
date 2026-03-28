@@ -54,7 +54,8 @@ public class DepenseService {
                 // Valeur inconnue : pas de filtre catégorie
             }
         }
-        Page<DepenseEntity> depensesPage = depenseRepository.findAllWithSearch(searchParam, categorieParam, pageable);
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        Page<DepenseEntity> depensesPage = depenseRepository.findAllWithSearch(tenantUuid, searchParam, categorieParam, pageable);
         Page<DepenseDto> dtoPage = depensesPage.map(DepenseDto::fromEntity);
         return PagedResponse.from(dtoPage);
     }

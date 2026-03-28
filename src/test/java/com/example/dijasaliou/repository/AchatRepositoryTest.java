@@ -161,7 +161,7 @@ class AchatRepositoryTest {
                 .build());
 
         // Act
-        Page<AchatEntity> page = achatRepository.findAllWithSearch(null, null, null, PageRequest.of(0, 20));
+        Page<AchatEntity> page = achatRepository.findAllWithSearch(tenant.getTenantUuid(), null, null, null, PageRequest.of(0, 20));
 
         // Assert
         assertThat(page.getTotalElements()).isEqualTo(2L);
@@ -194,7 +194,7 @@ class AchatRepositoryTest {
                 .build());
 
         // Act — recherche insensible à la casse
-        Page<AchatEntity> page = achatRepository.findAllWithSearch("COLLIER", null, null, PageRequest.of(0, 20));
+        Page<AchatEntity> page = achatRepository.findAllWithSearch(tenant.getTenantUuid(), "COLLIER", null, null, PageRequest.of(0, 20));
 
         // Assert
         assertThat(page.getTotalElements()).isEqualTo(1L);
@@ -228,7 +228,7 @@ class AchatRepositoryTest {
                 .build());
 
         // Act — recherche par fournisseur
-        Page<AchatEntity> page = achatRepository.findAllWithSearch("dakar", null, null, PageRequest.of(0, 20));
+        Page<AchatEntity> page = achatRepository.findAllWithSearch(tenant.getTenantUuid(), "dakar", null, null, PageRequest.of(0, 20));
 
         // Assert
         assertThat(page.getTotalElements()).isEqualTo(1L);
@@ -263,7 +263,7 @@ class AchatRepositoryTest {
 
         // Act — dateDebut = 1er juin 2025
         Page<AchatEntity> page = achatRepository.findAllWithSearch(
-                null, LocalDate.of(2025, 6, 1), null, PageRequest.of(0, 20));
+                tenant.getTenantUuid(), null, LocalDate.of(2025, 6, 1), null, PageRequest.of(0, 20));
 
         // Assert — seul "Nouveau Produit" (20 juin) est retourné
         assertThat(page.getTotalElements()).isEqualTo(1L);
@@ -298,7 +298,7 @@ class AchatRepositoryTest {
 
         // Act — dateFin = 28 février 2025
         Page<AchatEntity> page = achatRepository.findAllWithSearch(
-                null, null, LocalDate.of(2025, 2, 28), PageRequest.of(0, 20));
+                tenant.getTenantUuid(), null, null, LocalDate.of(2025, 2, 28), PageRequest.of(0, 20));
 
         // Assert — seul "Produit Janvier" est retourné
         assertThat(page.getTotalElements()).isEqualTo(1L);
