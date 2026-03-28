@@ -42,7 +42,7 @@ public class StockAlertService {
     private final TenantService tenantService;
 
     // Seuils d'alerte (en ordre décroissant)
-    private static final int[] SEUILS_ALERTE = {15, 10, 5, 0};
+    private static final double[] SEUILS_ALERTE = {15, 10, 5, 0};
 
     public StockAlertService(AchatRepository achatRepository,
                              VenteRepository venteRepository,
@@ -78,7 +78,7 @@ public class StockAlertService {
         }
 
         // 1. Calculer le stock actuel du produit
-        int stockActuel = calculerStockActuel(nomProduit, tenant);
+        double stockActuel = calculerStockActuel(nomProduit, tenant);
 
         log.debug("Stock actuel pour {} : {} unités (tenant: {})",
                 nomProduit, stockActuel, tenant.getNomEntreprise());
@@ -89,8 +89,8 @@ public class StockAlertService {
         // PAS si stock < ou > à ces valeurs
 
         boolean seuilExactTrouve = false;
-        for (int seuil : SEUILS_ALERTE) {
-            if (stockActuel == seuil) {
+        for (double seuil : SEUILS_ALERTE) {
+            if (Double.compare(stockActuel, seuil) == 0) {
                 seuilExactTrouve = true;
                 break;
             }
@@ -104,9 +104,10 @@ public class StockAlertService {
         }
 
         // Le stock correspond exactement à un seuil, vérifier si l'alerte a déjà été envoyée
+        int stockActuelInt = (int) stockActuel;
         LocalDateTime ilYa24h = LocalDateTime.now().minusHours(24);
         boolean alerteDejaEnvoyee = stockAlertHistoryRepository.existsRecentAlert(
-                nomProduit, stockActuel, tenant, ilYa24h);
+                nomProduit, stockActuelInt, tenant, ilYa24h);
 
         if (alerteDejaEnvoyee) {
             log.debug("Alerte déjà envoyée pour {} au seuil exact {} dans les dernières 24h",
@@ -134,15 +135,15 @@ public class StockAlertService {
                 userName,
                 tenant.getNomEntreprise(),
                 nomProduit,
-                stockActuel,
-                stockActuel  // Le seuil d'alerte = le stock actuel (car stock == seuil)
+                stockActuelInt,
+                stockActuelInt  // Le seuil d'alerte = le stock actuel (car stock == seuil)
         );
 
         // 5. Enregistrer l'alerte dans l'historique
         StockAlertHistory history = StockAlertHistory.builder()
                 .nomProduit(nomProduit)
-                .seuilAlerte(stockActuel)  // Le seuil = stock actuel
-                .stockActuel(stockActuel)
+                .seuilAlerte(stockActuelInt)  // Le seuil = stock actuel
+                .stockActuel(stockActuelInt)
                 .emailDestinataire(admin.getEmail())
                 .tenant(tenant)
                 .dateEnvoi(LocalDateTime.now())
@@ -163,17 +164,17 @@ public class StockAlertService {
      * @param tenant Tenant concerné
      * @return Stock actuel (peut être négatif si plus de ventes que d'achats)
      */
-    private int calculerStockActuel(String nomProduit, TenantEntity tenant) {
+    private double calculerStockActuel(String nomProduit, TenantEntity tenant) {
         // Calculer le total des achats pour ce produit
-        Integer totalAchats = achatRepository.sumQuantiteByNomProduitAndTenant(nomProduit, tenant);
+        Double totalAchats = achatRepository.sumQuantiteByNomProduitAndTenant(nomProduit, tenant);
         if (totalAchats == null) {
-            totalAchats = 0;
+            totalAchats = 0.0;
         }
 
         // Calculer le total des ventes pour ce produit
-        Integer totalVentes = venteRepository.sumQuantiteByNomProduitAndTenant(nomProduit, tenant);
+        Double totalVentes = venteRepository.sumQuantiteByNomProduitAndTenant(nomProduit, tenant);
         if (totalVentes == null) {
-            totalVentes = 0;
+            totalVentes = 0.0;
         }
 
         return totalAchats - totalVentes;
@@ -185,6 +186,7 @@ public class StockAlertService {
      * @param nomProduit Nom du produit
      * @return Liste des alertes envoyées pour ce produit
      */
+    @Transactional(readOnly = true)
     public List<StockAlertHistory> getHistoriqueAlertes(String nomProduit) {
         TenantEntity tenant = tenantService.getCurrentTenant();
         // Note: Vous devez créer cette méthode dans le repository si nécessaire

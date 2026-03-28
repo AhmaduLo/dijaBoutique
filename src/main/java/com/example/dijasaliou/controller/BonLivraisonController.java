@@ -51,6 +51,7 @@ public class BonLivraisonController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
             Authentication auth) {
         log.info("[BL] {} consulte les bons de livraison", auth.getName());
+        if (size > 100) size = 100;
         return ResponseEntity.ok(bonLivraisonService.getTousPagines(page, size, search, statut, dateDebut, dateFin));
     }
 

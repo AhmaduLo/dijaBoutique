@@ -27,6 +27,7 @@ public class ClientController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search) {
+        if (size > 100) size = 100;
         return ResponseEntity.ok(clientService.obtenirClientsPagines(page, size, search));
     }
 

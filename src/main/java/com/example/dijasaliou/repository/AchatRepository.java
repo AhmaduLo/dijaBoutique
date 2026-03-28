@@ -16,13 +16,26 @@ import java.util.List;
 @Repository
 public interface AchatRepository extends JpaRepository<AchatEntity, String> {
 
-    /**Trouver tous les achats d'un produit*/
+    /**Trouver tous les achats d'un produit (filtre tenant via Hibernate filter) */
     List<AchatEntity> findByNomProduit(String nomProduit);
 
     /**
-     * Trouver les achats contenant un mot dans le nom
+     * Trouver les achats contenant un mot dans le nom (filtre tenant via Hibernate filter)
      */
     List<AchatEntity> findByNomProduitContaining(String keyword);
+
+    /**
+     * Trouver les achats d'un produit pour un tenant donné — filtre tenant EXPLICITE.
+     * Utiliser à la place de findByNomProduit() dans les contextes sans filtre Hibernate (tâches planifiées, etc.)
+     */
+    @Query("SELECT a FROM AchatEntity a WHERE a.nomProduit = :nomProduit AND a.tenant = :tenant")
+    List<AchatEntity> findByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
+
+    /**
+     * Trouver les achats contenant un mot, pour un tenant donné — filtre tenant EXPLICITE.
+     */
+    @Query("SELECT a FROM AchatEntity a WHERE LOWER(a.nomProduit) LIKE LOWER(CONCAT('%', :keyword, '%')) AND a.tenant = :tenant")
+    List<AchatEntity> findByNomProduitContainingAndTenant(@Param("keyword") String keyword, @Param("tenant") TenantEntity tenant);
 
     /**
      * Trouver tous les achats d'un utilisateur
@@ -54,7 +67,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
      * Utilisé pour le calcul de stock
      */
     @Query("SELECT SUM(a.quantite) FROM AchatEntity a WHERE a.nomProduit = :nomProduit AND a.tenant = :tenant")
-    Integer sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
+    Double sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
 
     /**
      * Récupère tous les achats d'un tenant (filtre explicite — évite findAll())

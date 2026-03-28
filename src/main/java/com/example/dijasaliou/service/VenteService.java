@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -62,6 +63,7 @@ public class VenteService {
     /**
      * Récupérer toutes les ventes du tenant courant (rapports/export)
      */
+    @Transactional(readOnly = true)
     public List<VenteEntity> obtenirToutesLesVentes() {
         return venteRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
@@ -69,6 +71,7 @@ public class VenteService {
     /**
      * Récupérer les ventes paginées avec recherche optionnelle et filtre de dates
      */
+    @Transactional(readOnly = true)
     public PagedResponse<VenteDto> obtenirVentesPaginees(int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
         PageRequest pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search : null;
@@ -80,6 +83,7 @@ public class VenteService {
     /**
      * Récupérer les ventes d'un utilisateur paginées avec recherche optionnelle et filtre de dates
      */
+    @Transactional(readOnly = true)
     public PagedResponse<VenteDto> obtenirVentesParUtilisateurPaginees(UserEntity utilisateur, int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
         PageRequest pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search : null;
@@ -91,6 +95,7 @@ public class VenteService {
     /**
      * Récupérer une vente par ID
      */
+    @Transactional(readOnly = true)
     public VenteEntity obtenirVenteParId(String id) {
         return venteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vente non trouvée avec l'ID : " + id));
@@ -99,7 +104,7 @@ public class VenteService {
     /**
      * Créer une nouvelle vente
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public VenteEntity creerVente(VenteEntity vente, UserEntity utilisateur) {
         // Validation
         validerVente(vente);
@@ -170,7 +175,7 @@ public class VenteService {
     /**
      * Modifier une vente
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public VenteEntity modifierVente(String id, VenteEntity venteModifiee) {
         VenteEntity venteExistante = obtenirVenteParId(id);
 
@@ -280,7 +285,7 @@ public class VenteService {
     /**
      * Supprimer une vente
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void supprimerVente(String id) {
         VenteEntity venteExistante = obtenirVenteParId(id);
 
@@ -290,7 +295,7 @@ public class VenteService {
         }
 
         // Bloquer la suppression si un crédit lié a des paiements enregistrés (incohérence comptable)
-        List<CreditClientEntity> credits = creditClientRepository.findByVenteId(id);
+        List<CreditClientEntity> credits = creditClientRepository.findByVenteIdWithPaiements(id); // JOIN FETCH évite N+1
         for (CreditClientEntity credit : credits) {
             if (credit.getPaiements() != null && !credit.getPaiements().isEmpty()) {
                 throw new IllegalStateException(
@@ -309,6 +314,7 @@ public class VenteService {
     /**
      * Récupérer les ventes d'un utilisateur
      */
+    @Transactional(readOnly = true)
     public List<VenteEntity> obtenirVentesParUtilisateur(UserEntity utilisateur) {
         return venteRepository.findByUtilisateur(utilisateur);
     }
@@ -316,6 +322,7 @@ public class VenteService {
     /**
      * Récupérer les ventes d'une période
      */
+    @Transactional(readOnly = true)
     public List<VenteEntity> obtenirVentesParPeriode(LocalDate debut, LocalDate fin) {
         return venteRepository.findByDateVenteBetween(debut, fin);
     }
@@ -323,6 +330,7 @@ public class VenteService {
     /**
      * Calculer le chiffre d'affaires d'une période
      */
+    @Transactional(readOnly = true)
     public BigDecimal calculerChiffreAffaires(LocalDate debut, LocalDate fin) {
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
         return venteRepository.sumChiffreAffairesPeriode(debut, fin, tenantUuid);
@@ -337,6 +345,7 @@ public class VenteService {
      *
      * Retourne une map : mode → {total, nombre}
      */
+    @Transactional(readOnly = true)
     public Map<String, Object> calculerRapportModePaiement(LocalDate debut, LocalDate fin) {
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
 
@@ -408,6 +417,7 @@ public class VenteService {
      * Format : FAC-001, FAC-002, ...
      * Basé sur le nombre de ventes existantes en base → jamais de doublon entre appareils.
      */
+    @Transactional(readOnly = true)
     public String getProchainNumeroFacture() {
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
         long count = venteRepository.countByTenantUuid(tenantUuid);

@@ -64,6 +64,7 @@ public class SuperAdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         log.info("[SUPER_ADMIN] {} consulte tous les tenants", auth.getName());
+        if (size > 100) size = 100;
         return ResponseEntity.ok(superAdminService.getAllTenants(page, size));
     }
 

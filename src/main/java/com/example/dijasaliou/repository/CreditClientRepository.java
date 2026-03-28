@@ -37,6 +37,13 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
 
     List<CreditClientEntity> findByVenteId(String venteId);
 
+    /**
+     * Charge les crédits d'une vente avec leurs paiements en une seule requête (évite N+1).
+     * Utiliser à la place de findByVenteId() quand on accède à credit.getPaiements().
+     */
+    @Query("SELECT DISTINCT c FROM CreditClientEntity c LEFT JOIN FETCH c.paiements WHERE c.vente.id = :venteId")
+    List<CreditClientEntity> findByVenteIdWithPaiements(@Param("venteId") String venteId);
+
     boolean existsByVenteIdAndStatutIn(String venteId, List<StatutCredit> statuts);
 
     @Query("SELECT COALESCE(SUM(c.montantRestant), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")

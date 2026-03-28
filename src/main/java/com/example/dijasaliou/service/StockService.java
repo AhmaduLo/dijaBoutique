@@ -9,6 +9,7 @@ import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,6 +44,7 @@ public class StockService {
      * @return Liste des stocks par produit
      */
     @Cacheable(value = "stocks", key = "#root.target.getCurrentTenantKey()")
+    @Transactional(readOnly = true)
     public List<StockDto> obtenirTousLesStocks() {
         // 1. Récupérer les achats et ventes du tenant courant uniquement
         TenantEntity tenant = tenantService.getCurrentTenant();
@@ -85,18 +87,21 @@ public class StockService {
      * @param nomProduit Nom du produit (insensible à la casse)
      * @return Stock du produit
      */
+    @Transactional(readOnly = true)
     public StockDto obtenirStockParNomProduit(String nomProduit) {
-        // Requêtes ciblées au lieu de findAll() + filter en mémoire
-        List<AchatEntity> achats = achatRepository.findByNomProduit(nomProduit);
-        List<VenteEntity> ventes = venteRepository.findByNomProduit(nomProduit);
+        TenantEntity tenant = tenantService.getCurrentTenant();
+
+        // Requêtes ciblées avec filtre tenant EXPLICITE (pas de dépendance au filtre Hibernate)
+        List<AchatEntity> achats = achatRepository.findByNomProduitAndTenant(nomProduit, tenant);
+        List<VenteEntity> ventes = venteRepository.findByNomProduitAndTenant(nomProduit, tenant);
 
         // Fallback insensible à la casse si rien trouvé avec le nom exact
         if (achats.isEmpty() && ventes.isEmpty()) {
             String nomNormalise = nomProduit.toLowerCase().trim();
-            achats = achatRepository.findByNomProduitContaining(nomProduit).stream()
+            achats = achatRepository.findByNomProduitContainingAndTenant(nomProduit, tenant).stream()
                     .filter(a -> a.getNomProduit().toLowerCase().trim().equals(nomNormalise))
                     .collect(Collectors.toList());
-            ventes = venteRepository.findByNomProduitContaining(nomProduit).stream()
+            ventes = venteRepository.findByNomProduitContainingAndTenant(nomProduit, tenant).stream()
                     .filter(v -> v.getNomProduit().toLowerCase().trim().equals(nomNormalise))
                     .collect(Collectors.toList());
         }
@@ -113,6 +118,7 @@ public class StockService {
      *
      * @return Liste des produits avec stock = 0
      */
+    @Transactional(readOnly = true)
     public List<StockDto> obtenirProduitsEnRupture() {
         return obtenirTousLesStocks().stream()
                 .filter(stock -> stock.getStockDisponible() <= 0)
@@ -124,6 +130,7 @@ public class StockService {
      *
      * @return Liste des produits avec stock faible
      */
+    @Transactional(readOnly = true)
     public List<StockDto> obtenirProduitsStockBas() {
         return obtenirTousLesStocks().stream()
                 .filter(stock -> stock.getStockDisponible() > 0 && stock.getStockDisponible() < 10)
@@ -137,6 +144,7 @@ public class StockService {
      * @param quantite Quantité demandée
      * @return true si le stock est suffisant
      */
+    @Transactional(readOnly = true)
     public boolean verifierStockDisponible(String nomProduit, Double quantite) {
         try {
             StockDto stock = obtenirStockParNomProduit(nomProduit);
@@ -152,6 +160,7 @@ public class StockService {
      *
      * @return Somme des valeurs de tous les stocks
      */
+    @Transactional(readOnly = true)
     public BigDecimal obtenirValeurTotaleStock() {
         return obtenirTousLesStocks().stream()
                 .map(StockDto::getValeurStock)

@@ -29,6 +29,7 @@ public class ClientService {
     private final CreditClientRepository creditClientRepository;
     private final TenantService tenantService;
 
+    @Transactional(readOnly = true)
     public List<ClientDto> rechercherClients(String search) {
         String searchParam = (search != null && !search.isBlank()) ? search : null;
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
@@ -39,6 +40,7 @@ public class ClientService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public PagedResponse<ClientDto> obtenirClientsPagines(int page, int size, String search) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "nom"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
@@ -66,6 +68,7 @@ public class ClientService {
         return ClientDto.fromEntity(saved, 0L);
     }
 
+    @Transactional(readOnly = true)
     public ClientDto obtenirClientParId(String id) {
         ClientEntity client = clientRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Client introuvable : " + id));

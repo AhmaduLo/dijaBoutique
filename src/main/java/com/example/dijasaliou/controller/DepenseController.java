@@ -44,6 +44,7 @@ public class DepenseController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String categorie) {
+        if (size > 100) size = 100;
         return ResponseEntity.ok(depenseService.obtenirDepensesPaginees(page, size, search, categorie));
     }
 

@@ -197,6 +197,7 @@ public class CreditClientService {
         return CreditClientDto.fromEntity(savedCredit);
     }
 
+    @Transactional(readOnly = true)
     public PagedResponse<CreditClientDto> obtenirCredits(int page, int size, String search,
                                                           String statut, LocalDate dateDebut, LocalDate dateFin) {
         Pageable pageable = PageRequest.of(page, size,
@@ -244,6 +245,7 @@ public class CreditClientService {
         return PagedResponse.from(dtoPage);
     }
 
+    @Transactional(readOnly = true)
     public List<PaiementCreditDto> obtenirPaiements(String creditId) {
         CreditClientEntity credit = creditClientRepository.findById(creditId)
                 .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
@@ -256,6 +258,7 @@ public class CreditClientService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<CreditClientDto> obtenirHistoriqueClient(String clientId) {
         ClientEntity client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client introuvable : " + clientId));

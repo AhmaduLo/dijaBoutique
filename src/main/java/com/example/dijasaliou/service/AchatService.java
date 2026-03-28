@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,6 +48,7 @@ public class AchatService {
     /**
      * Récupérer tous les achats du tenant courant
      */
+    @Transactional(readOnly = true)
     public List<AchatEntity> obtenirTousLesAchats() {
         return achatRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
@@ -54,6 +56,7 @@ public class AchatService {
     /**
      * Récupérer les achats paginés avec recherche optionnelle et filtre de dates
      */
+    @Transactional(readOnly = true)
     public PagedResponse<AchatDto> obtenirAchatsPagines(int page, int size, String search, LocalDate dateDebut, LocalDate dateFin) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateAchat"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
@@ -65,6 +68,7 @@ public class AchatService {
     /**
      * Récupérer un achat par son ID
      */
+    @Transactional(readOnly = true)
     public AchatEntity obtenirAchatParId(String id) {
         return achatRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Achat non trouvé avec l'ID : " + id));
@@ -199,6 +203,7 @@ public class AchatService {
     /**
      * Récupérer les achats d'un utilisateur
      */
+    @Transactional(readOnly = true)
     public List<AchatEntity> obtenirAchatsParUtilisateur(UserEntity utilisateur) {
         return achatRepository.findByUtilisateur(utilisateur);
     }
@@ -207,6 +212,7 @@ public class AchatService {
     /**
      * Récupérer les achats d'une période
      */
+    @Transactional(readOnly = true)
     public List<AchatEntity> obtenirAchatsParPeriode(LocalDate debut, LocalDate fin) {
         return achatRepository.findByDateAchatBetween(debut, fin);
     }
@@ -216,6 +222,7 @@ public class AchatService {
      *
      * LOGIQUE MÉTIER : Parcourir tous les achats et additionner
      */
+    @Transactional(readOnly = true)
     public BigDecimal calculerTotalAchats(LocalDate debut, LocalDate fin) {
         List<AchatEntity> achats = obtenirAchatsParPeriode(debut, fin);
 
@@ -233,6 +240,7 @@ public class AchatService {
      *
      * @return Liste des achats avec uniquement les infos nécessaires pour la vente
      */
+    @Transactional(readOnly = true)
     public List<AchatEntity> obtenirProduitsAvecPrixVente() {
         return achatRepository.findAllByTenant(tenantService.getCurrentTenant());
     }

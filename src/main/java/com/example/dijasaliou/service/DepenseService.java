@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -33,6 +34,7 @@ public class DepenseService {
     /**
      * Récupérer toutes les dépenses du tenant courant (rapports/export)
      */
+    @Transactional(readOnly = true)
     public List<DepenseEntity> obtenirToutesLesDepenses() {
         return depenseRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
@@ -40,6 +42,7 @@ public class DepenseService {
     /**
      * Récupérer les dépenses paginées avec recherche et filtre catégorie optionnels
      */
+    @Transactional(readOnly = true)
     public PagedResponse<DepenseDto> obtenirDepensesPaginees(int page, int size, String search, String categorie) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateDepense"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
@@ -59,6 +62,7 @@ public class DepenseService {
     /**
      * Récupérer une dépense par ID
      */
+    @Transactional(readOnly = true)
     public DepenseEntity obtenirDepenseParId(String id) {
         return depenseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Dépense non trouvée avec l'ID : " + id));
@@ -124,6 +128,7 @@ public class DepenseService {
     /**
      * Récupérer les dépenses d'un utilisateur
      */
+    @Transactional(readOnly = true)
     public List<DepenseEntity> obtenirDepensesParUtilisateur(UserEntity utilisateur) {
         return depenseRepository.findByUtilisateur(utilisateur);
     }
@@ -131,6 +136,7 @@ public class DepenseService {
     /**
      * Récupérer les dépenses d'une période
      */
+    @Transactional(readOnly = true)
     public List<DepenseEntity> obtenirDepensesParPeriode(LocalDate debut, LocalDate fin) {
         return depenseRepository.findByDateDepenseBetween(debut, fin);
     }
@@ -138,6 +144,7 @@ public class DepenseService {
     /**
      * Calculer le total des dépenses d'une période
      */
+    @Transactional(readOnly = true)
     public BigDecimal calculerTotalDepenses(LocalDate debut, LocalDate fin) {
         List<DepenseEntity> depenses = obtenirDepensesParPeriode(debut, fin);
 
@@ -149,6 +156,7 @@ public class DepenseService {
     /**
      * Récupérer les dépenses par catégorie
      */
+    @Transactional(readOnly = true)
     public List<DepenseEntity> obtenirDepensesParCategorie(DepenseEntity.CategorieDepense categorie) {
         return depenseRepository.findByCategorie(categorie);
     }

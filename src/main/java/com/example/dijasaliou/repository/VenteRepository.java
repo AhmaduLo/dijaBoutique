@@ -17,10 +17,23 @@ import java.util.List;
 @Repository
 public interface VenteRepository extends JpaRepository<VenteEntity, String> {
 
-    // Recherche par produit
+    // Recherche par produit (filtre tenant via Hibernate filter)
     List<VenteEntity> findByNomProduit(String nomProduit);
 
     List<VenteEntity> findByNomProduitContaining(String keyword);
+
+    /**
+     * Trouver les ventes d'un produit pour un tenant donné — filtre tenant EXPLICITE.
+     * Utiliser à la place de findByNomProduit() dans les contextes sans filtre Hibernate.
+     */
+    @Query("SELECT v FROM VenteEntity v WHERE v.nomProduit = :nomProduit AND v.tenant = :tenant")
+    List<VenteEntity> findByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
+
+    /**
+     * Trouver les ventes contenant un mot, pour un tenant donné — filtre tenant EXPLICITE.
+     */
+    @Query("SELECT v FROM VenteEntity v WHERE LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :keyword, '%')) AND v.tenant = :tenant")
+    List<VenteEntity> findByNomProduitContainingAndTenant(@Param("keyword") String keyword, @Param("tenant") TenantEntity tenant);
 
     // Recherche par utilisateur
     List<VenteEntity> findByUtilisateur(UserEntity utilisateur);
@@ -53,7 +66,7 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
      * Utilisé pour le calcul de stock
      */
     @Query("SELECT SUM(v.quantite) FROM VenteEntity v WHERE v.nomProduit = :nomProduit AND v.tenant = :tenant")
-    Integer sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
+    Double sumQuantiteByNomProduitAndTenant(@Param("nomProduit") String nomProduit, @Param("tenant") TenantEntity tenant);
 
     /**
      * Récupère toutes les ventes d'un tenant (filtre explicite — évite findAll())

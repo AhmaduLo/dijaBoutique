@@ -41,6 +41,7 @@ public class BonLivraisonService {
     /**
      * Retourne tous les bons de livraison du tenant courant (filtrés par Hibernate)
      */
+    @Transactional(readOnly = true)
     public List<BonLivraisonDto> getTous() {
         return bonLivraisonRepository.findAllByOrderByCreatedDateDesc()
                 .stream()
@@ -51,6 +52,7 @@ public class BonLivraisonService {
     /**
      * Retourne les bons de livraison paginés avec filtre statut, recherche et plage de dates optionnels
      */
+    @Transactional(readOnly = true)
     public PagedResponse<BonLivraisonDto> getTousPagines(int page, int size, String search, String statut, LocalDate dateDebut, LocalDate dateFin) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
@@ -68,6 +70,7 @@ public class BonLivraisonService {
     /**
      * Retourne un bon de livraison par ID
      */
+    @Transactional(readOnly = true)
     public BonLivraisonDto getParId(String id) {
         BonLivraisonEntity bl = bonLivraisonRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bon de livraison non trouvé : " + id));
