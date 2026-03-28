@@ -274,7 +274,7 @@ class CreditClientRepositoryTest {
     void sumCreditsRestantParPeriode_DoitAgregerParPeriode() {
         // Crée une vente dans la période de test
         VenteEntity vente = em.persistAndFlush(VenteEntity.builder()
-                .quantite(1)
+                .quantite(1.0)
                 .nomProduit("Collier Test")
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("5000"))

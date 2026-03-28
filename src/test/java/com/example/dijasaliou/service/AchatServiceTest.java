@@ -55,7 +55,7 @@ class AchatServiceTest {
 
         achatValide = AchatEntity.builder()
                 .nomProduit("Ordinateur portable")
-                .quantite(5)
+                .quantite(5.0)
                 .prixUnitaire(new BigDecimal("500.00"))
                 .prixTotal(new BigDecimal("2500.00"))
                 .fournisseur("Dell")
@@ -74,7 +74,7 @@ class AchatServiceTest {
     @DisplayName("obtenirTousLesAchats() — retourne tous les achats")
     void obtenirTousLesAchats_retourneListe() {
         AchatEntity achat2 = AchatEntity.builder().nomProduit("Souris")
-                .quantite(10).prixUnitaire(new BigDecimal("15.00")).build();
+                .quantite(10.0).prixUnitaire(new BigDecimal("15.00")).build();
         achat2.setId("test-id-2");
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.findAllByTenant(tenantTest)).thenReturn(Arrays.asList(achatValide, achat2));
@@ -126,7 +126,7 @@ class AchatServiceTest {
     @Test
     @DisplayName("creerAchat() — lève exception si quantité = 0")
     void creerAchat_leveExceptionQuantiteZero() {
-        AchatEntity a = AchatEntity.builder().nomProduit("Produit").quantite(0)
+        AchatEntity a = AchatEntity.builder().nomProduit("Produit").quantite(0.0)
                 .prixUnitaire(new BigDecimal("100.00")).build();
 
         assertThatThrownBy(() -> achatService.creerAchat(a, utilisateurTest))
@@ -148,7 +148,7 @@ class AchatServiceTest {
     @Test
     @DisplayName("creerAchat() — lève exception si prix = 0")
     void creerAchat_leveExceptionPrixZero() {
-        AchatEntity a = AchatEntity.builder().nomProduit("Produit").quantite(5)
+        AchatEntity a = AchatEntity.builder().nomProduit("Produit").quantite(5.0)
                 .prixUnitaire(BigDecimal.ZERO).build();
 
         assertThatThrownBy(() -> achatService.creerAchat(a, utilisateurTest))
@@ -159,7 +159,7 @@ class AchatServiceTest {
     @Test
     @DisplayName("creerAchat() — lève exception si nom produit vide")
     void creerAchat_leveExceptionNomProduitVide() {
-        AchatEntity a = AchatEntity.builder().nomProduit("").quantite(5)
+        AchatEntity a = AchatEntity.builder().nomProduit("").quantite(5.0)
                 .prixUnitaire(new BigDecimal("100.00")).build();
 
         assertThatThrownBy(() -> achatService.creerAchat(a, utilisateurTest))
@@ -175,7 +175,7 @@ class AchatServiceTest {
     @DisplayName("creerAchat() — crée l'achat et assigne l'utilisateur et le tenant")
     void creerAchat_succes() {
         AchatEntity nouvelAchat = AchatEntity.builder()
-                .nomProduit("Clavier").quantite(3)
+                .nomProduit("Clavier").quantite(3.0)
                 .prixUnitaire(new BigDecimal("50.00"))
                 .fournisseur("Logitech").dateAchat(LocalDate.now()).build();
 
@@ -193,7 +193,7 @@ class AchatServiceTest {
     @DisplayName("creerAchat() — calcule le prix total si absent")
     void creerAchat_calculePrixTotal() {
         AchatEntity achatSansPrixTotal = AchatEntity.builder()
-                .nomProduit("Moniteur").quantite(2)
+                .nomProduit("Moniteur").quantite(2.0)
                 .prixUnitaire(new BigDecimal("300.00"))
                 .dateAchat(LocalDate.now()).build();
 
@@ -213,7 +213,7 @@ class AchatServiceTest {
     @DisplayName("modifierAchat() — modifie un achat existant du même tenant")
     void modifierAchat_succes() {
         AchatEntity modifie = AchatEntity.builder()
-                .nomProduit("Ordinateur portable").quantite(8)
+                .nomProduit("Ordinateur portable").quantite(8.0)
                 .prixUnitaire(new BigDecimal("450.00"))
                 .fournisseur("HP").dateAchat(LocalDate.now()).build();
 
@@ -231,7 +231,7 @@ class AchatServiceTest {
     @DisplayName("modifierAchat() — lève exception si achat non trouvé")
     void modifierAchat_leveExceptionSiAbsent() {
         AchatEntity modifie = AchatEntity.builder()
-                .nomProduit("Produit").quantite(1)
+                .nomProduit("Produit").quantite(1.0)
                 .prixUnitaire(new BigDecimal("100.00")).build();
 
         when(achatRepository.findById("999")).thenReturn(Optional.empty());
@@ -248,7 +248,7 @@ class AchatServiceTest {
         autreTenant.setTenantUuid("uuid-autre");
 
         AchatEntity modifie = AchatEntity.builder()
-                .nomProduit("Produit").quantite(1)
+                .nomProduit("Produit").quantite(1.0)
                 .prixUnitaire(new BigDecimal("100.00")).build();
 
         when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));

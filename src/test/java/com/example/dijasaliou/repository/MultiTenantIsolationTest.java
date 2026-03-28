@@ -73,7 +73,7 @@ class MultiTenantIsolationTest {
         // Ventes du tenant A (2 ventes)
         em.persistAndFlush(VenteEntity.builder()
                 .nomProduit("Collier Alpha")
-                .quantite(1).prixUnitaire(new BigDecimal("5000"))
+                .quantite(1.0).prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("5000"))
                 .dateVente(LocalDate.now())
                 .utilisateur(userA).tenant(tenantA)
@@ -81,7 +81,7 @@ class MultiTenantIsolationTest {
 
         em.persistAndFlush(VenteEntity.builder()
                 .nomProduit("Bracelet Alpha")
-                .quantite(2).prixUnitaire(new BigDecimal("3000"))
+                .quantite(2.0).prixUnitaire(new BigDecimal("3000"))
                 .prixTotal(new BigDecimal("6000"))
                 .dateVente(LocalDate.now())
                 .utilisateur(userA).tenant(tenantA)
@@ -98,7 +98,7 @@ class MultiTenantIsolationTest {
 
         em.persistAndFlush(VenteEntity.builder()
                 .nomProduit("Bague Beta CONFIDENTIELLE")
-                .quantite(1).prixUnitaire(new BigDecimal("99999"))
+                .quantite(1.0).prixUnitaire(new BigDecimal("99999"))
                 .prixTotal(new BigDecimal("99999"))
                 .dateVente(LocalDate.now())
                 .utilisateur(userB).tenant(tenantB)

@@ -22,7 +22,7 @@ class AchatDtoTest {
                 .build();
         return AchatEntity.builder()
                 .nomProduit("Tissu wax")
-                .quantite(10)
+                .quantite(10.0)
                 .prixUnitaire(new BigDecimal("2000"))
                 .prixTotal(new BigDecimal("20000"))
                 .dateAchat(LocalDate.now())
@@ -70,7 +70,7 @@ class AchatDtoTest {
     void fromEntity_tenantNull_photoUrlNull() {
         AchatEntity achat = AchatEntity.builder()
                 .nomProduit("Tissu wax")
-                .quantite(5)
+                .quantite(5.0)
                 .prixUnitaire(new BigDecimal("2000"))
                 .prixTotal(new BigDecimal("10000"))
                 .dateAchat(LocalDate.now())

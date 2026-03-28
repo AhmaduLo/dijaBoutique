@@ -199,7 +199,7 @@ class VenteServiceTest {
     void creerVente_succes_stockSuffisant() {
         StockDto stock = StockDto.builder()
                 .nomProduit("Ordinateur")
-                .stockDisponible(10)
+                .stockDisponible(10.0)
                 .build();
 
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
@@ -219,7 +219,7 @@ class VenteServiceTest {
     void creerVente_leveExceptionStockInsuffisant() {
         StockDto stock = StockDto.builder()
                 .nomProduit("Ordinateur")
-                .stockDisponible(1)
+                .stockDisponible(1.0)
                 .build();
 
         when(stockService.obtenirStockParNomProduit("Ordinateur")).thenReturn(stock);
@@ -265,7 +265,7 @@ class VenteServiceTest {
                 .dateEcheance(LocalDate.now().plusDays(30))
                 .build();
 
-        StockDto stock = StockDto.builder().nomProduit("Téléphone").stockDisponible(5).build();
+        StockDto stock = StockDto.builder().nomProduit("Téléphone").stockDisponible(5.0).build();
 
         when(stockService.obtenirStockParNomProduit("Téléphone")).thenReturn(stock);
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
@@ -290,7 +290,7 @@ class VenteServiceTest {
                 .clientId(null)
                 .build();
 
-        StockDto stock = StockDto.builder().nomProduit("Téléphone").stockDisponible(5).build();
+        StockDto stock = StockDto.builder().nomProduit("Téléphone").stockDisponible(5.0).build();
 
         when(stockService.obtenirStockParNomProduit("Téléphone")).thenReturn(stock);
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);

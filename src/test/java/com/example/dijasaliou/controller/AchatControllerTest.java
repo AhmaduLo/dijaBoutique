@@ -96,7 +96,7 @@ class AchatControllerTest {
 
         // Création d'un premier achat de test
         achatTest = AchatEntity.builder()
-                .quantite(10)
+                .quantite(10.0)
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("50.00"))
                 .prixTotal(new BigDecimal("500.00"))
@@ -108,7 +108,7 @@ class AchatControllerTest {
 
         // Création d'un deuxième achat de test
         achatTest2 = AchatEntity.builder()
-                .quantite(5)
+                .quantite(5.0)
                 .nomProduit("Bracelet en argent")
                 .prixUnitaire(new BigDecimal("30.00"))
                 .prixTotal(new BigDecimal("150.00"))
@@ -251,7 +251,7 @@ class AchatControllerTest {
     void creer_DevraitCreerNouvelAchat() throws Exception {
         // Arrange
         AchatEntity nouvelAchat = AchatEntity.builder()
-                .quantite(15)
+                .quantite(15.0)
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("100.00"))
                 .prixTotal(new BigDecimal("1500.00"))
@@ -260,7 +260,7 @@ class AchatControllerTest {
                 .build();
 
         AchatEntity achatCree = AchatEntity.builder()
-                .quantite(15)
+                .quantite(15.0)
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("100.00"))
                 .prixTotal(new BigDecimal("1500.00"))
@@ -323,7 +323,7 @@ class AchatControllerTest {
         String achatId = "test-id-1";
 
         AchatEntity achatModifie = AchatEntity.builder()
-                .quantite(20)
+                .quantite(20.0)
                 .nomProduit("Collier en or modifié")
                 .prixUnitaire(new BigDecimal("60.00"))
                 .prixTotal(new BigDecimal("1200.00"))
@@ -332,7 +332,7 @@ class AchatControllerTest {
                 .build();
 
         AchatEntity achatMiseAJour = AchatEntity.builder()
-                .quantite(20)
+                .quantite(20.0)
                 .nomProduit("Collier en or modifié")
                 .prixUnitaire(new BigDecimal("60.00"))
                 .prixTotal(new BigDecimal("1200.00"))
@@ -370,7 +370,7 @@ class AchatControllerTest {
         String achatId = "id-inexistant";
 
         AchatEntity achatModifie = AchatEntity.builder()
-                .quantite(20)
+                .quantite(20.0)
                 .nomProduit("Produit inexistant")
                 .prixUnitaire(new BigDecimal("50.00"))
                 .prixTotal(new BigDecimal("1000.00"))
@@ -503,7 +503,7 @@ class AchatControllerTest {
     void obtenirTous_DevraitGererFournisseurNull() throws Exception {
         // Arrange
         AchatEntity achatSansFournisseur = AchatEntity.builder()
-                .quantite(8)
+                .quantite(8.0)
                 .nomProduit("Montre")
                 .prixUnitaire(new BigDecimal("80.00"))
                 .prixTotal(new BigDecimal("640.00"))
@@ -533,7 +533,7 @@ class AchatControllerTest {
     void creer_DevraitCalculerPrixTotal() throws Exception {
         // Arrange - 12 × 25.00 = 300.00 (prixTotal fourni, le service confirme le calcul)
         AchatEntity nouvelAchat = AchatEntity.builder()
-                .quantite(12)
+                .quantite(12.0)
                 .nomProduit("Boucles d'oreilles")
                 .prixUnitaire(new BigDecimal("25.00"))
                 .prixTotal(new BigDecimal("300.00"))
@@ -541,7 +541,7 @@ class AchatControllerTest {
                 .build();
 
         AchatEntity achatCree = AchatEntity.builder()
-                .quantite(12)
+                .quantite(12.0)
                 .nomProduit("Boucles d'oreilles")
                 .prixUnitaire(new BigDecimal("25.00"))
                 .prixTotal(new BigDecimal("300.00"))

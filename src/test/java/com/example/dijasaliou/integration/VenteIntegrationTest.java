@@ -115,7 +115,7 @@ class VenteIntegrationTest {
         // Vente avec photo pour le tenant BASIC
         venteRepository.saveAndFlush(VenteEntity.builder()
                 .nomProduit("Collier Basic")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("5000"))
                 .dateVente(LocalDate.now())
@@ -127,7 +127,7 @@ class VenteIntegrationTest {
         // Vente avec photo pour le tenant PREMIUM
         venteRepository.saveAndFlush(VenteEntity.builder()
                 .nomProduit("Collier Premium")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("8000"))
                 .prixTotal(new BigDecimal("8000"))
                 .dateVente(LocalDate.now())

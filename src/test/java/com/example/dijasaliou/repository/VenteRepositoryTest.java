@@ -66,7 +66,7 @@ class VenteRepositoryTest {
 
         // Vente 1 : Collier — ESPECES — 15 jan 2025
         em.persistAndFlush(VenteEntity.builder()
-                .quantite(2)
+                .quantite(2.0)
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("10000"))
@@ -79,7 +79,7 @@ class VenteRepositoryTest {
 
         // Vente 2 : Bracelet — WAVE — 20 jan 2025
         em.persistAndFlush(VenteEntity.builder()
-                .quantite(1)
+                .quantite(1.0)
                 .nomProduit("Bracelet argent")
                 .prixUnitaire(new BigDecimal("3000"))
                 .prixTotal(new BigDecimal("3000"))
@@ -91,7 +91,7 @@ class VenteRepositoryTest {
 
         // Vente 3 : Collier — ESPECES — 10 mars 2025 (hors janvier)
         em.persistAndFlush(VenteEntity.builder()
-                .quantite(3)
+                .quantite(3.0)
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("15000"))
@@ -104,7 +104,7 @@ class VenteRepositoryTest {
 
         // Vente 4 : Bague — CREDIT — 15 jan 2025
         em.persistAndFlush(VenteEntity.builder()
-                .quantite(1)
+                .quantite(1.0)
                 .nomProduit("Bague diamant")
                 .prixUnitaire(new BigDecimal("20000"))
                 .prixTotal(new BigDecimal("20000"))
@@ -116,7 +116,7 @@ class VenteRepositoryTest {
 
         // Vente dans un autre tenant (ne doit pas compter dans les agrégats tenant-001)
         em.persistAndFlush(VenteEntity.builder()
-                .quantite(5)
+                .quantite(5.0)
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("25000"))

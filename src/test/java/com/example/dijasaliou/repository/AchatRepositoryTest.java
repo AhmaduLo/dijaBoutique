@@ -83,7 +83,7 @@ class AchatRepositoryTest {
         // Arrange
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Collier en or")
-                .quantite(10)
+                .quantite(10.0)
                 .prixUnitaire(new BigDecimal("5000.00"))
                 .prixTotal(new BigDecimal("50000.00"))
                 .dateAchat(LocalDate.of(2025, 1, 10))
@@ -94,7 +94,7 @@ class AchatRepositoryTest {
 
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Collier en or")
-                .quantite(5)
+                .quantite(5.0)
                 .prixUnitaire(new BigDecimal("5000.00"))
                 .prixTotal(new BigDecimal("25000.00"))
                 .dateAchat(LocalDate.of(2025, 2, 15))
@@ -116,7 +116,7 @@ class AchatRepositoryTest {
         // Arrange — achat dans autreTenant
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Bracelet argent")
-                .quantite(8)
+                .quantite(8.0)
                 .prixUnitaire(new BigDecimal("3000.00"))
                 .prixTotal(new BigDecimal("24000.00"))
                 .dateAchat(LocalDate.of(2025, 3, 1))
@@ -140,7 +140,7 @@ class AchatRepositoryTest {
         // Arrange
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Montre dorée")
-                .quantite(3)
+                .quantite(3.0)
                 .prixUnitaire(new BigDecimal("15000.00"))
                 .prixTotal(new BigDecimal("45000.00"))
                 .dateAchat(LocalDate.of(2025, 1, 5))
@@ -151,7 +151,7 @@ class AchatRepositoryTest {
 
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Bague diamant")
-                .quantite(2)
+                .quantite(2.0)
                 .prixUnitaire(new BigDecimal("25000.00"))
                 .prixTotal(new BigDecimal("50000.00"))
                 .dateAchat(LocalDate.of(2025, 2, 10))
@@ -173,7 +173,7 @@ class AchatRepositoryTest {
         // Arrange
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Collier perles")
-                .quantite(4)
+                .quantite(4.0)
                 .prixUnitaire(new BigDecimal("8000.00"))
                 .prixTotal(new BigDecimal("32000.00"))
                 .dateAchat(LocalDate.of(2025, 1, 20))
@@ -184,7 +184,7 @@ class AchatRepositoryTest {
 
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Pendentif argent")
-                .quantite(6)
+                .quantite(6.0)
                 .prixUnitaire(new BigDecimal("4000.00"))
                 .prixTotal(new BigDecimal("24000.00"))
                 .dateAchat(LocalDate.of(2025, 1, 25))
@@ -207,7 +207,7 @@ class AchatRepositoryTest {
         // Arrange
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Produit A")
-                .quantite(5)
+                .quantite(5.0)
                 .prixUnitaire(new BigDecimal("2000.00"))
                 .prixTotal(new BigDecimal("10000.00"))
                 .dateAchat(LocalDate.of(2025, 3, 10))
@@ -218,7 +218,7 @@ class AchatRepositoryTest {
 
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Produit B")
-                .quantite(3)
+                .quantite(3.0)
                 .prixUnitaire(new BigDecimal("3000.00"))
                 .prixTotal(new BigDecimal("9000.00"))
                 .dateAchat(LocalDate.of(2025, 3, 15))
@@ -241,7 +241,7 @@ class AchatRepositoryTest {
         // Arrange
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Ancien Produit")
-                .quantite(2)
+                .quantite(2.0)
                 .prixUnitaire(new BigDecimal("5000.00"))
                 .prixTotal(new BigDecimal("10000.00"))
                 .dateAchat(LocalDate.of(2025, 1, 5))
@@ -252,7 +252,7 @@ class AchatRepositoryTest {
 
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Nouveau Produit")
-                .quantite(4)
+                .quantite(4.0)
                 .prixUnitaire(new BigDecimal("7000.00"))
                 .prixTotal(new BigDecimal("28000.00"))
                 .dateAchat(LocalDate.of(2025, 6, 20))
@@ -276,7 +276,7 @@ class AchatRepositoryTest {
         // Arrange
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Produit Janvier")
-                .quantite(3)
+                .quantite(3.0)
                 .prixUnitaire(new BigDecimal("4000.00"))
                 .prixTotal(new BigDecimal("12000.00"))
                 .dateAchat(LocalDate.of(2025, 1, 15))
@@ -287,7 +287,7 @@ class AchatRepositoryTest {
 
         entityManager.persistAndFlush(AchatEntity.builder()
                 .nomProduit("Produit Décembre")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("10000.00"))
                 .prixTotal(new BigDecimal("10000.00"))
                 .dateAchat(LocalDate.of(2025, 12, 1))

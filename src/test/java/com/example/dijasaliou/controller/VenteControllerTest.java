@@ -94,7 +94,7 @@ class VenteControllerTest {
 
         // Création d'une première vente de test
         venteTest = VenteEntity.builder()
-                .quantite(5)
+                .quantite(5.0)
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("150000.00"))
                 .prixTotal(new BigDecimal("750000.00"))
@@ -106,7 +106,7 @@ class VenteControllerTest {
 
         // Création d'une deuxième vente de test
         venteTest2 = VenteEntity.builder()
-                .quantite(3)
+                .quantite(3.0)
                 .nomProduit("Bracelet en argent")
                 .prixUnitaire(new BigDecimal("80000.00"))
                 .prixTotal(new BigDecimal("240000.00"))
@@ -210,7 +210,7 @@ class VenteControllerTest {
         // Arrange
         Long utilisateurId = 1L;
         VenteEntity nouvelleVente = VenteEntity.builder()
-                .quantite(10)
+                .quantite(10.0)
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("200000.00"))
                 .dateVente(LocalDate.now())
@@ -218,7 +218,7 @@ class VenteControllerTest {
                 .build();
 
         VenteEntity venteCreee = VenteEntity.builder()
-                .quantite(10)
+                .quantite(10.0)
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("200000.00"))
                 .prixTotal(new BigDecimal("2000000.00"))
@@ -258,7 +258,7 @@ class VenteControllerTest {
         Long utilisateurId = 1L;
 
         VenteEntity venteModifiee = VenteEntity.builder()
-                .quantite(8)
+                .quantite(8.0)
                 .nomProduit("Collier en or - Mise à jour")
                 .prixUnitaire(new BigDecimal("160000.00"))
                 .dateVente(LocalDate.of(2025, 10, 25))
@@ -266,7 +266,7 @@ class VenteControllerTest {
                 .build();
 
         VenteEntity venteMiseAJour = VenteEntity.builder()
-                .quantite(8)
+                .quantite(8.0)
                 .nomProduit("Collier en or - Mise à jour")
                 .prixUnitaire(new BigDecimal("160000.00"))
                 .prixTotal(new BigDecimal("1280000.00"))
@@ -302,7 +302,7 @@ class VenteControllerTest {
         String venteId = "999";
 
         VenteEntity venteModifiee = VenteEntity.builder()
-                .quantite(5)
+                .quantite(5.0)
                 .nomProduit("Vente inexistante")
                 .prixUnitaire(new BigDecimal("100000.00"))
                 .dateVente(LocalDate.now())
@@ -522,7 +522,7 @@ class VenteControllerTest {
     void obtenirTous_DevraitGererClientNull() throws Exception {
         // Arrange
         VenteEntity venteSansClient = VenteEntity.builder()
-                .quantite(2)
+                .quantite(2.0)
                 .nomProduit("Montre")
                 .prixUnitaire(new BigDecimal("120000.00"))
                 .prixTotal(new BigDecimal("240000.00"))
@@ -552,7 +552,7 @@ class VenteControllerTest {
     void creer_DevraitCalculerPrixTotal() throws Exception {
         // Arrange
         VenteEntity nouvelleVente = VenteEntity.builder()
-                .quantite(7)
+                .quantite(7.0)
                 .nomProduit("Chaîne en or")
                 .prixUnitaire(new BigDecimal("90000.00"))
                 .dateVente(LocalDate.now())
@@ -560,7 +560,7 @@ class VenteControllerTest {
 
         // Le service devrait calculer : 7 × 90000.00 = 630000.00
         VenteEntity venteCreee = VenteEntity.builder()
-                .quantite(7)
+                .quantite(7.0)
                 .nomProduit("Chaîne en or")
                 .prixUnitaire(new BigDecimal("90000.00"))
                 .prixTotal(new BigDecimal("630000.00")) // Calculé automatiquement

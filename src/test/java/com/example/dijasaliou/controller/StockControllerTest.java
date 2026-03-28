@@ -76,9 +76,9 @@ class StockControllerTest {
         // Produit 1 : Stock normal (EN_STOCK)
         stockTest1 = StockDto.builder()
                 .nomProduit("Collier en or")
-                .quantiteAchetee(50)
-                .quantiteVendue(30)
-                .stockDisponible(20)
+                .quantiteAchetee(50.0)
+                .quantiteVendue(30.0)
+                .stockDisponible(20.0)
                 .prixMoyenAchat(new BigDecimal("100000.00"))
                 .prixMoyenVente(new BigDecimal("150000.00"))
                 .valeurStock(new BigDecimal("2000000.00"))
@@ -89,9 +89,9 @@ class StockControllerTest {
         // Produit 2 : Stock bas (STOCK_BAS)
         stockTest2 = StockDto.builder()
                 .nomProduit("Bracelet en argent")
-                .quantiteAchetee(15)
-                .quantiteVendue(10)
-                .stockDisponible(5)
+                .quantiteAchetee(15.0)
+                .quantiteVendue(10.0)
+                .stockDisponible(5.0)
                 .prixMoyenAchat(new BigDecimal("50000.00"))
                 .prixMoyenVente(new BigDecimal("80000.00"))
                 .valeurStock(new BigDecimal("250000.00"))
@@ -102,9 +102,9 @@ class StockControllerTest {
         // Produit 3 : Rupture de stock (RUPTURE)
         stockTest3 = StockDto.builder()
                 .nomProduit("Bague en diamant")
-                .quantiteAchetee(10)
-                .quantiteVendue(10)
-                .stockDisponible(0)
+                .quantiteAchetee(10.0)
+                .quantiteVendue(10.0)
+                .stockDisponible(0.0)
                 .prixMoyenAchat(new BigDecimal("200000.00"))
                 .prixMoyenVente(new BigDecimal("300000.00"))
                 .valeurStock(BigDecimal.ZERO)
@@ -550,9 +550,9 @@ class StockControllerTest {
     @DisplayName("GET /stock/alertes - Devrait combiner correctement ruptures et stocks bas")
     void obtenirAlertes_DevraitCombinerCorrectement() throws Exception {
         // Arrange
-        StockDto stockBas1 = StockDto.builder().nomProduit("Produit A").stockDisponible(3).statut(StockDto.StatutStock.STOCK_BAS).build();
-        StockDto stockBas2 = StockDto.builder().nomProduit("Produit B").stockDisponible(7).statut(StockDto.StatutStock.STOCK_BAS).build();
-        StockDto rupture1 = StockDto.builder().nomProduit("Produit C").stockDisponible(0).statut(StockDto.StatutStock.RUPTURE).build();
+        StockDto stockBas1 = StockDto.builder().nomProduit("Produit A").stockDisponible(3.0).statut(StockDto.StatutStock.STOCK_BAS).build();
+        StockDto stockBas2 = StockDto.builder().nomProduit("Produit B").stockDisponible(7.0).statut(StockDto.StatutStock.STOCK_BAS).build();
+        StockDto rupture1 = StockDto.builder().nomProduit("Produit C").stockDisponible(0.0).statut(StockDto.StatutStock.RUPTURE).build();
 
         when(stockService.obtenirProduitsEnRupture()).thenReturn(Arrays.asList(rupture1));
         when(stockService.obtenirProduitsStockBas()).thenReturn(Arrays.asList(stockBas1, stockBas2));

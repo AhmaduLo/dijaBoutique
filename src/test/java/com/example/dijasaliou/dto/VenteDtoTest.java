@@ -23,7 +23,7 @@ class VenteDtoTest {
                 .build();
         return VenteEntity.builder()
                 .nomProduit("Collier en or")
-                .quantite(2)
+                .quantite(2.0)
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("10000"))
                 .dateVente(LocalDate.now())
@@ -82,7 +82,7 @@ class VenteDtoTest {
     void fromEntity_tenantNull_photoUrlNull() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("Bague")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("8000"))
                 .prixTotal(new BigDecimal("8000"))
                 .dateVente(LocalDate.now())
@@ -129,7 +129,7 @@ class VenteDtoTest {
     void fromEntity_vente60JoursAvant_pasRecente() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("Bracelet")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("3000"))
                 .prixTotal(new BigDecimal("3000"))
                 .dateVente(LocalDate.now().minusDays(60))
@@ -157,7 +157,7 @@ class VenteDtoTest {
     void fromEntity_modePaiementWAVE_retourneWAVE() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("Collier")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("5000"))
                 .dateVente(LocalDate.now())
@@ -177,7 +177,7 @@ class VenteDtoTest {
     void fromEntity_avecClient_aUnClientTrue() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("Anneau")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("2000"))
                 .prixTotal(new BigDecimal("2000"))
                 .dateVente(LocalDate.now())
@@ -195,7 +195,7 @@ class VenteDtoTest {
     void fromEntity_clientNull_aUnClientFalse() {
         VenteEntity vente = VenteEntity.builder()
                 .nomProduit("Anneau")
-                .quantite(1)
+                .quantite(1.0)
                 .prixUnitaire(new BigDecimal("2000"))
                 .prixTotal(new BigDecimal("2000"))
                 .dateVente(LocalDate.now())
