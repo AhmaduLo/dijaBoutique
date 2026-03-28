@@ -71,7 +71,7 @@ class AchatRepositoryTest {
     @DisplayName("sumQuantiteByNomProduitAndTenant — aucun enregistrement → retourne null")
     void sumQuantiteByNomProduitAndTenant_AucunEnregistrement_RetourneNull() {
         // Act
-        Integer result = achatRepository.sumQuantiteByNomProduitAndTenant("Produit Inexistant", tenant);
+        Double result = achatRepository.sumQuantiteByNomProduitAndTenant("Produit Inexistant", tenant);
 
         // Assert
         assertThat(result).isNull();
@@ -104,10 +104,10 @@ class AchatRepositoryTest {
                 .build());
 
         // Act
-        Integer result = achatRepository.sumQuantiteByNomProduitAndTenant("Collier en or", tenant);
+        Double result = achatRepository.sumQuantiteByNomProduitAndTenant("Collier en or", tenant);
 
         // Assert
-        assertThat(result).isEqualTo(15);
+        assertThat(result).isEqualTo(15.0);
     }
 
     @Test
@@ -126,7 +126,7 @@ class AchatRepositoryTest {
                 .build());
 
         // Act — chercher dans tenant (qui n'a aucun achat de ce produit)
-        Integer result = achatRepository.sumQuantiteByNomProduitAndTenant("Bracelet argent", tenant);
+        Double result = achatRepository.sumQuantiteByNomProduitAndTenant("Bracelet argent", tenant);
 
         // Assert
         assertThat(result).isNull();

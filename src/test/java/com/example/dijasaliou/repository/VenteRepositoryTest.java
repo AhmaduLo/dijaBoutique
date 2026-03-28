@@ -133,26 +133,26 @@ class VenteRepositoryTest {
     @DisplayName("sumQuantiteByNomProduitAndTenant — doit sommer toutes les ventes du produit")
     void sumQuantiteByNomProduitAndTenant_DoitSommerParProduit() {
         // "Collier en or" : vente1 (qte=2) + vente3 (qte=3) = 5 pour tenant-001
-        Integer sum = repo.sumQuantiteByNomProduitAndTenant("Collier en or", tenant);
+        Double sum = repo.sumQuantiteByNomProduitAndTenant("Collier en or", tenant);
 
-        assertThat(sum).isEqualTo(5);
+        assertThat(sum).isEqualTo(5.0);
     }
 
     @Test
     @DisplayName("sumQuantiteByNomProduitAndTenant — isolation tenant : ne compte pas l'autre tenant")
     void sumQuantiteByNomProduitAndTenant_IsolationTenant() {
         // tenant-001 a 5 Colliers, autreTenant a 5 Colliers séparément
-        Integer sumTenant1 = repo.sumQuantiteByNomProduitAndTenant("Collier en or", tenant);
-        Integer sumTenant2 = repo.sumQuantiteByNomProduitAndTenant("Collier en or", autreTenant);
+        Double sumTenant1 = repo.sumQuantiteByNomProduitAndTenant("Collier en or", tenant);
+        Double sumTenant2 = repo.sumQuantiteByNomProduitAndTenant("Collier en or", autreTenant);
 
-        assertThat(sumTenant1).isEqualTo(5);
-        assertThat(sumTenant2).isEqualTo(5);
+        assertThat(sumTenant1).isEqualTo(5.0);
+        assertThat(sumTenant2).isEqualTo(5.0);
     }
 
     @Test
     @DisplayName("sumQuantiteByNomProduitAndTenant — doit retourner null si produit inexistant")
     void sumQuantiteByNomProduitAndTenant_RetourneNullSiProduitInexistant() {
-        Integer sum = repo.sumQuantiteByNomProduitAndTenant("Produit Inexistant", tenant);
+        Double sum = repo.sumQuantiteByNomProduitAndTenant("Produit Inexistant", tenant);
 
         assertThat(sum).isNull();
     }

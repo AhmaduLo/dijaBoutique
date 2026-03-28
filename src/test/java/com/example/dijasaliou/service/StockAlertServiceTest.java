@@ -117,8 +117,8 @@ class StockAlertServiceTest {
     void verifierEtEnvoyerAlerte_PremiumStockHorsSeuil_AucunEmail() {
         // Arrange
         when(tenantService.getCurrentTenant()).thenReturn(tenantPremium);
-        when(achatRepository.sumQuantiteByNomProduitAndTenant(eq("Bague diamant"), eq(tenantPremium))).thenReturn(10);
-        when(venteRepository.sumQuantiteByNomProduitAndTenant(eq("Bague diamant"), eq(tenantPremium))).thenReturn(3);
+        when(achatRepository.sumQuantiteByNomProduitAndTenant(eq("Bague diamant"), eq(tenantPremium))).thenReturn(10.0);
+        when(venteRepository.sumQuantiteByNomProduitAndTenant(eq("Bague diamant"), eq(tenantPremium))).thenReturn(3.0);
         // stock = 10 - 3 = 7, pas dans [15, 10, 5, 0]
 
         // Act
@@ -136,8 +136,8 @@ class StockAlertServiceTest {
     void verifierEtEnvoyerAlerte_PremiumStockCinqAlerteDejaEnvoyee_AucunEmail() {
         // Arrange
         when(tenantService.getCurrentTenant()).thenReturn(tenantPremium);
-        when(achatRepository.sumQuantiteByNomProduitAndTenant(eq("Pendentif"), eq(tenantPremium))).thenReturn(15);
-        when(venteRepository.sumQuantiteByNomProduitAndTenant(eq("Pendentif"), eq(tenantPremium))).thenReturn(10);
+        when(achatRepository.sumQuantiteByNomProduitAndTenant(eq("Pendentif"), eq(tenantPremium))).thenReturn(15.0);
+        when(venteRepository.sumQuantiteByNomProduitAndTenant(eq("Pendentif"), eq(tenantPremium))).thenReturn(10.0);
         // stock = 15 - 10 = 5 (seuil exact)
         when(stockAlertHistoryRepository.existsRecentAlert(eq("Pendentif"), eq(5), eq(tenantPremium), any()))
                 .thenReturn(true);
@@ -157,8 +157,8 @@ class StockAlertServiceTest {
     void verifierEtEnvoyerAlerte_PremiumStockCinqSansAlerteRecente_EmailEnvoyeEtHistoriqueSauvegarde() {
         // Arrange
         when(tenantService.getCurrentTenant()).thenReturn(tenantPremium);
-        when(achatRepository.sumQuantiteByNomProduitAndTenant(eq("Collier or"), eq(tenantPremium))).thenReturn(20);
-        when(venteRepository.sumQuantiteByNomProduitAndTenant(eq("Collier or"), eq(tenantPremium))).thenReturn(15);
+        when(achatRepository.sumQuantiteByNomProduitAndTenant(eq("Collier or"), eq(tenantPremium))).thenReturn(20.0);
+        when(venteRepository.sumQuantiteByNomProduitAndTenant(eq("Collier or"), eq(tenantPremium))).thenReturn(15.0);
         // stock = 20 - 15 = 5
         when(stockAlertHistoryRepository.existsRecentAlert(eq("Collier or"), eq(5), eq(tenantPremium), any()))
                 .thenReturn(false);
@@ -196,8 +196,8 @@ class StockAlertServiceTest {
     void verifierEtEnvoyerAlerte_EntrepriseStockZeroAdminNull_AucunEmailSansCrash() {
         // Arrange
         when(tenantService.getCurrentTenant()).thenReturn(tenantEntreprise);
-        when(achatRepository.sumQuantiteByNomProduitAndTenant(eq("Montre"), eq(tenantEntreprise))).thenReturn(5);
-        when(venteRepository.sumQuantiteByNomProduitAndTenant(eq("Montre"), eq(tenantEntreprise))).thenReturn(5);
+        when(achatRepository.sumQuantiteByNomProduitAndTenant(eq("Montre"), eq(tenantEntreprise))).thenReturn(5.0);
+        when(venteRepository.sumQuantiteByNomProduitAndTenant(eq("Montre"), eq(tenantEntreprise))).thenReturn(5.0);
         // stock = 5 - 5 = 0 (seuil exact)
         when(stockAlertHistoryRepository.existsRecentAlert(eq("Montre"), eq(0), eq(tenantEntreprise), any()))
                 .thenReturn(false);
