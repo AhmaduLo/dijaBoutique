@@ -51,9 +51,9 @@ public class UserService {
      * Créer un nouvel utilisateur
      */
     public UserEntity creerUtilisateur(UserEntity utilisateur) {
-        // Validation : Email unique (parmi les utilisateurs actifs)
-        if (userRepository.existsByEmailAndDeletedFalse(utilisateur.getEmail())) {
-            throw new IllegalArgumentException("Un utilisateur avec cet email existe déjà");
+        // Validation : Email unique (tous comptes, y compris supprimés — contrainte DB globale)
+        if (userRepository.existsByEmail(utilisateur.getEmail())) {
+            throw new IllegalArgumentException("Cet email est déjà utilisé par un autre compte.");
         }
 
         // Validation : Champs obligatoires

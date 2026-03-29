@@ -2,6 +2,7 @@ package com.example.dijasaliou.exception;
 
 import com.example.dijasaliou.aspect.PlanRestrictionAspect;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -55,6 +56,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(errorResponse);
+    }
+
+    /**
+     * Filet de sécurité : violation de contrainte DB (ex: email en double)
+     * Retourne 400 avec message lisible au lieu de 500
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("DataIntegrityViolationException: {}", ex.getMostSpecificCause().getMessage());
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
+        errorResponse.put("error", "Données invalides");
+        String msg = ex.getMostSpecificCause().getMessage();
+        if (msg != null && msg.contains("Duplicate entry")) {
+            errorResponse.put("message", "Cet email est déjà utilisé par un autre compte.");
+        } else {
+            errorResponse.put("message", "Violation de contrainte base de données.");
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     /**
