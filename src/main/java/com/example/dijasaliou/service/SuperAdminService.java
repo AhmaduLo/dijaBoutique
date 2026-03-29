@@ -3,16 +3,20 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.AuditLogDto;
 import com.example.dijasaliou.dto.FactureDto;
 import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.PaiementSuperAdminDto;
 import com.example.dijasaliou.dto.TenantAdminDto;
 import com.example.dijasaliou.dto.UtilisateurTenantDto;
+import com.example.dijasaliou.dto.ValiderPaiementRequest;
 import com.example.dijasaliou.entity.AuditLog;
 import com.example.dijasaliou.entity.FactureEntity;
+import com.example.dijasaliou.entity.PaiementSuperAdminEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.NoteInterne;
 import com.example.dijasaliou.repository.AuditLogRepository;
 import com.example.dijasaliou.repository.FactureRepository;
 import com.example.dijasaliou.repository.NoteInterneRepository;
+import com.example.dijasaliou.repository.PaiementSuperAdminRepository;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteRepository;
@@ -24,7 +28,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +57,7 @@ public class SuperAdminService {
     private final FactureService factureService;
     private final FactureRepository factureRepository;
     private final TenantCacheService tenantCacheService;
+    private final PaiementSuperAdminRepository paiementSuperAdminRepository;
 
     public SuperAdminService(TenantRepository tenantRepository,
                              UserRepository userRepository,
@@ -59,7 +66,8 @@ public class SuperAdminService {
                              AuditLogRepository auditLogRepository,
                              FactureService factureService,
                              FactureRepository factureRepository,
-                             TenantCacheService tenantCacheService) {
+                             TenantCacheService tenantCacheService,
+                             PaiementSuperAdminRepository paiementSuperAdminRepository) {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.venteRepository = venteRepository;
@@ -68,6 +76,7 @@ public class SuperAdminService {
         this.factureService = factureService;
         this.factureRepository = factureRepository;
         this.tenantCacheService = tenantCacheService;
+        this.paiementSuperAdminRepository = paiementSuperAdminRepository;
     }
 
     /**
@@ -386,6 +395,88 @@ public class SuperAdminService {
                 .stream()
                 .map(AuditLogDto::fromEntity)
                 .toList();
+    }
+
+    // ==================== PAIEMENTS MANUELS ====================
+
+    /**
+     * Valider un paiement manuel (WhatsApp / Wave / Cash / Orange Money).
+     * - Change le plan du tenant
+     * - Réinitialise dateExpiration à maintenant + 30 jours
+     * - Enregistre le paiement dans paiements_super_admin
+     */
+    @Transactional
+    public PaiementSuperAdminDto validerPaiement(Long tenantId, ValiderPaiementRequest req, String auteurEmail) {
+        TenantEntity tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + tenantId));
+
+        TenantEntity.Plan plan = TenantEntity.Plan.valueOf(req.plan());
+        TenantEntity.Plan ancienPlan = tenant.getPlan();
+
+        // Mettre à jour le tenant
+        tenant.setPlan(plan);
+        tenant.setDateExpiration(LocalDateTime.now().plusDays(30));
+        tenant.setActif(true);
+        tenant.setEssaiUtilise(true);
+        tenantRepository.save(tenant);
+        tenantCacheService.evict(tenant.getTenantUuid());
+
+        // Retrouver l'ID du super admin à partir de son email
+        Long superAdminId = userRepository.findByEmailAndDeletedFalse(auteurEmail)
+                .map(UserEntity::getId)
+                .orElse(null);
+
+        // Enregistrer le paiement
+        PaiementSuperAdminEntity paiement = PaiementSuperAdminEntity.builder()
+                .tenant(tenant)
+                .plan(plan)
+                .montant(req.montant())
+                .datePaiement(LocalDateTime.now())
+                .moisDebut(req.moisDebut())
+                .modePaiement(req.modePaiement())
+                .note(req.note())
+                .validePar(superAdminId)
+                .build();
+        paiementSuperAdminRepository.save(paiement);
+
+        log.info("[SUPER_ADMIN] {} valide paiement pour tenant {} : {} → {} ({}F, {})",
+                auteurEmail, tenant.getTenantUuid(), ancienPlan, plan, req.montant(), req.modePaiement());
+        saveLog("VALIDER_PAIEMENT",
+                ancienPlan + " → " + plan + " | " + req.montant() + " F | " + req.modePaiement(),
+                tenant);
+
+        return PaiementSuperAdminDto.fromEntity(paiement);
+    }
+
+    /**
+     * Retourne les paiements manuels d'un tenant (historique).
+     */
+    @Transactional(readOnly = true)
+    public List<PaiementSuperAdminDto> getPaiementsByTenant(Long tenantId) {
+        TenantEntity tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new RuntimeException("Tenant non trouvé : " + tenantId));
+        return paiementSuperAdminRepository.findByTenantOrderByDatePaiementDesc(tenant)
+                .stream()
+                .map(PaiementSuperAdminDto::fromEntity)
+                .toList();
+    }
+
+    /**
+     * Revenus mensuels agrégés — dashboard super admin.
+     * Retourne la liste des mois avec total encaissé et nombre de paiements.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getRevenusMenuels() {
+        List<Object[]> rows = paiementSuperAdminRepository.findRevenusMenuels();
+        List<Map<String, Object>> result = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("mois", row[0]);
+            item.put("total", row[1]);
+            item.put("nbPaiements", row[2]);
+            result.add(item);
+        }
+        return result;
     }
 
     // ==================== MÉTHODES PRIVÉES ====================

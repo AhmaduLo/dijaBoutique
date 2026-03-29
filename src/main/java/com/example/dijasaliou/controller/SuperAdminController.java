@@ -3,8 +3,10 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.AuditLogDto;
 import com.example.dijasaliou.dto.FactureDto;
 import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.PaiementSuperAdminDto;
 import com.example.dijasaliou.dto.TenantAdminDto;
 import com.example.dijasaliou.dto.UtilisateurTenantDto;
+import com.example.dijasaliou.dto.ValiderPaiementRequest;
 import com.example.dijasaliou.entity.NoteInterne;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.SuperAdminService;
@@ -261,5 +263,45 @@ public class SuperAdminController {
         log.info("[SUPER_ADMIN] {} envoie la facture {} par email", auth.getName(), factureId);
         FactureDto updated = superAdminService.envoyerFacture(factureId);
         return ResponseEntity.ok(updated);
+    }
+
+    // ==================== PAIEMENTS MANUELS ====================
+
+    /**
+     * POST /superadmin/tenants/{id}/valider-paiement
+     * Validation manuelle d'un paiement (WhatsApp / Wave / Cash / Orange Money).
+     * Change le plan, reset la dateExpiration à +30j, enregistre le paiement.
+     */
+    @PostMapping("/tenants/{id}/valider-paiement")
+    public ResponseEntity<PaiementSuperAdminDto> validerPaiement(
+            @PathVariable Long id,
+            @RequestBody ValiderPaiementRequest req,
+            Authentication auth) {
+        log.info("[SUPER_ADMIN] {} valide paiement pour tenant {} — plan={}, montant={}, mode={}",
+                auth.getName(), id, req.plan(), req.montant(), req.modePaiement());
+        PaiementSuperAdminDto result = superAdminService.validerPaiement(id, req, auth.getName());
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * GET /superadmin/tenants/{id}/paiements
+     * Historique des paiements manuels d'un tenant
+     */
+    @GetMapping("/tenants/{id}/paiements")
+    public ResponseEntity<List<PaiementSuperAdminDto>> getPaiements(
+            @PathVariable Long id, Authentication auth) {
+        log.info("[SUPER_ADMIN] {} consulte les paiements du tenant {}", auth.getName(), id);
+        return ResponseEntity.ok(superAdminService.getPaiementsByTenant(id));
+    }
+
+    /**
+     * GET /superadmin/stats/revenus-mensuels
+     * Revenus mensuels agrégés pour le dashboard super admin.
+     * Retourne : [{ "mois": "2026-03", "total": 25000, "nbPaiements": 2 }, ...]
+     */
+    @GetMapping("/stats/revenus-mensuels")
+    public ResponseEntity<List<Map<String, Object>>> getRevenusMenuels(Authentication auth) {
+        log.info("[SUPER_ADMIN] {} consulte les revenus mensuels", auth.getName());
+        return ResponseEntity.ok(superAdminService.getRevenusMenuels());
     }
 }
