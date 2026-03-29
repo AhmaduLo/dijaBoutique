@@ -97,6 +97,14 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     Optional<LocalDateTime> findDerniereActiviteByTenantId(@Param("tenantId") Long tenantId);
 
     /**
+     * Vérifie si un email existe globalement (tous tenants, incl. comptes supprimés).
+     * Requête native pour bypasser le filtre Hibernate tenant — nécessaire pour respecter
+     * la contrainte UNIQUE sur email qui est globale en base.
+     */
+    @Query(value = "SELECT COUNT(*) > 0 FROM utilisateurs WHERE email = :email", nativeQuery = true)
+    boolean existsByEmailGlobal(@Param("email") String email);
+
+    /**
      * Met à jour derniereConnexion sans charger l'entité complète.
      * Appelé par ActivityTrackingFilter à chaque requête authentifiée (throttlé à 5 min).
      */

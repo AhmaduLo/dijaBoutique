@@ -51,8 +51,9 @@ public class UserService {
      * Créer un nouvel utilisateur
      */
     public UserEntity creerUtilisateur(UserEntity utilisateur) {
-        // Validation : Email unique (tous comptes, y compris supprimés — contrainte DB globale)
-        if (userRepository.existsByEmail(utilisateur.getEmail())) {
+        // Validation : Email unique — requête native pour bypasser le filtre Hibernate tenant
+        // (la contrainte UNIQUE sur email est globale en base, indépendante du tenant)
+        if (userRepository.existsByEmailGlobal(utilisateur.getEmail())) {
             throw new IllegalArgumentException("Cet email est déjà utilisé par un autre compte.");
         }
 
