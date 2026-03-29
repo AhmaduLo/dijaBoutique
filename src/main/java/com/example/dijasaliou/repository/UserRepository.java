@@ -5,9 +5,11 @@ import com.example.dijasaliou.entity.UserEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -93,4 +95,13 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
 
     @Query("SELECT MAX(u.derniereConnexion) FROM UserEntity u WHERE u.tenant.id = :tenantId AND u.deleted = false")
     Optional<LocalDateTime> findDerniereActiviteByTenantId(@Param("tenantId") Long tenantId);
+
+    /**
+     * Met à jour derniereConnexion sans charger l'entité complète.
+     * Appelé par ActivityTrackingFilter à chaque requête authentifiée (throttlé à 5 min).
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE UserEntity u SET u.derniereConnexion = :now WHERE u.email = :email")
+    void updateDerniereConnexion(@Param("email") String email, @Param("now") LocalDateTime now);
 }

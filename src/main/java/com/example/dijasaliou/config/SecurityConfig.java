@@ -1,5 +1,6 @@
 package com.example.dijasaliou.config;
 
+import com.example.dijasaliou.filter.ActivityTrackingFilter;
 import com.example.dijasaliou.filter.SubscriptionExpirationFilter;
 import com.example.dijasaliou.jwt.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,11 +42,14 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final SubscriptionExpirationFilter subscriptionExpirationFilter;
+    private final ActivityTrackingFilter activityTrackingFilter;
 
     public SecurityConfig(@Lazy JwtAuthenticationFilter jwtAuthFilter,
-                          SubscriptionExpirationFilter subscriptionExpirationFilter) {
+                          SubscriptionExpirationFilter subscriptionExpirationFilter,
+                          ActivityTrackingFilter activityTrackingFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.subscriptionExpirationFilter = subscriptionExpirationFilter;
+        this.activityTrackingFilter = activityTrackingFilter;
     }
 
     @Bean
@@ -143,7 +147,8 @@ public class SecurityConfig {
         // 1. JWT pour l'authentification (avant UsernamePasswordAuthenticationFilter)
         // 2. SubscriptionExpiration pour bloquer si l'abonnement est expiré (après UsernamePasswordAuthenticationFilter)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(subscriptionExpirationFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterAfter(subscriptionExpirationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(activityTrackingFilter, SubscriptionExpirationFilter.class);
 
         return http.build();
     }
@@ -236,6 +241,16 @@ public class SecurityConfig {
     @Bean
     public FilterRegistrationBean<SubscriptionExpirationFilter> subscriptionFilterRegistration(SubscriptionExpirationFilter filter) {
         FilterRegistrationBean<SubscriptionExpirationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    /**
+     * Même raison : évite la double exécution de ActivityTrackingFilter.
+     */
+    @Bean
+    public FilterRegistrationBean<ActivityTrackingFilter> activityFilterRegistration(ActivityTrackingFilter filter) {
+        FilterRegistrationBean<ActivityTrackingFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

@@ -290,6 +290,8 @@ public class AuthService {
 
         // 3. SUPER_ADMIN : pas de tenant, accès direct
         if (user.getRole() == UserEntity.Role.SUPER_ADMIN) {
+            user.setDerniereConnexion(LocalDateTime.now());
+            userRepository.save(user);
             String token = jwtService.generateToken(user.getEmail(), null, user.getRole());
             return AuthResponse.builder()
                     .token(token)
