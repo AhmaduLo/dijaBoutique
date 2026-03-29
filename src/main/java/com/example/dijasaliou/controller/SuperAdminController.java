@@ -3,6 +3,7 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.AuditLogDto;
 import com.example.dijasaliou.dto.FactureDto;
 import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.ModifierPaiementRequest;
 import com.example.dijasaliou.dto.PaiementSuperAdminDto;
 import com.example.dijasaliou.dto.TenantAdminDto;
 import com.example.dijasaliou.dto.UtilisateurTenantDto;
@@ -295,9 +296,37 @@ public class SuperAdminController {
     }
 
     /**
+     * PUT /superadmin/paiements/{paiementId}
+     * Corriger un paiement existant (plan, montant, modePaiement, note).
+     * Ne change PAS le plan courant du tenant — utiliser valider-paiement pour ça.
+     */
+    @PutMapping("/paiements/{paiementId}")
+    public ResponseEntity<PaiementSuperAdminDto> modifierPaiement(
+            @PathVariable Long paiementId,
+            @RequestBody ModifierPaiementRequest req,
+            Authentication auth) {
+        log.info("[SUPER_ADMIN] {} modifie le paiement {}", auth.getName(), paiementId);
+        return ResponseEntity.ok(superAdminService.modifierPaiement(paiementId, req));
+    }
+
+    /**
+     * DELETE /superadmin/paiements/{paiementId}
+     * Supprimer un paiement.
+     * Si c'est le dernier du tenant → rétrograder le tenant vers GRATUIT.
+     */
+    @DeleteMapping("/paiements/{paiementId}")
+    public ResponseEntity<Map<String, String>> supprimerPaiement(
+            @PathVariable Long paiementId,
+            Authentication auth) {
+        log.info("[SUPER_ADMIN] {} supprime le paiement {}", auth.getName(), paiementId);
+        superAdminService.supprimerPaiement(paiementId);
+        return ResponseEntity.ok(Map.of("message", "Paiement supprimé avec succès"));
+    }
+
+    /**
      * GET /superadmin/stats/revenus-mensuels
-     * Revenus mensuels agrégés pour le dashboard super admin.
-     * Retourne : [{ "mois": "2026-03", "total": 25000, "nbPaiements": 2 }, ...]
+     * Revenus mensuels détaillés pour le dashboard super admin.
+     * Retourne : [{ "mois": "2026-03", "total": 25000, "nbPaiements": 2, "paiements": [...] }, ...]
      */
     @GetMapping("/stats/revenus-mensuels")
     public ResponseEntity<List<Map<String, Object>>> getRevenusMenuels(Authentication auth) {

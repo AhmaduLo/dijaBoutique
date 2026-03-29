@@ -3,7 +3,6 @@ package com.example.dijasaliou.repository;
 import com.example.dijasaliou.entity.PaiementSuperAdminEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,17 +12,9 @@ public interface PaiementSuperAdminRepository extends JpaRepository<PaiementSupe
 
     List<PaiementSuperAdminEntity> findByTenantOrderByDatePaiementDesc(TenantEntity tenant);
 
-    /**
-     * Revenus mensuels agrégés — pour le dashboard super admin.
-     * Retourne : [mois (YYYY-MM), total_montant, nb_paiements]
-     */
-    @Query(value = """
-            SELECT DATE_FORMAT(date_paiement, '%Y-%m') AS mois,
-                   SUM(montant)                        AS total,
-                   COUNT(*)                            AS nb_paiements
-            FROM paiements_super_admin
-            GROUP BY DATE_FORMAT(date_paiement, '%Y-%m')
-            ORDER BY mois DESC
-            """, nativeQuery = true)
-    List<Object[]> findRevenusMenuels();
+    /** Tous les paiements triés par date DESC — utilisé pour le rapport mensuel détaillé. */
+    List<PaiementSuperAdminEntity> findAllByOrderByDatePaiementDesc();
+
+    /** Compte les paiements d'un tenant — utilisé avant rétrogradation vers GRATUIT. */
+    long countByTenant(TenantEntity tenant);
 }

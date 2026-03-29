@@ -3,6 +3,7 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.AuditLogDto;
 import com.example.dijasaliou.dto.FactureDto;
 import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.ModifierPaiementRequest;
 import com.example.dijasaliou.dto.PaiementSuperAdminDto;
 import com.example.dijasaliou.dto.TenantAdminDto;
 import com.example.dijasaliou.dto.UtilisateurTenantDto;
@@ -30,10 +31,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Service pour le Super Admin — accès cross-tenant
@@ -462,18 +466,82 @@ public class SuperAdminService {
     }
 
     /**
-     * Revenus mensuels agrégés — dashboard super admin.
-     * Retourne la liste des mois avec total encaissé et nombre de paiements.
+     * Modifier les champs d'un paiement existant (correction d'erreur).
+     * Ne change PAS le plan courant du tenant — utiliser validerPaiement() pour ça.
+     */
+    @Transactional
+    public PaiementSuperAdminDto modifierPaiement(Long paiementId, ModifierPaiementRequest req) {
+        PaiementSuperAdminEntity paiement = paiementSuperAdminRepository.findById(paiementId)
+                .orElseThrow(() -> new RuntimeException("Paiement non trouvé : " + paiementId));
+
+        if (req.plan() != null) paiement.setPlan(TenantEntity.Plan.valueOf(req.plan()));
+        if (req.montant() != null) paiement.setMontant(req.montant());
+        if (req.modePaiement() != null) paiement.setModePaiement(req.modePaiement());
+        if (req.note() != null) paiement.setNote(req.note());
+
+        paiementSuperAdminRepository.save(paiement);
+        log.info("[SUPER_ADMIN] Paiement {} modifié", paiementId);
+        saveLog("MODIFIER_PAIEMENT", "Paiement #" + paiementId + " corrigé", paiement.getTenant());
+        return PaiementSuperAdminDto.fromEntity(paiement);
+    }
+
+    /**
+     * Supprimer un paiement.
+     * Si c'était le dernier paiement du tenant → rétrograder le tenant vers GRATUIT.
+     */
+    @Transactional
+    public void supprimerPaiement(Long paiementId) {
+        PaiementSuperAdminEntity paiement = paiementSuperAdminRepository.findById(paiementId)
+                .orElseThrow(() -> new RuntimeException("Paiement non trouvé : " + paiementId));
+
+        TenantEntity tenant = paiement.getTenant();
+        paiementSuperAdminRepository.delete(paiement);
+
+        long restants = paiementSuperAdminRepository.countByTenant(tenant);
+        if (restants == 0) {
+            tenant.setPlan(TenantEntity.Plan.GRATUIT);
+            tenant.setDateExpiration(null);
+            tenantRepository.save(tenant);
+            tenantCacheService.evict(tenant.getTenantUuid());
+            log.info("[SUPER_ADMIN] Dernier paiement supprimé pour tenant {} → rétrogradé GRATUIT",
+                    tenant.getTenantUuid());
+            saveLog("SUPPRIMER_PAIEMENT",
+                    "Paiement #" + paiementId + " supprimé — aucun paiement restant → GRATUIT", tenant);
+        } else {
+            log.info("[SUPER_ADMIN] Paiement {} supprimé, {} paiement(s) restant(s) pour tenant {}",
+                    paiementId, restants, tenant.getTenantUuid());
+            saveLog("SUPPRIMER_PAIEMENT",
+                    "Paiement #" + paiementId + " supprimé — " + restants + " paiement(s) actifs conservés", tenant);
+        }
+    }
+
+    /**
+     * Revenus mensuels détaillés — dashboard super admin.
+     * Retourne pour chaque mois : total, nbPaiements et la liste complète des paiements.
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getRevenusMenuels() {
-        List<Object[]> rows = paiementSuperAdminRepository.findRevenusMenuels();
-        List<Map<String, Object>> result = new ArrayList<>(rows.size());
-        for (Object[] row : rows) {
-            Map<String, Object> item = new HashMap<>();
-            item.put("mois", row[0]);
-            item.put("total", row[1]);
-            item.put("nbPaiements", row[2]);
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM");
+
+        // Grouper tous les paiements par mois (ordre DESC déjà garanti par la requête)
+        Map<String, List<PaiementSuperAdminEntity>> parMois = paiementSuperAdminRepository
+                .findAllByOrderByDatePaiementDesc()
+                .stream()
+                .collect(Collectors.groupingBy(p -> p.getDatePaiement().format(fmt),
+                        LinkedHashMap::new, Collectors.toList()));
+
+        List<Map<String, Object>> result = new ArrayList<>(parMois.size());
+        for (Map.Entry<String, List<PaiementSuperAdminEntity>> entry : parMois.entrySet()) {
+            List<PaiementSuperAdminEntity> paiements = entry.getValue();
+            BigDecimal total = paiements.stream()
+                    .map(PaiementSuperAdminEntity::getMontant)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("mois", entry.getKey());
+            item.put("total", total);
+            item.put("nbPaiements", paiements.size());
+            item.put("paiements", paiements.stream().map(PaiementSuperAdminDto::fromEntity).toList());
             result.add(item);
         }
         return result;
