@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -24,9 +24,9 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
     List<DepenseEntity> findByCategorie(DepenseEntity.CategorieDepense categorie);
 
     // Recherche par date
-    List<DepenseEntity> findByDateDepense(LocalDate date);
+    List<DepenseEntity> findByDateDepense(LocalDateTime date);
 
-    List<DepenseEntity> findByDateDepenseBetween(LocalDate debut, LocalDate fin);
+    List<DepenseEntity> findByDateDepenseBetween(LocalDateTime debut, LocalDateTime fin);
 
     // Recherche par récurrence
     List<DepenseEntity> findByEstRecurrente(Boolean estRecurrente);

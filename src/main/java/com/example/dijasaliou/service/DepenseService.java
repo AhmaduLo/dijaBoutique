@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -82,6 +84,9 @@ public class DepenseService {
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         depense.setTenant(tenantService.getCurrentTenant());
 
+        // DATE : Toujours fixer la date côté serveur (heure exacte de la transaction)
+        depense.setDateDepense(LocalDateTime.now());
+
         return depenseRepository.save(depense);
     }
 
@@ -101,7 +106,6 @@ public class DepenseService {
 
         depenseExistante.setLibelle(depenseModifiee.getLibelle());
         depenseExistante.setMontant(depenseModifiee.getMontant());
-        depenseExistante.setDateDepense(depenseModifiee.getDateDepense());
         depenseExistante.setCategorie(depenseModifiee.getCategorie());
         depenseExistante.setEstRecurrente(depenseModifiee.getEstRecurrente());
         depenseExistante.setNotes(depenseModifiee.getNotes());
@@ -139,7 +143,7 @@ public class DepenseService {
      */
     @Transactional(readOnly = true)
     public List<DepenseEntity> obtenirDepensesParPeriode(LocalDate debut, LocalDate fin) {
-        return depenseRepository.findByDateDepenseBetween(debut, fin);
+        return depenseRepository.findByDateDepenseBetween(debut.atStartOfDay(), fin.atTime(LocalTime.MAX));
     }
 
     /**

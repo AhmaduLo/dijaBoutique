@@ -8,7 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * DTO pour les ventes
@@ -29,7 +29,7 @@ public class VenteDto {
     private String nomProduit;
     private BigDecimal prixUnitaire;
     private BigDecimal prixTotal;
-    private LocalDate dateVente;
+    private LocalDateTime dateVente;
     private String client;
     private String telephoneClient;
     private String adresseClient;

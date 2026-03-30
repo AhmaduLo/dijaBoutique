@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -39,9 +39,9 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     List<VenteEntity> findByUtilisateur(UserEntity utilisateur);
 
     // Recherche par date
-    List<VenteEntity> findByDateVente(LocalDate date);
+    List<VenteEntity> findByDateVente(LocalDateTime date);
 
-    List<VenteEntity> findByDateVenteBetween(LocalDate debut, LocalDate fin);
+    List<VenteEntity> findByDateVenteBetween(LocalDateTime debut, LocalDateTime fin);
 
     // Recherche par client
     List<VenteEntity> findByClient(String client);
@@ -80,8 +80,8 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +
            "WHERE v.dateVente BETWEEN :debut AND :fin " +
            "AND v.tenant.tenantUuid = :tenantUuid")
-    BigDecimal sumChiffreAffairesPeriode(@Param("debut") LocalDate debut,
-                                         @Param("fin") LocalDate fin,
+    BigDecimal sumChiffreAffairesPeriode(@Param("debut") LocalDateTime debut,
+                                         @Param("fin") LocalDateTime fin,
                                          @Param("tenantUuid") String tenantUuid);
 
     @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.tenantUuid = :tenantUuid")
@@ -110,8 +110,8 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
     Page<VenteEntity> findAllWithSearch(@Param("tenantUuid") String tenantUuid,
                                         @Param("search") String search,
-                                        @Param("dateDebut") LocalDate dateDebut,
-                                        @Param("dateFin") LocalDate dateFin,
+                                        @Param("dateDebut") LocalDateTime dateDebut,
+                                        @Param("dateFin") LocalDateTime dateFin,
                                         Pageable pageable);
 
     /**
@@ -127,8 +127,8 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
            "AND v.modePaiement <> :creditMode " +
            "AND v.tenant.tenantUuid = :tenantUuid " +
            "GROUP BY v.modePaiement")
-    List<Object[]> sumDirectVentesParModeEtPeriode(@Param("debut") LocalDate debut,
-                                                   @Param("fin") LocalDate fin,
+    List<Object[]> sumDirectVentesParModeEtPeriode(@Param("debut") LocalDateTime debut,
+                                                   @Param("fin") LocalDateTime fin,
                                                    @Param("creditMode") VenteEntity.ModePaiementVente creditMode,
                                                    @Param("tenantUuid") String tenantUuid);
 
@@ -150,7 +150,7 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     Page<VenteEntity> findByUtilisateurWithSearch(@Param("utilisateur") UserEntity utilisateur,
                                                   @Param("tenantUuid") String tenantUuid,
                                                   @Param("search") String search,
-                                                  @Param("dateDebut") LocalDate dateDebut,
-                                                  @Param("dateFin") LocalDate dateFin,
+                                                  @Param("dateDebut") LocalDateTime dateDebut,
+                                                  @Param("dateFin") LocalDateTime dateFin,
                                                   Pageable pageable);
 }

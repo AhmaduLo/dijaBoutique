@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -45,12 +45,12 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Trouver les achats d'une date précise
      */
-    List<AchatEntity> findByDateAchat(LocalDate date);
+    List<AchatEntity> findByDateAchat(LocalDateTime date);
 
     /**
      * Trouver les achats entre deux dates
      */
-    List<AchatEntity> findByDateAchatBetween(LocalDate debut, LocalDate fin);
+    List<AchatEntity> findByDateAchatBetween(LocalDateTime debut, LocalDateTime fin);
 
     /**
      * Compter les achats d'un produit
@@ -93,7 +93,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
            "(:dateFin IS NULL OR a.dateAchat <= :dateFin)")
     Page<AchatEntity> findAllWithSearch(@Param("tenantUuid") String tenantUuid,
                                         @Param("search") String search,
-                                        @Param("dateDebut") LocalDate dateDebut,
-                                        @Param("dateFin") LocalDate dateFin,
+                                        @Param("dateDebut") LocalDateTime dateDebut,
+                                        @Param("dateFin") LocalDateTime dateFin,
                                         Pageable pageable);
 }

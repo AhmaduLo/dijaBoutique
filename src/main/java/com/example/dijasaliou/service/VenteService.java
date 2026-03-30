@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -76,7 +78,9 @@ public class VenteService {
         PageRequest pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search : null;
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
-        Page<VenteEntity> ventesPage = venteRepository.findAllWithSearch(tenantUuid, searchParam, dateDebut, dateFin, pageable);
+        LocalDateTime debutDt = dateDebut != null ? dateDebut.atStartOfDay() : null;
+        LocalDateTime finDt = dateFin != null ? dateFin.atTime(LocalTime.MAX) : null;
+        Page<VenteEntity> ventesPage = venteRepository.findAllWithSearch(tenantUuid, searchParam, debutDt, finDt, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
         return PagedResponse.from(dtoPage);
     }
@@ -89,7 +93,9 @@ public class VenteService {
         PageRequest pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search : null;
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
-        Page<VenteEntity> ventesPage = venteRepository.findByUtilisateurWithSearch(utilisateur, tenantUuid, searchParam, dateDebut, dateFin, pageable);
+        LocalDateTime debutDt2 = dateDebut != null ? dateDebut.atStartOfDay() : null;
+        LocalDateTime finDt2 = dateFin != null ? dateFin.atTime(LocalTime.MAX) : null;
+        Page<VenteEntity> ventesPage = venteRepository.findByUtilisateurWithSearch(utilisateur, tenantUuid, searchParam, debutDt2, finDt2, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
         return PagedResponse.from(dtoPage);
     }
@@ -116,6 +122,10 @@ public class VenteService {
 
         // Associer l'utilisateur
         vente.setUtilisateur(utilisateur);
+
+        // Horodatage exact à la création — écrase toute valeur envoyée par le frontend
+        // Cette valeur ne changera jamais : c'est l'instant réel de la vente
+        vente.setDateVente(LocalDateTime.now());
 
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         vente.setTenant(tenantService.getCurrentTenant());
@@ -209,7 +219,7 @@ public class VenteService {
         venteExistante.setQuantite(venteModifiee.getQuantite());
         venteExistante.setNomProduit(venteModifiee.getNomProduit());
         venteExistante.setPrixUnitaire(venteModifiee.getPrixUnitaire());
-        venteExistante.setDateVente(venteModifiee.getDateVente());
+        // dateVente intentionnellement non modifiable : c'est l'horodatage de création
         venteExistante.setClient(venteModifiee.getClient());
         venteExistante.setTelephoneClient(venteModifiee.getTelephoneClient());
         venteExistante.setAdresseClient(venteModifiee.getAdresseClient());
@@ -326,7 +336,8 @@ public class VenteService {
      */
     @Transactional(readOnly = true)
     public List<VenteEntity> obtenirVentesParPeriode(LocalDate debut, LocalDate fin) {
-        return venteRepository.findByDateVenteBetween(debut, fin);
+        return venteRepository.findByDateVenteBetween(
+                debut.atStartOfDay(), fin.atTime(LocalTime.MAX));
     }
 
     /**
@@ -335,7 +346,8 @@ public class VenteService {
     @Transactional(readOnly = true)
     public BigDecimal calculerChiffreAffaires(LocalDate debut, LocalDate fin) {
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
-        return venteRepository.sumChiffreAffairesPeriode(debut, fin, tenantUuid);
+        return venteRepository.sumChiffreAffairesPeriode(
+                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), tenantUuid);
     }
 
     /**
@@ -360,7 +372,7 @@ public class VenteService {
 
         // 1. Ventes directes non-CREDIT groupées par mode
         List<Object[]> directVentes = venteRepository.sumDirectVentesParModeEtPeriode(
-                debut, fin, VenteEntity.ModePaiementVente.CREDIT, tenantUuid);
+                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), VenteEntity.ModePaiementVente.CREDIT, tenantUuid);
         for (Object[] row : directVentes) {
             String mode = ((VenteEntity.ModePaiementVente) row[0]).name();
             Long count = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;

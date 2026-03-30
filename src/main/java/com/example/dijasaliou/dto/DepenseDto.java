@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * DTO pour les dépenses
@@ -26,7 +26,7 @@ public class DepenseDto {
     private String id;
     private String libelle;
     private BigDecimal montant;
-    private LocalDate dateDepense;
+    private LocalDateTime dateDepense;
     private DepenseEntity.CategorieDepense categorie;
     private String notes;
     private Boolean estRecurrente;

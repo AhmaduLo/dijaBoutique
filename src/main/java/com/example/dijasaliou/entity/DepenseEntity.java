@@ -8,7 +8,7 @@ import lombok.*;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,7 +51,7 @@ public class DepenseEntity  extends BaseEntity{
     @NotNull(message = "La date de dépense est obligatoire")
     @PastOrPresent(message = "La date de dépense ne peut pas être dans le futur")
     @Column(name = "date_depense", nullable = false)
-    private LocalDate dateDepense;
+    private LocalDateTime dateDepense;
 
     @NotNull(message = "La catégorie est obligatoire")
     @Enumerated(EnumType.STRING)
@@ -172,7 +172,7 @@ public class DepenseEntity  extends BaseEntity{
     protected void onCreate() {
         // Date par défaut
         if (this.dateDepense == null) {
-            this.dateDepense = LocalDate.now();
+            this.dateDepense = LocalDateTime.now();
         }
 
         // Nettoyer les champs
@@ -199,7 +199,7 @@ public class DepenseEntity  extends BaseEntity{
      */
     public boolean estRecente() {
         return dateDepense != null &&
-                dateDepense.isAfter(LocalDate.now().minusDays(30));
+                dateDepense.isAfter(LocalDateTime.now().minusDays(30));
     }
 
     /**

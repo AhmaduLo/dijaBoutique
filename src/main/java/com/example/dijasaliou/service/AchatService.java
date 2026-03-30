@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -61,7 +63,9 @@ public class AchatService {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateAchat"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
-        Page<AchatEntity> achatsPage = achatRepository.findAllWithSearch(tenantUuid, searchParam, dateDebut, dateFin, pageable);
+        LocalDateTime debutDt = (dateDebut != null) ? dateDebut.atStartOfDay() : null;
+        LocalDateTime finDt = (dateFin != null) ? dateFin.atTime(LocalTime.MAX) : null;
+        Page<AchatEntity> achatsPage = achatRepository.findAllWithSearch(tenantUuid, searchParam, debutDt, finDt, pageable);
         Page<AchatDto> dtoPage = achatsPage.map(AchatDto::fromEntity);
         return PagedResponse.from(dtoPage);
     }
@@ -93,6 +97,9 @@ public class AchatService {
 
         // 3. MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         achat.setTenant(tenantService.getCurrentTenant());
+
+        // 4. DATE : Toujours fixer la date côté serveur (heure exacte de la transaction)
+        achat.setDateAchat(LocalDateTime.now());
 
         // 4. LOGIQUE : Calculer le prix total (si pas fait)
         if (achat.getPrixTotal() == null) {
@@ -165,7 +172,6 @@ public class AchatService {
         achatExistant.setNomProduit(achatModifie.getNomProduit());
         achatExistant.setPrixUnitaire(achatModifie.getPrixUnitaire());
         achatExistant.setPrixVenteSuggere(achatModifie.getPrixVenteSuggere());
-        achatExistant.setDateAchat(achatModifie.getDateAchat());
         achatExistant.setFournisseur(achatModifie.getFournisseur());
         achatExistant.setUtilisateur(achatModifie.getUtilisateur());
         achatExistant.setPhotoUrl(achatModifie.getPhotoUrl());
@@ -215,7 +221,7 @@ public class AchatService {
      */
     @Transactional(readOnly = true)
     public List<AchatEntity> obtenirAchatsParPeriode(LocalDate debut, LocalDate fin) {
-        return achatRepository.findByDateAchatBetween(debut, fin);
+        return achatRepository.findByDateAchatBetween(debut.atStartOfDay(), fin.atTime(LocalTime.MAX));
     }
 
     /**

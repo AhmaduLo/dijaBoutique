@@ -2,7 +2,6 @@ package com.example.dijasaliou.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -10,6 +9,7 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 
 @Entity
@@ -60,7 +60,7 @@ public class VenteEntity  extends BaseEntity{
     @NotNull(message = "La date de vente est obligatoire")
     @PastOrPresent(message = "La date de vente ne peut pas être dans le futur")
     @Column(name = "date_vente", nullable = false)
-    private LocalDate dateVente;
+    private LocalDateTime dateVente;
 
     @Size(max = 100, message = "Le nom du client ne peut dépasser 100 caractères")
     @Column(name = "client", length = 100)
@@ -141,7 +141,7 @@ public class VenteEntity  extends BaseEntity{
      * Date d'échéance pour les ventes à crédit — champ transient pour la désérialisation JSON
      */
     @Transient
-    private LocalDate dateEcheance;
+    private LocalDate dateEcheance;  // reste LocalDate : l'échéance est une date, pas un instant
 
     public enum ModePaiementVente {
         ESPECES, WAVE, ORANGE_MONEY, CREDIT;
@@ -254,7 +254,7 @@ public class VenteEntity  extends BaseEntity{
             calculerPrixTotal();
         }
         if (this.dateVente == null) {
-            this.dateVente = LocalDate.now();
+            this.dateVente = LocalDateTime.now();
         }
         if (this.nomProduit != null) {
             this.nomProduit = this.nomProduit.trim();
@@ -275,7 +275,7 @@ public class VenteEntity  extends BaseEntity{
 
     public boolean estRecente() {
         return dateVente != null &&
-                dateVente.isAfter(LocalDate.now().minusDays(30));
+                dateVente.isAfter(LocalDateTime.now().minusDays(30));
     }
 
     public int getMois() {

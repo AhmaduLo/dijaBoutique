@@ -9,7 +9,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 
@@ -59,7 +59,7 @@ public class AchatEntity extends BaseEntity{
     @NotNull(message = "La date d'achat est obligatoire")
     @PastOrPresent(message = "La date d'achat ne peut pas être dans le futur")
     @Column(name = "date_achat", nullable = false)
-    private LocalDate dateAchat;
+    private LocalDateTime dateAchat;
 
     @Size(max = 100, message = "Le nom du fournisseur ne peut dépasser 100 caractères")
     @Column(name = "fournisseur", length = 100)
@@ -176,7 +176,7 @@ public class AchatEntity extends BaseEntity{
 
         // Date d'achat par défaut = aujourd'hui
         if (this.dateAchat == null) {
-            this.dateAchat = LocalDate.now();
+            this.dateAchat = LocalDateTime.now();
         }
 
         // Nettoyer le nom du produit
@@ -211,7 +211,7 @@ public class AchatEntity extends BaseEntity{
      * Vérifie si l'achat est récent (< 30 jours)
      */
     public boolean estRecent() {
-        return dateAchat != null && dateAchat.isAfter(LocalDate.now().minusDays(30));
+        return dateAchat != null && dateAchat.isAfter(LocalDateTime.now().minusDays(30));
     }
 
     /**
