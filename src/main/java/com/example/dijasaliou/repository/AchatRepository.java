@@ -84,7 +84,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
            "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR a.dateAchat >= :dateDebut) AND " +
            "(:dateFin IS NULL OR a.dateAchat <= :dateFin) " +
-           "ORDER BY a.dateAchat DESC",
+           "ORDER BY a.dateAchat DESC, a.id DESC",
            countQuery = "SELECT COUNT(a) FROM AchatEntity a WHERE " +
            "a.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(a.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
