@@ -79,20 +79,41 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Gestion des RuntimeException génériques → 500 (erreur interne, pas du client)
+     * Gestion des RuntimeException génériques
+     *
+     * SÉCURITÉ : ex.getMessage() n'est jamais envoyé tel quel au client.
+     * - Si le message ressemble à un message utilisateur connu (court, sans stack trace)
+     *   → retourné en 400 (erreur métier, ex: "Utilisateur non trouvé")
+     * - Sinon → message générique 500 (ex: NullPointerException interne)
+     * Dans tous les cas, la stack trace complète est loggée côté serveur uniquement.
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
         log.error("RuntimeException: {} - {}", ex.getClass().getName(), ex.getMessage(), ex);
+
+        String message = ex.getMessage();
+        boolean isUserFacingMessage = message != null
+                && message.length() < 200
+                && !message.contains("Exception")
+                && !message.contains("at com.")
+                && !message.contains("at java.")
+                && !message.contains("at org.");
+
+        if (isUserFacingMessage) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("timestamp", LocalDateTime.now());
+            errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
+            errorResponse.put("error", "Erreur de traitement");
+            errorResponse.put("message", message);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         errorResponse.put("error", "Erreur interne");
-        errorResponse.put("message", ex.getMessage());
-
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(errorResponse);
+        errorResponse.put("message", "Une erreur inattendue s'est produite.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
     /**

@@ -1,6 +1,9 @@
 package com.example.dijasaliou.dto;
 
 import com.example.dijasaliou.entity.UserEntity;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -27,12 +30,29 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegisterRequest {
+
+    @NotBlank(message = "Nom obligatoire")
+    @Size(max = 100, message = "Le nom ne peut pas dépasser 100 caractères")
     private String nom;
+
+    @NotBlank(message = "Prénom obligatoire")
+    @Size(max = 100, message = "Le prénom ne peut pas dépasser 100 caractères")
     private String prenom;
+
+    @NotBlank(message = "Email obligatoire")
+    @Email(message = "Format email invalide")
     private String email;
+
+    @NotBlank(message = "Mot de passe obligatoire")
+    @Size(min = 8, message = "Le mot de passe doit contenir au minimum 8 caractères")
     private String motDePasse;
+
+    @NotBlank(message = "Nom de l'entreprise obligatoire")
+    @Size(max = 100, message = "Le nom de l'entreprise ne peut pas dépasser 100 caractères")
     private String nomEntreprise;
+
     private String numeroTelephone;
+
     private String adresseEntreprise;
 
     /**

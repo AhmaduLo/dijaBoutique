@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import java.util.List;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -18,15 +19,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 
 /**
  * Configuration de sécurité
@@ -43,13 +42,16 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final SubscriptionExpirationFilter subscriptionExpirationFilter;
     private final ActivityTrackingFilter activityTrackingFilter;
+    private final Environment environment;
 
     public SecurityConfig(@Lazy JwtAuthenticationFilter jwtAuthFilter,
                           SubscriptionExpirationFilter subscriptionExpirationFilter,
-                          ActivityTrackingFilter activityTrackingFilter) {
+                          ActivityTrackingFilter activityTrackingFilter,
+                          Environment environment) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.subscriptionExpirationFilter = subscriptionExpirationFilter;
         this.activityTrackingFilter = activityTrackingFilter;
+        this.environment = environment;
     }
 
     @Bean
@@ -129,8 +131,15 @@ public class SecurityConfig {
                         // Routes devises : lecture accessible à tous, modification ADMIN uniquement
                         .requestMatchers("/devises/**").authenticated()
 
-                        // Toutes les autres routes nécessitent un token (par sécurité)
+                                // Toutes les autres routes nécessitent un token (par sécurité)
                         .anyRequest().authenticated()
+                )
+
+                // Forcer HTTPS sur les requêtes passant par un proxy (Railway, etc.)
+                // X-Forwarded-Proto présent = requête via proxy → exiger HTTPS
+                .requiresChannel(channel -> channel
+                        .requestMatchers(r -> r.getHeader("X-Forwarded-Proto") != null)
+                        .requiresSecure()
                 )
         // Retourner 401 (pas 403) pour les requêtes non authentifiées
         // Nécessaire pour que Angular redirige vers /login au lieu de bloquer
@@ -167,15 +176,19 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(List.of(
-                "http://localhost:4200",
-                "http://localhost:64390",
+        List<String> origins = new ArrayList<>(List.of(
                 "https://heasystock.vercel.app",
-                "https://*.vercel.app",
                 "https://heasystock.com",
                 "https://www.heasystock.com",
                 frontendUrl
         ));
+        // Origines dev local — autorisées uniquement si le profil "local" est actif
+        // En production SPRING_PROFILES_ACTIVE=prod → localhost jamais autorisé
+        if (Arrays.asList(environment.getActiveProfiles()).contains("local")) {
+            origins.add("http://localhost:4200");
+            origins.add("http://localhost:64390");
+        }
+        configuration.setAllowedOriginPatterns(origins);
 
         // Méthodes HTTP autorisées (strictement nécessaires)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));

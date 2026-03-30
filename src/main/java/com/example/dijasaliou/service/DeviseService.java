@@ -143,9 +143,8 @@ public class DeviseService {
             );
         }
 
-        // TODO: Vérifier si la devise est utilisée dans des transactions
-        // Si oui, lancer une exception
-
+        // Les entités VenteEntity et AchatEntity ne stockent pas de FK vers la devise —
+        // elles utilisent DeviseService.convertir() à la volée. La suppression est sûre.
         deviseRepository.deleteById(id);
     }
 
