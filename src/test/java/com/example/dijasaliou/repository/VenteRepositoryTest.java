@@ -336,8 +336,8 @@ class VenteRepositoryTest {
         // user + entre 14 jan et 16 jan → vente1 (15 jan) + vente4 (15 jan) = 2
         Page<VenteEntity> page = repo.findByUtilisateurWithSearch(
                 user, "tenant-vente-001", null,
-                LocalDate.of(2025, 1, 14),
-                LocalDate.of(2025, 1, 16),
+                LocalDateTime.of(2025, 1, 14, 0, 0),
+                LocalDateTime.of(2025, 1, 16, 23, 59, 59),
                 PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(2L);
