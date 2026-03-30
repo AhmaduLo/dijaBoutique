@@ -48,9 +48,8 @@ public class DepenseEntity  extends BaseEntity{
     @Column(name = "montant", nullable = false, precision = 10, scale = 2)
     private BigDecimal montant;
 
-    @NotNull(message = "La date de dépense est obligatoire")
-    @PastOrPresent(message = "La date de dépense ne peut pas être dans le futur")
     @Column(name = "date_depense", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
     private LocalDateTime dateDepense;
 
     @NotNull(message = "La catégorie est obligatoire")

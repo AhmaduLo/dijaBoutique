@@ -57,9 +57,8 @@ public class VenteEntity  extends BaseEntity{
     @Column(name = "prix_total", nullable = false, precision = 10, scale = 2)
     private BigDecimal prixTotal;
 
-    @NotNull(message = "La date de vente est obligatoire")
-    @PastOrPresent(message = "La date de vente ne peut pas être dans le futur")
     @Column(name = "date_vente", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
     private LocalDateTime dateVente;
 
     @Size(max = 100, message = "Le nom du client ne peut dépasser 100 caractères")
