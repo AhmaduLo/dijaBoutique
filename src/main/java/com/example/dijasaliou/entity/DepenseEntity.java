@@ -249,7 +249,7 @@ public class DepenseEntity  extends BaseEntity{
             throw new IllegalArgumentException("Le montant doit être positif");
         }
 
-        if (dateDepense != null && dateDepense.isAfter(LocalDate.now())) {
+        if (dateDepense != null && dateDepense.isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("La date ne peut pas être dans le futur");
         }
 
