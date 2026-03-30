@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -118,7 +119,7 @@ class VenteIntegrationTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("5000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .photoUrl("/photos/collier-basic.jpg")
                 .utilisateur(userBasic)
                 .tenant(tenantBasic)
@@ -130,7 +131,7 @@ class VenteIntegrationTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("8000"))
                 .prixTotal(new BigDecimal("8000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .photoUrl("/photos/collier-premium.jpg")
                 .utilisateur(userPremium)
                 .tenant(tenantPremium)

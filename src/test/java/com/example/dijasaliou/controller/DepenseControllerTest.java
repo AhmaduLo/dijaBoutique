@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -94,7 +95,7 @@ class DepenseControllerTest {
         depenseTest = DepenseEntity.builder()
                 .libelle("Loyer du magasin")
                 .montant(new BigDecimal("500000.00"))
-                .dateDepense(LocalDate.of(2025, 10, 15))
+                .dateDepense(LocalDateTime.of(2025, 10, 15, 0, 0))
                 .categorie(DepenseEntity.CategorieDepense.LOYER)
                 .notes("Loyer mensuel")
                 .estRecurrente(true)
@@ -106,7 +107,7 @@ class DepenseControllerTest {
         depenseTest2 = DepenseEntity.builder()
                 .libelle("Facture électricité")
                 .montant(new BigDecimal("75000.00"))
-                .dateDepense(LocalDate.of(2025, 10, 20))
+                .dateDepense(LocalDateTime.of(2025, 10, 20, 0, 0))
                 .categorie(DepenseEntity.CategorieDepense.ELECTRICITE)
                 .notes("Facture mensuelle")
                 .estRecurrente(true)
@@ -256,7 +257,7 @@ class DepenseControllerTest {
         DepenseEntity nouvelleDepense = DepenseEntity.builder()
                 .libelle("Assurance locale")
                 .montant(new BigDecimal("120000.00"))
-                .dateDepense(LocalDate.now())
+                .dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.ASSURANCE)
                 .notes("Assurance annuelle")
                 .estRecurrente(false)
@@ -265,7 +266,7 @@ class DepenseControllerTest {
         DepenseEntity depenseCreee = DepenseEntity.builder()
                 .libelle("Assurance locale")
                 .montant(new BigDecimal("120000.00"))
-                .dateDepense(LocalDate.now())
+                .dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.ASSURANCE)
                 .notes("Assurance annuelle")
                 .estRecurrente(false)
@@ -304,7 +305,7 @@ class DepenseControllerTest {
         DepenseEntity depenseModifiee = DepenseEntity.builder()
                 .libelle("Loyer du magasin - Mise à jour")
                 .montant(new BigDecimal("550000.00"))
-                .dateDepense(LocalDate.of(2025, 11, 15))
+                .dateDepense(LocalDateTime.of(2025, 11, 15, 0, 0))
                 .categorie(DepenseEntity.CategorieDepense.LOYER)
                 .notes("Loyer mensuel augmenté")
                 .estRecurrente(true)
@@ -313,7 +314,7 @@ class DepenseControllerTest {
         DepenseEntity depenseMiseAJour = DepenseEntity.builder()
                 .libelle("Loyer du magasin - Mise à jour")
                 .montant(new BigDecimal("550000.00"))
-                .dateDepense(LocalDate.of(2025, 11, 15))
+                .dateDepense(LocalDateTime.of(2025, 11, 15, 0, 0))
                 .categorie(DepenseEntity.CategorieDepense.LOYER)
                 .notes("Loyer mensuel augmenté")
                 .estRecurrente(true)
@@ -349,7 +350,7 @@ class DepenseControllerTest {
         DepenseEntity depenseModifiee = DepenseEntity.builder()
                 .libelle("Dépense inexistante")
                 .montant(new BigDecimal("100000.00"))
-                .dateDepense(LocalDate.now())
+                .dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.AUTRE)
                 .build();
 
@@ -560,7 +561,7 @@ class DepenseControllerTest {
         DepenseEntity depenseSansNotes = DepenseEntity.builder()
                 .libelle("Transport")
                 .montant(new BigDecimal("25000.00"))
-                .dateDepense(LocalDate.now())
+                .dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.TRANSPORT)
                 .notes(null) // Pas de notes
                 .estRecurrente(false)
@@ -593,7 +594,7 @@ class DepenseControllerTest {
         DepenseEntity nouvelleDepense = DepenseEntity.builder()
                 .libelle("Achat ponctuel")
                 .montant(new BigDecimal("50000.00"))
-                .dateDepense(LocalDate.now())
+                .dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.FOURNITURES)
                 .estRecurrente(false)
                 .build();
@@ -601,7 +602,7 @@ class DepenseControllerTest {
         DepenseEntity depenseCreee = DepenseEntity.builder()
                 .libelle("Achat ponctuel")
                 .montant(new BigDecimal("50000.00"))
-                .dateDepense(LocalDate.now())
+                .dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.FOURNITURES)
                 .estRecurrente(false)
                 .utilisateur(utilisateurTest)

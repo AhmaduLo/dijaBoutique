@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -68,7 +69,7 @@ class VenteServiceTest {
                 .prixUnitaire(new BigDecimal("500.00"))
                 .prixTotal(new BigDecimal("1000.00"))
                 .client("Client A")
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .utilisateur(utilisateurTest)
                 .tenant(tenantTest)
                 .build();
@@ -259,7 +260,7 @@ class VenteServiceTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("200.00"))
                 .prixTotal(new BigDecimal("200.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .modePaiement(VenteEntity.ModePaiementVente.CREDIT)
                 .clientRef(client)
                 .dateEcheance(LocalDate.now().plusDays(30))
@@ -284,7 +285,7 @@ class VenteServiceTest {
                 .nomProduit("Téléphone")
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("200.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .modePaiement(VenteEntity.ModePaiementVente.CREDIT)
                 .clientRef(null)
                 .clientId(null)
@@ -381,7 +382,7 @@ class VenteServiceTest {
     void obtenirVentesParPeriode_retourneListe() {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
-        when(venteRepository.findByDateVenteBetween(debut, fin)).thenReturn(List.of(venteValide));
+        when(venteRepository.findByDateVenteBetween(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of(venteValide));
 
         List<VenteEntity> resultat = venteService.obtenirVentesParPeriode(debut, fin);
 
@@ -398,7 +399,7 @@ class VenteServiceTest {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(venteRepository.sumChiffreAffairesPeriode(debut, fin, tenantTest.getTenantUuid()))
+        when(venteRepository.sumChiffreAffairesPeriode(any(LocalDateTime.class), any(LocalDateTime.class), eq(tenantTest.getTenantUuid())))
                 .thenReturn(new BigDecimal("1500.00"));
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
@@ -412,7 +413,7 @@ class VenteServiceTest {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(venteRepository.sumChiffreAffairesPeriode(debut, fin, tenantTest.getTenantUuid()))
+        when(venteRepository.sumChiffreAffairesPeriode(any(LocalDateTime.class), any(LocalDateTime.class), eq(tenantTest.getTenantUuid())))
                 .thenReturn(BigDecimal.ZERO);
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
@@ -563,7 +564,7 @@ class VenteServiceTest {
                 .quantite(1.0) // quantité réduite → même nom + qté ≤ ancienne → pas d'appel au StockService
                 .nomProduit("Ordinateur")
                 .prixUnitaire(new BigDecimal("600.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .build();
 
         when(venteRepository.findById("test-id-1")).thenReturn(Optional.of(venteValide));
@@ -584,7 +585,7 @@ class VenteServiceTest {
         VenteEntity modifications = VenteEntity.builder()
                 .quantite(3.0).nomProduit("Ordinateur")
                 .prixUnitaire(new BigDecimal("600.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .build();
 
         when(venteRepository.findById("test-id-1")).thenReturn(Optional.of(venteValide));

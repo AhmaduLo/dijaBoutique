@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,7 +27,7 @@ class VenteDtoTest {
                 .quantite(2.0)
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("10000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .photoUrl("/photos/collier.jpg")
                 .modePaiement(VenteEntity.ModePaiementVente.ESPECES)
                 .tenant(tenant)
@@ -85,7 +86,7 @@ class VenteDtoTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("8000"))
                 .prixTotal(new BigDecimal("8000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .photoUrl("/photos/bague.jpg")
                 .tenant(null) // tenant absent
                 .build();
@@ -132,7 +133,7 @@ class VenteDtoTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("3000"))
                 .prixTotal(new BigDecimal("3000"))
-                .dateVente(LocalDate.now().minusDays(60))
+                .dateVente(LocalDateTime.now().minusDays(60))
                 .tenant(TenantEntity.builder()
                         .plan(TenantEntity.Plan.STARTER)
                         .nomEntreprise("B").numeroTelephone("0").tenantUuid("u").build())
@@ -160,7 +161,7 @@ class VenteDtoTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("5000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .modePaiement(VenteEntity.ModePaiementVente.WAVE)
                 .tenant(TenantEntity.builder()
                         .plan(TenantEntity.Plan.STARTER)
@@ -180,7 +181,7 @@ class VenteDtoTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("2000"))
                 .prixTotal(new BigDecimal("2000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .client("Aminata Diallo")
                 .tenant(TenantEntity.builder()
                         .plan(TenantEntity.Plan.STARTER)
@@ -198,7 +199,7 @@ class VenteDtoTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("2000"))
                 .prixTotal(new BigDecimal("2000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .client(null)
                 .tenant(TenantEntity.builder()
                         .plan(TenantEntity.Plan.STARTER)

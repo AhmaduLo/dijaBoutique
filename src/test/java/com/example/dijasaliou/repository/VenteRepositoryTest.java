@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,7 +71,7 @@ class VenteRepositoryTest {
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("10000"))
-                .dateVente(LocalDate.of(2025, 1, 15))
+                .dateVente(LocalDateTime.of(2025, 1, 15, 0, 0))
                 .modePaiement(ModePaiementVente.ESPECES)
                 .client("Aminata Diallo")
                 .utilisateur(user)
@@ -83,7 +84,7 @@ class VenteRepositoryTest {
                 .nomProduit("Bracelet argent")
                 .prixUnitaire(new BigDecimal("3000"))
                 .prixTotal(new BigDecimal("3000"))
-                .dateVente(LocalDate.of(2025, 1, 20))
+                .dateVente(LocalDateTime.of(2025, 1, 20, 0, 0))
                 .modePaiement(ModePaiementVente.WAVE)
                 .utilisateur(user)
                 .tenant(tenant)
@@ -95,7 +96,7 @@ class VenteRepositoryTest {
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("15000"))
-                .dateVente(LocalDate.of(2025, 3, 10))
+                .dateVente(LocalDateTime.of(2025, 3, 10, 0, 0))
                 .modePaiement(ModePaiementVente.ESPECES)
                 .client("Moussa Traoré")
                 .utilisateur(autreUser)
@@ -108,7 +109,7 @@ class VenteRepositoryTest {
                 .nomProduit("Bague diamant")
                 .prixUnitaire(new BigDecimal("20000"))
                 .prixTotal(new BigDecimal("20000"))
-                .dateVente(LocalDate.of(2025, 1, 15))
+                .dateVente(LocalDateTime.of(2025, 1, 15, 0, 0))
                 .modePaiement(ModePaiementVente.CREDIT)
                 .utilisateur(user)
                 .tenant(tenant)
@@ -120,7 +121,7 @@ class VenteRepositoryTest {
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("25000"))
-                .dateVente(LocalDate.of(2025, 1, 15))
+                .dateVente(LocalDateTime.of(2025, 1, 15, 0, 0))
                 .modePaiement(ModePaiementVente.ESPECES)
                 .utilisateur(autreUser)
                 .tenant(autreTenant)
@@ -220,7 +221,7 @@ class VenteRepositoryTest {
     void findAllWithSearch_FiltreDateDebut() {
         // Ventes à partir du 1er mars 2025 → seule vente3 (10 mars)
         Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", null,
-                LocalDate.of(2025, 3, 1), null, PageRequest.of(0, 20));
+                LocalDateTime.of(2025, 3, 1, 0, 0), null, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(1L);
     }
@@ -230,7 +231,7 @@ class VenteRepositoryTest {
     void findAllWithSearch_FiltreDateFin() {
         // Ventes jusqu'au 31 jan 2025 → vente1, vente2, vente4 (autreTenant exclu)
         Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", null,
-                null, LocalDate.of(2025, 1, 31), PageRequest.of(0, 20));
+                null, LocalDateTime.of(2025, 1, 31, 23, 59), PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(3L);
     }
@@ -240,7 +241,7 @@ class VenteRepositoryTest {
     void findAllWithSearch_PlageDesDates() {
         // 1er–31 jan 2025 → vente1 (15 jan), vente2 (20 jan), vente4 (15 jan) — autreTenant exclu
         Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", null,
-                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 1, 31), PageRequest.of(0, 20));
+                LocalDateTime.of(2025, 1, 1, 0, 0), LocalDateTime.of(2025, 1, 31, 23, 59), PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(3L);
     }
@@ -258,8 +259,8 @@ class VenteRepositoryTest {
     @Test
     @DisplayName("sumDirectVentesParModeEtPeriode — doit agréger par mode, hors CREDIT")
     void sumDirectVentesParModeEtPeriode_DoitAgregerSaufCredit() {
-        LocalDate debut = LocalDate.of(2025, 1, 1);
-        LocalDate fin = LocalDate.of(2025, 1, 31);
+        LocalDateTime debut = LocalDateTime.of(2025, 1, 1, 0, 0);
+        LocalDateTime fin = LocalDateTime.of(2025, 1, 31, 23, 59);
 
         List<Object[]> result = repo.sumDirectVentesParModeEtPeriode(
                 debut, fin, ModePaiementVente.CREDIT, "tenant-vente-001");
@@ -276,8 +277,8 @@ class VenteRepositoryTest {
     @Test
     @DisplayName("sumDirectVentesParModeEtPeriode — vérifie les montants ESPECES")
     void sumDirectVentesParModeEtPeriode_VerifieMontantsEspeces() {
-        LocalDate debut = LocalDate.of(2025, 1, 1);
-        LocalDate fin = LocalDate.of(2025, 1, 31);
+        LocalDateTime debut = LocalDateTime.of(2025, 1, 1, 0, 0);
+        LocalDateTime fin = LocalDateTime.of(2025, 1, 31, 23, 59);
 
         List<Object[]> result = repo.sumDirectVentesParModeEtPeriode(
                 debut, fin, ModePaiementVente.CREDIT, "tenant-vente-001");
@@ -298,8 +299,8 @@ class VenteRepositoryTest {
     @Test
     @DisplayName("sumDirectVentesParModeEtPeriode — doit retourner liste vide hors période")
     void sumDirectVentesParModeEtPeriode_HorsPeriodeRetourneVide() {
-        LocalDate debut = LocalDate.of(2020, 1, 1);
-        LocalDate fin = LocalDate.of(2020, 12, 31);
+        LocalDateTime debut = LocalDateTime.of(2020, 1, 1, 0, 0);
+        LocalDateTime fin = LocalDateTime.of(2020, 12, 31, 23, 59);
 
         List<Object[]> result = repo.sumDirectVentesParModeEtPeriode(
                 debut, fin, ModePaiementVente.CREDIT, "tenant-vente-001");

@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -100,7 +101,7 @@ class AchatControllerTest {
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("50.00"))
                 .prixTotal(new BigDecimal("500.00"))
-                .dateAchat(LocalDate.of(2025, 10, 15))
+                .dateAchat(LocalDateTime.of(2025, 10, 15, 0, 0))
                 .fournisseur("Fournisseur A")
                 .utilisateur(utilisateurTest)
                 .build();
@@ -112,7 +113,7 @@ class AchatControllerTest {
                 .nomProduit("Bracelet en argent")
                 .prixUnitaire(new BigDecimal("30.00"))
                 .prixTotal(new BigDecimal("150.00"))
-                .dateAchat(LocalDate.of(2025, 10, 20))
+                .dateAchat(LocalDateTime.of(2025, 10, 20, 0, 0))
                 .fournisseur("Fournisseur B")
                 .utilisateur(utilisateurTest)
                 .build();
@@ -255,7 +256,7 @@ class AchatControllerTest {
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("100.00"))
                 .prixTotal(new BigDecimal("1500.00"))
-                .dateAchat(LocalDate.now())
+                .dateAchat(LocalDateTime.now())
                 .fournisseur("Fournisseur C")
                 .build();
 
@@ -264,7 +265,7 @@ class AchatControllerTest {
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("100.00"))
                 .prixTotal(new BigDecimal("1500.00"))
-                .dateAchat(LocalDate.now())
+                .dateAchat(LocalDateTime.now())
                 .fournisseur("Fournisseur C")
                 .utilisateur(utilisateurTest)
                 .build();
@@ -327,7 +328,7 @@ class AchatControllerTest {
                 .nomProduit("Collier en or modifié")
                 .prixUnitaire(new BigDecimal("60.00"))
                 .prixTotal(new BigDecimal("1200.00"))
-                .dateAchat(LocalDate.of(2025, 10, 25))
+                .dateAchat(LocalDateTime.of(2025, 10, 25, 0, 0))
                 .fournisseur("Fournisseur A modifié")
                 .build();
 
@@ -336,7 +337,7 @@ class AchatControllerTest {
                 .nomProduit("Collier en or modifié")
                 .prixUnitaire(new BigDecimal("60.00"))
                 .prixTotal(new BigDecimal("1200.00"))
-                .dateAchat(LocalDate.of(2025, 10, 25))
+                .dateAchat(LocalDateTime.of(2025, 10, 25, 0, 0))
                 .fournisseur("Fournisseur A modifié")
                 .utilisateur(utilisateurTest)
                 .build();
@@ -374,7 +375,7 @@ class AchatControllerTest {
                 .nomProduit("Produit inexistant")
                 .prixUnitaire(new BigDecimal("50.00"))
                 .prixTotal(new BigDecimal("1000.00"))
-                .dateAchat(LocalDate.of(2025, 10, 25))
+                .dateAchat(LocalDateTime.of(2025, 10, 25, 0, 0))
                 .build();
 
         when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
@@ -507,7 +508,7 @@ class AchatControllerTest {
                 .nomProduit("Montre")
                 .prixUnitaire(new BigDecimal("80.00"))
                 .prixTotal(new BigDecimal("640.00"))
-                .dateAchat(LocalDate.now())
+                .dateAchat(LocalDateTime.now())
                 .fournisseur(null) // Pas de fournisseur
                 .utilisateur(utilisateurTest)
                 .build();
@@ -537,7 +538,7 @@ class AchatControllerTest {
                 .nomProduit("Boucles d'oreilles")
                 .prixUnitaire(new BigDecimal("25.00"))
                 .prixTotal(new BigDecimal("300.00"))
-                .dateAchat(LocalDate.now())
+                .dateAchat(LocalDateTime.now())
                 .build();
 
         AchatEntity achatCree = AchatEntity.builder()
@@ -545,7 +546,7 @@ class AchatControllerTest {
                 .nomProduit("Boucles d'oreilles")
                 .prixUnitaire(new BigDecimal("25.00"))
                 .prixTotal(new BigDecimal("300.00"))
-                .dateAchat(LocalDate.now())
+                .dateAchat(LocalDateTime.now())
                 .utilisateur(utilisateurTest)
                 .build();
         achatCree.setId("test-id-4");

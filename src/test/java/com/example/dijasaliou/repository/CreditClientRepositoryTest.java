@@ -17,6 +17,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -278,7 +279,7 @@ class CreditClientRepositoryTest {
                 .nomProduit("Collier Test")
                 .prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("5000"))
-                .dateVente(LocalDate.of(2025, 6, 15))
+                .dateVente(LocalDateTime.of(2025, 6, 15, 0, 0))
                 .utilisateur(user)
                 .tenant(tenant)
                 .build());

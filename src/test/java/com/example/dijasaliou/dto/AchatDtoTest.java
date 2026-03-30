@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,7 +26,7 @@ class AchatDtoTest {
                 .quantite(10.0)
                 .prixUnitaire(new BigDecimal("2000"))
                 .prixTotal(new BigDecimal("20000"))
-                .dateAchat(LocalDate.now())
+                .dateAchat(LocalDateTime.now())
                 .photoUrl("/photos/tissu.jpg")
                 .tenant(tenant)
                 .build();
@@ -73,7 +74,7 @@ class AchatDtoTest {
                 .quantite(5.0)
                 .prixUnitaire(new BigDecimal("2000"))
                 .prixTotal(new BigDecimal("10000"))
-                .dateAchat(LocalDate.now())
+                .dateAchat(LocalDateTime.now())
                 .photoUrl("/photos/tissu.jpg")
                 .tenant(null)
                 .build();

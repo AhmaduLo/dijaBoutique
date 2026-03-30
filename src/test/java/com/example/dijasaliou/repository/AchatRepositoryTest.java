@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -86,7 +87,7 @@ class AchatRepositoryTest {
                 .quantite(10.0)
                 .prixUnitaire(new BigDecimal("5000.00"))
                 .prixTotal(new BigDecimal("50000.00"))
-                .dateAchat(LocalDate.of(2025, 1, 10))
+                .dateAchat(LocalDateTime.of(2025, 1, 10, 0, 0))
                 .fournisseur("Fournisseur A")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -97,7 +98,7 @@ class AchatRepositoryTest {
                 .quantite(5.0)
                 .prixUnitaire(new BigDecimal("5000.00"))
                 .prixTotal(new BigDecimal("25000.00"))
-                .dateAchat(LocalDate.of(2025, 2, 15))
+                .dateAchat(LocalDateTime.of(2025, 2, 15, 0, 0))
                 .fournisseur("Fournisseur B")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -119,7 +120,7 @@ class AchatRepositoryTest {
                 .quantite(8.0)
                 .prixUnitaire(new BigDecimal("3000.00"))
                 .prixTotal(new BigDecimal("24000.00"))
-                .dateAchat(LocalDate.of(2025, 3, 1))
+                .dateAchat(LocalDateTime.of(2025, 3, 1, 0, 0))
                 .fournisseur("Fournisseur C")
                 .utilisateur(autreUtilisateur)
                 .tenant(autreTenant)
@@ -143,7 +144,7 @@ class AchatRepositoryTest {
                 .quantite(3.0)
                 .prixUnitaire(new BigDecimal("15000.00"))
                 .prixTotal(new BigDecimal("45000.00"))
-                .dateAchat(LocalDate.of(2025, 1, 5))
+                .dateAchat(LocalDateTime.of(2025, 1, 5, 0, 0))
                 .fournisseur("Fournisseur X")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -154,7 +155,7 @@ class AchatRepositoryTest {
                 .quantite(2.0)
                 .prixUnitaire(new BigDecimal("25000.00"))
                 .prixTotal(new BigDecimal("50000.00"))
-                .dateAchat(LocalDate.of(2025, 2, 10))
+                .dateAchat(LocalDateTime.of(2025, 2, 10, 0, 0))
                 .fournisseur("Fournisseur Y")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -176,7 +177,7 @@ class AchatRepositoryTest {
                 .quantite(4.0)
                 .prixUnitaire(new BigDecimal("8000.00"))
                 .prixTotal(new BigDecimal("32000.00"))
-                .dateAchat(LocalDate.of(2025, 1, 20))
+                .dateAchat(LocalDateTime.of(2025, 1, 20, 0, 0))
                 .fournisseur("Fournisseur Bijoux")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -187,7 +188,7 @@ class AchatRepositoryTest {
                 .quantite(6.0)
                 .prixUnitaire(new BigDecimal("4000.00"))
                 .prixTotal(new BigDecimal("24000.00"))
-                .dateAchat(LocalDate.of(2025, 1, 25))
+                .dateAchat(LocalDateTime.of(2025, 1, 25, 0, 0))
                 .fournisseur("Fournisseur Argent")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -210,7 +211,7 @@ class AchatRepositoryTest {
                 .quantite(5.0)
                 .prixUnitaire(new BigDecimal("2000.00"))
                 .prixTotal(new BigDecimal("10000.00"))
-                .dateAchat(LocalDate.of(2025, 3, 10))
+                .dateAchat(LocalDateTime.of(2025, 3, 10, 0, 0))
                 .fournisseur("Dakar Import")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -221,7 +222,7 @@ class AchatRepositoryTest {
                 .quantite(3.0)
                 .prixUnitaire(new BigDecimal("3000.00"))
                 .prixTotal(new BigDecimal("9000.00"))
-                .dateAchat(LocalDate.of(2025, 3, 15))
+                .dateAchat(LocalDateTime.of(2025, 3, 15, 0, 0))
                 .fournisseur("Thiès Export")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -244,7 +245,7 @@ class AchatRepositoryTest {
                 .quantite(2.0)
                 .prixUnitaire(new BigDecimal("5000.00"))
                 .prixTotal(new BigDecimal("10000.00"))
-                .dateAchat(LocalDate.of(2025, 1, 5))
+                .dateAchat(LocalDateTime.of(2025, 1, 5, 0, 0))
                 .fournisseur("Fournisseur Ancien")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -255,7 +256,7 @@ class AchatRepositoryTest {
                 .quantite(4.0)
                 .prixUnitaire(new BigDecimal("7000.00"))
                 .prixTotal(new BigDecimal("28000.00"))
-                .dateAchat(LocalDate.of(2025, 6, 20))
+                .dateAchat(LocalDateTime.of(2025, 6, 20, 0, 0))
                 .fournisseur("Fournisseur Nouveau")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -263,7 +264,7 @@ class AchatRepositoryTest {
 
         // Act — dateDebut = 1er juin 2025
         Page<AchatEntity> page = achatRepository.findAllWithSearch(
-                tenant.getTenantUuid(), null, LocalDate.of(2025, 6, 1), null, PageRequest.of(0, 20));
+                tenant.getTenantUuid(), null, LocalDateTime.of(2025, 6, 1, 0, 0), null, PageRequest.of(0, 20));
 
         // Assert — seul "Nouveau Produit" (20 juin) est retourné
         assertThat(page.getTotalElements()).isEqualTo(1L);
@@ -279,7 +280,7 @@ class AchatRepositoryTest {
                 .quantite(3.0)
                 .prixUnitaire(new BigDecimal("4000.00"))
                 .prixTotal(new BigDecimal("12000.00"))
-                .dateAchat(LocalDate.of(2025, 1, 15))
+                .dateAchat(LocalDateTime.of(2025, 1, 15, 0, 0))
                 .fournisseur("Fournisseur Jan")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -290,7 +291,7 @@ class AchatRepositoryTest {
                 .quantite(1.0)
                 .prixUnitaire(new BigDecimal("10000.00"))
                 .prixTotal(new BigDecimal("10000.00"))
-                .dateAchat(LocalDate.of(2025, 12, 1))
+                .dateAchat(LocalDateTime.of(2025, 12, 1, 0, 0))
                 .fournisseur("Fournisseur Dec")
                 .utilisateur(utilisateur)
                 .tenant(tenant)
@@ -298,7 +299,7 @@ class AchatRepositoryTest {
 
         // Act — dateFin = 28 février 2025
         Page<AchatEntity> page = achatRepository.findAllWithSearch(
-                tenant.getTenantUuid(), null, null, LocalDate.of(2025, 2, 28), PageRequest.of(0, 20));
+                tenant.getTenantUuid(), null, null, LocalDateTime.of(2025, 2, 28, 0, 0), PageRequest.of(0, 20));
 
         // Assert — seul "Produit Janvier" est retourné
         assertThat(page.getTotalElements()).isEqualTo(1L);

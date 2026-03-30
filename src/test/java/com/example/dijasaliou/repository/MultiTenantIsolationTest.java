@@ -17,6 +17,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,7 +76,7 @@ class MultiTenantIsolationTest {
                 .nomProduit("Collier Alpha")
                 .quantite(1.0).prixUnitaire(new BigDecimal("5000"))
                 .prixTotal(new BigDecimal("5000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .utilisateur(userA).tenant(tenantA)
                 .build());
 
@@ -83,7 +84,7 @@ class MultiTenantIsolationTest {
                 .nomProduit("Bracelet Alpha")
                 .quantite(2.0).prixUnitaire(new BigDecimal("3000"))
                 .prixTotal(new BigDecimal("6000"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .utilisateur(userA).tenant(tenantA)
                 .build());
 
@@ -100,7 +101,7 @@ class MultiTenantIsolationTest {
                 .nomProduit("Bague Beta CONFIDENTIELLE")
                 .quantite(1.0).prixUnitaire(new BigDecimal("99999"))
                 .prixTotal(new BigDecimal("99999"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .utilisateur(userB).tenant(tenantB)
                 .build());
 

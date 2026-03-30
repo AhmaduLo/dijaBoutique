@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -59,7 +60,7 @@ class AchatServiceTest {
                 .prixUnitaire(new BigDecimal("500.00"))
                 .prixTotal(new BigDecimal("2500.00"))
                 .fournisseur("Dell")
-                .dateAchat(LocalDate.now())
+                .dateAchat(LocalDateTime.now())
                 .utilisateur(utilisateurTest)
                 .tenant(tenantTest)
                 .build();
@@ -177,7 +178,7 @@ class AchatServiceTest {
         AchatEntity nouvelAchat = AchatEntity.builder()
                 .nomProduit("Clavier").quantite(3.0)
                 .prixUnitaire(new BigDecimal("50.00"))
-                .fournisseur("Logitech").dateAchat(LocalDate.now()).build();
+                .fournisseur("Logitech").dateAchat(LocalDateTime.now()).build();
 
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.save(any())).thenReturn(nouvelAchat);
@@ -195,7 +196,7 @@ class AchatServiceTest {
         AchatEntity achatSansPrixTotal = AchatEntity.builder()
                 .nomProduit("Moniteur").quantite(2.0)
                 .prixUnitaire(new BigDecimal("300.00"))
-                .dateAchat(LocalDate.now()).build();
+                .dateAchat(LocalDateTime.now()).build();
 
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.save(any())).thenReturn(achatSansPrixTotal);
@@ -215,7 +216,7 @@ class AchatServiceTest {
         AchatEntity modifie = AchatEntity.builder()
                 .nomProduit("Ordinateur portable").quantite(8.0)
                 .prixUnitaire(new BigDecimal("450.00"))
-                .fournisseur("HP").dateAchat(LocalDate.now()).build();
+                .fournisseur("HP").dateAchat(LocalDateTime.now()).build();
 
         when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
@@ -338,7 +339,7 @@ class AchatServiceTest {
     void obtenirAchatsParPeriode_retourneListe() {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
-        when(achatRepository.findByDateAchatBetween(debut, fin)).thenReturn(Arrays.asList(achatValide));
+        when(achatRepository.findByDateAchatBetween(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(Arrays.asList(achatValide));
 
         List<AchatEntity> resultat = achatService.obtenirAchatsParPeriode(debut, fin);
 
@@ -357,7 +358,7 @@ class AchatServiceTest {
         AchatEntity achat2 = AchatEntity.builder()
                 .prixTotal(new BigDecimal("1000.00"))
                 .build();
-        when(achatRepository.findByDateAchatBetween(debut, fin))
+        when(achatRepository.findByDateAchatBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(Arrays.asList(achatValide, achat2));
 
         BigDecimal total = achatService.calculerTotalAchats(debut, fin);
@@ -370,7 +371,7 @@ class AchatServiceTest {
     void calculerTotalAchats_retourneZeroSiVide() {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
-        when(achatRepository.findByDateAchatBetween(debut, fin)).thenReturn(Collections.emptyList());
+        when(achatRepository.findByDateAchatBetween(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(Collections.emptyList());
 
         BigDecimal total = achatService.calculerTotalAchats(debut, fin);
 

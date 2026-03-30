@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -98,7 +99,7 @@ class VenteControllerTest {
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("150000.00"))
                 .prixTotal(new BigDecimal("750000.00"))
-                .dateVente(LocalDate.of(2025, 10, 15))
+                .dateVente(LocalDateTime.of(2025, 10, 15, 0, 0))
                 .client("Mme Ndiaye")
                 .utilisateur(utilisateurTest)
                 .build();
@@ -110,7 +111,7 @@ class VenteControllerTest {
                 .nomProduit("Bracelet en argent")
                 .prixUnitaire(new BigDecimal("80000.00"))
                 .prixTotal(new BigDecimal("240000.00"))
-                .dateVente(LocalDate.of(2025, 10, 20))
+                .dateVente(LocalDateTime.of(2025, 10, 20, 0, 0))
                 .client("M. Sow")
                 .utilisateur(utilisateurTest)
                 .build();
@@ -213,7 +214,7 @@ class VenteControllerTest {
                 .quantite(10.0)
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("200000.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .client("Mme Ba")
                 .build();
 
@@ -222,7 +223,7 @@ class VenteControllerTest {
                 .nomProduit("Bague en diamant")
                 .prixUnitaire(new BigDecimal("200000.00"))
                 .prixTotal(new BigDecimal("2000000.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .client("Mme Ba")
                 .utilisateur(utilisateurTest)
                 .build();
@@ -261,7 +262,7 @@ class VenteControllerTest {
                 .quantite(8.0)
                 .nomProduit("Collier en or - Mise à jour")
                 .prixUnitaire(new BigDecimal("160000.00"))
-                .dateVente(LocalDate.of(2025, 10, 25))
+                .dateVente(LocalDateTime.of(2025, 10, 25, 0, 0))
                 .client("Mme Ndiaye (modifié)")
                 .build();
 
@@ -270,7 +271,7 @@ class VenteControllerTest {
                 .nomProduit("Collier en or - Mise à jour")
                 .prixUnitaire(new BigDecimal("160000.00"))
                 .prixTotal(new BigDecimal("1280000.00"))
-                .dateVente(LocalDate.of(2025, 10, 25))
+                .dateVente(LocalDateTime.of(2025, 10, 25, 0, 0))
                 .client("Mme Ndiaye (modifié)")
                 .utilisateur(utilisateurTest)
                 .build();
@@ -305,7 +306,7 @@ class VenteControllerTest {
                 .quantite(5.0)
                 .nomProduit("Vente inexistante")
                 .prixUnitaire(new BigDecimal("100000.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .build();
 
         when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
@@ -526,7 +527,7 @@ class VenteControllerTest {
                 .nomProduit("Montre")
                 .prixUnitaire(new BigDecimal("120000.00"))
                 .prixTotal(new BigDecimal("240000.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .client(null) // Pas de client
                 .utilisateur(utilisateurTest)
                 .build();
@@ -555,7 +556,7 @@ class VenteControllerTest {
                 .quantite(7.0)
                 .nomProduit("Chaîne en or")
                 .prixUnitaire(new BigDecimal("90000.00"))
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .build();
 
         // Le service devrait calculer : 7 × 90000.00 = 630000.00
@@ -564,7 +565,7 @@ class VenteControllerTest {
                 .nomProduit("Chaîne en or")
                 .prixUnitaire(new BigDecimal("90000.00"))
                 .prixTotal(new BigDecimal("630000.00")) // Calculé automatiquement
-                .dateVente(LocalDate.now())
+                .dateVente(LocalDateTime.now())
                 .utilisateur(utilisateurTest)
                 .build();
         venteCreee.setId("test-id-4");

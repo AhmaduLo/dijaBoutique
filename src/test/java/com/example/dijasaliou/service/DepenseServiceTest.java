@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -56,7 +57,7 @@ class DepenseServiceTest {
         depenseValide = DepenseEntity.builder()
                 .libelle("Loyer bureau")
                 .montant(new BigDecimal("500.00"))
-                .dateDepense(LocalDate.now())
+                .dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.LOYER)
                 .estRecurrente(true)
                 .notes("Paiement mensuel")
@@ -168,7 +169,7 @@ class DepenseServiceTest {
     @DisplayName("creerDepense() — crée la dépense et assigne l'utilisateur + tenant")
     void creerDepense_succes() {
         DepenseEntity nouvelle = DepenseEntity.builder().libelle("Eau")
-                .montant(new BigDecimal("50.00")).dateDepense(LocalDate.now())
+                .montant(new BigDecimal("50.00")).dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.EAU).build();
 
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
@@ -189,7 +190,7 @@ class DepenseServiceTest {
     @DisplayName("modifierDepense() — modifie une dépense du même tenant")
     void modifierDepense_succes() {
         DepenseEntity modifiee = DepenseEntity.builder().libelle("Loyer modifié")
-                .montant(new BigDecimal("600.00")).dateDepense(LocalDate.now())
+                .montant(new BigDecimal("600.00")).dateDepense(LocalDateTime.now())
                 .categorie(DepenseEntity.CategorieDepense.LOYER).utilisateur(utilisateurTest).build();
 
         when(depenseRepository.findById("test-id-1")).thenReturn(Optional.of(depenseValide));
@@ -288,7 +289,7 @@ class DepenseServiceTest {
     @Test
     @DisplayName("obtenirDepensesParPeriode() — retourne les dépenses de la période")
     void obtenirDepensesParPeriode_retourneListe() {
-        when(depenseRepository.findByDateDepenseBetween(dateDebut, dateFin)).thenReturn(Arrays.asList(depenseValide));
+        when(depenseRepository.findByDateDepenseBetween(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(Arrays.asList(depenseValide));
 
         List<DepenseEntity> resultat = depenseService.obtenirDepensesParPeriode(dateDebut, dateFin);
 
@@ -314,7 +315,7 @@ class DepenseServiceTest {
     @DisplayName("calculerTotalDepenses() — somme correcte (500 + 150 = 650)")
     void calculerTotalDepenses_sommeCorrect() {
         DepenseEntity d2 = DepenseEntity.builder().montant(new BigDecimal("150.00")).build();
-        when(depenseRepository.findByDateDepenseBetween(dateDebut, dateFin))
+        when(depenseRepository.findByDateDepenseBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(Arrays.asList(depenseValide, d2));
 
         BigDecimal total = depenseService.calculerTotalDepenses(dateDebut, dateFin);
@@ -325,7 +326,7 @@ class DepenseServiceTest {
     @Test
     @DisplayName("calculerTotalDepenses() — retourne zéro si aucune dépense")
     void calculerTotalDepenses_retourneZero() {
-        when(depenseRepository.findByDateDepenseBetween(dateDebut, dateFin))
+        when(depenseRepository.findByDateDepenseBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(Collections.emptyList());
 
         assertThat(depenseService.calculerTotalDepenses(dateDebut, dateFin))
