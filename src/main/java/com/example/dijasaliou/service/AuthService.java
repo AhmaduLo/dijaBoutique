@@ -112,6 +112,8 @@ public class AuthService {
                 .nomEntreprise(request.getNomEntreprise())
                 .numeroTelephone(request.getNumeroTelephone())
                 .adresse(request.getAdresseEntreprise())
+                .ville(request.getVille())
+                .pays(request.getPays())
                 .nineaSiret(request.getNineaSiret()) // OPTIONNEL - peut être null
                 .actif(true)
                 .plan(TenantEntity.Plan.BUSINESS) // Essai BUSINESS complet pendant 14 jours

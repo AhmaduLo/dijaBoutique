@@ -55,6 +55,10 @@ public class RegisterRequest {
 
     private String adresseEntreprise;
 
+    private String ville;
+
+    private String pays;
+
     /**
      * Numéro NINEA (Sénégal) ou SIRET (France) - OPTIONNEL
      * L'entreprise peut ne pas avoir ce numéro lors de l'inscription
