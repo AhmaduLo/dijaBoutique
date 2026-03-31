@@ -385,7 +385,7 @@ public class VenteService {
 
         // 2. Montant restant dû sur les crédits non soldés créés dans la période
         List<Object[]> creditRows = creditClientRepository.sumCreditsRestantParPeriode(
-                debut, fin, StatutCredit.SOLDE, tenantUuid);
+                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), StatutCredit.SOLDE, tenantUuid);
         if (creditRows != null && !creditRows.isEmpty()) {
             Object[] creditRow = creditRows.get(0);
             if (creditRow != null && creditRow.length >= 2 && creditRow[1] != null) {

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -86,8 +87,8 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
            "AND c.vente.dateVente BETWEEN :debut AND :fin " +
            "AND c.statut <> :statut " +
            "AND c.tenant.tenantUuid = :tenantUuid")
-    List<Object[]> sumCreditsRestantParPeriode(@Param("debut") LocalDate debut,
-                                               @Param("fin") LocalDate fin,
+    List<Object[]> sumCreditsRestantParPeriode(@Param("debut") LocalDateTime debut,
+                                               @Param("fin") LocalDateTime fin,
                                                @Param("statut") StatutCredit statut,
                                                @Param("tenantUuid") String tenantUuid);
 }
