@@ -294,8 +294,8 @@ class CreditClientRepositoryTest {
                 .tenant(tenant)
                 .build());
 
-        LocalDate debut = LocalDate.of(2025, 6, 1);
-        LocalDate fin = LocalDate.of(2025, 6, 30);
+        LocalDateTime debut = LocalDateTime.of(2025, 6, 1, 0, 0);
+        LocalDateTime fin = LocalDateTime.of(2025, 6, 30, 23, 59, 59);
 
         List<Object[]> result = repo.sumCreditsRestantParPeriode(
                 debut, fin, StatutCredit.SOLDE, "tenant-001");
@@ -310,8 +310,8 @@ class CreditClientRepositoryTest {
     @Test
     @DisplayName("sumCreditsRestantParPeriode — hors période retourne count=0 et sum=0")
     void sumCreditsRestantParPeriode_HorsPeriodeRetourneZero() {
-        LocalDate debut = LocalDate.of(2020, 1, 1);
-        LocalDate fin = LocalDate.of(2020, 12, 31);
+        LocalDateTime debut = LocalDateTime.of(2020, 1, 1, 0, 0);
+        LocalDateTime fin = LocalDateTime.of(2020, 12, 31, 23, 59, 59);
 
         List<Object[]> result = repo.sumCreditsRestantParPeriode(
                 debut, fin, StatutCredit.SOLDE, "tenant-001");
