@@ -106,6 +106,10 @@ public class AuthService {
         }
 
         // 3. Créer le TENANT (entreprise) - ESSAI GRATUIT DE 14 JOURS
+        if (request.getNomEntreprise() == null || request.getNomEntreprise().isBlank()) {
+            throw new RuntimeException("Nom de l'entreprise obligatoire");
+        }
+
         LocalDateTime now = LocalDateTime.now();
 
         TenantEntity tenant = TenantEntity.builder()

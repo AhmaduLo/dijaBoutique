@@ -47,7 +47,6 @@ public class RegisterRequest {
     @Size(min = 8, message = "Le mot de passe doit contenir au minimum 8 caractères")
     private String motDePasse;
 
-    @NotBlank(message = "Nom de l'entreprise obligatoire")
     @Size(max = 100, message = "Le nom de l'entreprise ne peut pas dépasser 100 caractères")
     private String nomEntreprise;
 
