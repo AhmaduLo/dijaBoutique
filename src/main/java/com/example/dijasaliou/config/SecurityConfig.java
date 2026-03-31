@@ -180,6 +180,8 @@ public class SecurityConfig {
                 "https://heasystock.vercel.app",
                 "https://heasystock.com",
                 "https://www.heasystock.com",
+                "https://easystock.com",
+                "https://www.easystock.com",
                 frontendUrl
         ));
         // Origines dev local — autorisées uniquement si le profil "local" est actif
