@@ -26,6 +26,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Arrays;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 /**
  * Configuration de sécurité
@@ -60,7 +62,24 @@ public class SecurityConfig {
                 // Désactiver CSRF (pas nécessaire avec JWT)
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // Désactiver CORS pour autoriser Angular
+                // Headers de sécurité HTTP
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000)
+                                .preload(true)
+                        )
+                        .referrerPolicy(referrer -> referrer
+                                .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
+                        )
+                        .permissionsPolicy(permissions -> permissions
+                                .policy("camera=(), microphone=(), geolocation=()")
+                        )
+                )
+
+                // CORS pour autoriser Angular
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 // Pas de session (stateless avec JWT)

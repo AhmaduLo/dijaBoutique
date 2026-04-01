@@ -138,38 +138,38 @@ public class GlobalExceptionHandler {
 
     /**
      * Gestion de IllegalArgumentException
+     * SÉCURITÉ : filtre le message comme RuntimeException — court et sans stack trace → 400, sinon générique
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.warn("IllegalArgumentException: {}", ex.getMessage());
+        String message = ex.getMessage();
+        boolean isUserFacing = message != null
+                && message.length() < 200
+                && !message.contains("Exception")
+                && !message.contains("at com.")
+                && !message.contains("at java.");
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
-        errorResponse.put("error", "Argument invalide");
-        errorResponse.put("message", ex.getMessage());
-
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(errorResponse);
+        errorResponse.put("error", "Requête invalide");
+        errorResponse.put("message", isUserFacing ? message : "Requête invalide.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     /**
      * Gestion de IllegalStateException
-     * Message générique au client, détails loggés serveur
+     * SÉCURITÉ : message générique au client, détails loggés serveur uniquement
      */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException ex) {
-        // Logger l'erreur complète côté serveur (visible seulement dans les logs)
         log.error("IllegalStateException: {}", ex.getMessage(), ex);
-
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
-        errorResponse.put("error", "Erreur de traitement");
-        errorResponse.put("message", ex.getMessage());
-
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(errorResponse);
+        errorResponse.put("error", "Opération non autorisée");
+        errorResponse.put("message", "Opération non autorisée.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     /**
