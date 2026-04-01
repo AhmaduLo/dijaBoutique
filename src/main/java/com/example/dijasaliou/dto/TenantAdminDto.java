@@ -8,6 +8,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 /**
  * DTO pour la vue Super Admin d'un tenant
@@ -47,7 +49,7 @@ public class TenantAdminDto {
     // Stats
     private Long nbUtilisateurs;
     private Long nbVentes;
-    private LocalDateTime derniereActivite;
+    private OffsetDateTime derniereActivite;
 
     // Statut calculé : ESSAI, ACTIF, EXPIRE, SUSPENDU
     private String statut;
@@ -74,7 +76,7 @@ public class TenantAdminDto {
                 .essaiUtilise(tenant.getEssaiUtilise())
                 .nbUtilisateurs(nbUsers)
                 .nbVentes(nbVentes)
-                .derniereActivite(derniereActivite)
+                .derniereActivite(derniereActivite != null ? derniereActivite.atOffset(ZoneOffset.UTC) : null)
                 .statut(calculerStatut(tenant))
                 .build();
     }

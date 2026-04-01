@@ -3,6 +3,8 @@ package com.example.dijasaliou.dto;
 import com.example.dijasaliou.entity.UserEntity;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 public record UtilisateurTenantDto(
         Long id,
@@ -11,9 +13,10 @@ public record UtilisateurTenantDto(
         String email,
         String role,
         boolean actif,
-        LocalDateTime derniereConnexion
+        OffsetDateTime derniereConnexion
 ) {
     public static UtilisateurTenantDto fromEntity(UserEntity user) {
+        LocalDateTime dc = user.getDerniereConnexion();
         return new UtilisateurTenantDto(
                 user.getId(),
                 user.getNom(),
@@ -21,7 +24,7 @@ public record UtilisateurTenantDto(
                 user.getEmail(),
                 user.getRole().name(),
                 !Boolean.TRUE.equals(user.getDeleted()),
-                user.getDerniereConnexion()
+                dc != null ? dc.atOffset(ZoneOffset.UTC) : null
         );
     }
 }
