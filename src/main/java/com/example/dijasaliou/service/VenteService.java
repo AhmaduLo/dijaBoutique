@@ -123,9 +123,12 @@ public class VenteService {
         // Associer l'utilisateur
         vente.setUtilisateur(utilisateur);
 
-        // Horodatage exact à la création — écrase toute valeur envoyée par le frontend
-        // Cette valeur ne changera jamais : c'est l'instant réel de la vente
-        vente.setDateVente(LocalDateTime.now());
+        // Si le frontend fournit une dateVente (date locale de l'utilisateur), on la conserve.
+        // Sinon on utilise l'heure serveur UTC. Cela évite le bug timezone : une vente faite à
+        // 01h00 Paris (UTC+1) serait stockée la veille en UTC et invisible dans le filtre "Aujourd'hui".
+        if (vente.getDateVente() == null) {
+            vente.setDateVente(LocalDateTime.now());
+        }
 
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         vente.setTenant(tenantService.getCurrentTenant());

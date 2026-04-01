@@ -233,6 +233,13 @@ public class StockService {
                     2,
                     RoundingMode.HALF_UP
             );
+        } else {
+            // Aucune vente : utiliser le prixVenteSuggere du dernier achat comme référence
+            prixMoyenVente = achats.stream()
+                    .filter(a -> a.getPrixVenteSuggere() != null && a.getPrixVenteSuggere().compareTo(BigDecimal.ZERO) > 0)
+                    .max(Comparator.comparing(AchatEntity::getDateAchat))
+                    .map(AchatEntity::getPrixVenteSuggere)
+                    .orElse(BigDecimal.ZERO);
         }
 
         // Calculer la valeur du stock
