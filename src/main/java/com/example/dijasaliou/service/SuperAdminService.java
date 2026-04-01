@@ -337,8 +337,9 @@ public class SuperAdminService {
         stats.put("totalUtilisateurs", totalUtilisateurs);
 
         // Taux de conversion essai → payant
+        // Un tenant est "converti" seulement s'il a au moins un paiement réel enregistré.
         long totalEssaiHistorique = tenantRepository.countByEssaiUtiliseTrue();
-        long totalConvertis = tenantRepository.countByEssaiUtiliseTrueAndPlanNot(TenantEntity.Plan.GRATUIT);
+        long totalConvertis = paiementSuperAdminRepository.countDistinctTenants();
         double tauxConversion = totalEssaiHistorique > 0 ? (totalConvertis * 100.0 / totalEssaiHistorique) : 0;
         stats.put("totalEssaiHistorique", totalEssaiHistorique);
         stats.put("totalConvertis", totalConvertis);
