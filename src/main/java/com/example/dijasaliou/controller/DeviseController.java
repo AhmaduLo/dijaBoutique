@@ -130,7 +130,15 @@ public class DeviseController {
      */
     @PostMapping("/convertir")
     public ResponseEntity<Map<String, Object>> convertir(@RequestBody Map<String, Object> request) {
-        Double montant = Double.parseDouble(request.get("montant").toString());
+        if (request.get("montant") == null || request.get("deviseSource") == null || request.get("deviseCible") == null) {
+            throw new IllegalArgumentException("montant, deviseSource et deviseCible sont obligatoires");
+        }
+        Double montant;
+        try {
+            montant = Double.parseDouble(request.get("montant").toString());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Le montant doit être un nombre valide");
+        }
         String deviseSource = request.get("deviseSource").toString();
         String deviseCible = request.get("deviseCible").toString();
 

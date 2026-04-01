@@ -121,8 +121,8 @@ public class CreditClientService {
     public CreditClientDto enregistrerPaiement(String creditId, BigDecimal montant,
                                                 PaiementCreditEntity.ModePaiement modePaiement,
                                                 String note, UserEntity employe) {
-        // 1. Récupérer le crédit (filtre tenant actif via Hibernate)
-        CreditClientEntity credit = creditClientRepository.findById(creditId)
+        // 1. Récupérer le crédit avec verrou pessimiste (empêche les paiements simultanés)
+        CreditClientEntity credit = creditClientRepository.findByIdForUpdate(creditId)
                 .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
 
         // 2. Double vérification tenant
@@ -162,6 +162,9 @@ public class CreditClientService {
         credit.setMontantRestant(nouveauRestant);
 
         ClientEntity client = credit.getClient();
+        if (client == null) {
+            throw new RuntimeException("Client introuvable pour ce crédit : " + creditId);
+        }
 
         if (nouveauRestant.compareTo(BigDecimal.ZERO) == 0) {
             // Crédit soldé — soustraire uniquement le montant de CE paiement (les partiels précédents ont déjà réduit la dette)

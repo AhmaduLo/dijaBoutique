@@ -40,6 +40,9 @@ public class CreditController {
     public ResponseEntity<CreditClientDto> creerCredit(
             @RequestBody Map<String, Object> body,
             Authentication auth) {
+        if (body.get("venteId") == null || body.get("clientId") == null) {
+            throw new IllegalArgumentException("venteId et clientId sont obligatoires");
+        }
         String venteId = body.get("venteId").toString();
         String clientId = body.get("clientId").toString();
         java.time.LocalDate dateEcheance = body.get("dateEcheance") != null

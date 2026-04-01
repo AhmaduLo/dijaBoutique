@@ -7,9 +7,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import jakarta.persistence.LockModeType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -33,6 +36,10 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
             @Param("search") String search,
             @Param("tenantUuid") String tenantUuid,
             Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM CreditClientEntity c WHERE c.id = :id")
+    java.util.Optional<CreditClientEntity> findByIdForUpdate(@Param("id") String id);
 
     List<CreditClientEntity> findByClientOrderByCreatedDateAsc(ClientEntity client);
 
