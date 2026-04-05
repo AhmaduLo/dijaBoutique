@@ -479,6 +479,22 @@ public class ImportService {
         Double quantite = colDouble(cols, idx, "quantite");
         if (quantite == null || quantite <= 0)
             throw new IllegalArgumentException("[quantite] Quantité manquante ou invalide (doit être > 0)");
+
+        // Vérifier le stock disponible avant d'accepter la ligne
+        try {
+            var stock = stockService.obtenirStockParNomProduit(nomProduit);
+            double dispo = stock.getStockDisponible() != null ? stock.getStockDisponible() : 0.0;
+            if (quantite > dispo)
+                throw new IllegalArgumentException(String.format(
+                        "[quantite] Stock insuffisant pour '%s' : disponible %.0f, demandé %.0f",
+                        nomProduit, dispo, quantite));
+        } catch (IllegalArgumentException e) {
+            throw e; // relancer les erreurs métier (stock insuffisant ou produit introuvable)
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(
+                    "[nomProduit] Produit '" + nomProduit + "' introuvable dans le stock — vérifiez le nom exact");
+        }
+
         d.put("quantite", quantite);
 
         Double prixVente = colDouble(cols, idx, "prixvente");
