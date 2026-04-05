@@ -49,7 +49,7 @@ public class DepenseEntity  extends BaseEntity{
     private BigDecimal montant;
 
     @Column(name = "date_depense", nullable = false)
-    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.dijasaliou.config.FlexibleLocalDateTimeDeserializer.class)
     private LocalDateTime dateDepense;
 
     @NotNull(message = "La catégorie est obligatoire")

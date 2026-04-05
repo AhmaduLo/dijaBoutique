@@ -58,7 +58,7 @@ public class VenteEntity  extends BaseEntity{
     private BigDecimal prixTotal;
 
     @Column(name = "date_vente", nullable = false)
-    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.dijasaliou.config.FlexibleLocalDateTimeDeserializer.class)
     private LocalDateTime dateVente;
 
     @Size(max = 100, message = "Le nom du client ne peut dépasser 100 caractères")
