@@ -98,8 +98,10 @@ public class AchatService {
         // 3. MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         achat.setTenant(tenantService.getCurrentTenant());
 
-        // 4. DATE : Toujours fixer la date côté serveur (heure exacte de la transaction)
-        achat.setDateAchat(LocalDateTime.now());
+        // 4. DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
+        if (achat.getDateAchat() == null) {
+            achat.setDateAchat(LocalDateTime.now());
+        }
 
         // 4. LOGIQUE : Calculer le prix total (si pas fait)
         if (achat.getPrixTotal() == null) {

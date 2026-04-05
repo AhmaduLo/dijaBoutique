@@ -84,8 +84,10 @@ public class DepenseService {
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         depense.setTenant(tenantService.getCurrentTenant());
 
-        // DATE : Toujours fixer la date côté serveur (heure exacte de la transaction)
-        depense.setDateDepense(LocalDateTime.now());
+        // DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
+        if (depense.getDateDepense() == null) {
+            depense.setDateDepense(LocalDateTime.now());
+        }
 
         return depenseRepository.save(depense);
     }
