@@ -171,8 +171,19 @@ public class ImportService {
         }
 
         // ── Phase 2 : sauvegarde transactionnelle via proxy Spring ────────────
-        return self.sauvegarderDonneesParsees(
+        // L'invalidation du cache est faite ICI (hors @Transactional) et non dans
+        // sauvegarderDonneesParsees(), afin de garantir que le cache n'est évincé
+        // qu'APRÈS le commit. Sans ça, le cache pouvait être vidé avant commit,
+        // puis re-rempli avec les anciennes données avant que le commit ne soit visible.
+        ImportResultatDto resultat = self.sauvegarderDonneesParsees(
                 donneesParsees, type, utilisateur, erreursParse, ignoreesParsePhase);
+
+        if (resultat.getImportees() > 0 && (type.equals("achats") || type.equals("ventes"))) {
+            TenantEntity tenant = tenantService.getCurrentTenant();
+            stockService.invalidateStockCache(tenant.getTenantUuid());
+        }
+
+        return resultat;
     }
 
     /**
@@ -224,10 +235,6 @@ public class ImportService {
 
         if (!batch.isEmpty()) {
             importees += sauvegarderBatch(batch, type);
-        }
-
-        if (importees > 0 && (type.equals("achats") || type.equals("ventes"))) {
-            stockService.invalidateStockCache(tenant.getTenantUuid());
         }
 
         return ImportResultatDto.builder()
