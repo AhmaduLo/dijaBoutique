@@ -826,21 +826,36 @@ public class ImportService {
      * Retourne une chaîne de suggestion (avec le stock disponible) ou null si rien trouvé.
      * Exemple : "produit similaire trouvé : 'sucre 50 kg' (stock disponible : 45)"
      */
+    /**
+     * Cherche un produit dont le nom ressemble à nomProduit parmi les achats du tenant.
+     * Ignore les mots qui sont des quantités/unités (ex: "50kg", "25l", "100g", "1kg")
+     * car ils sont communs à beaucoup de produits différents et causent des faux positifs.
+     * N'effectue la recherche que sur les mots porteurs de sens (≥3 lettres, pas numérique).
+     */
     private String suggererProduit(String nomProduit) {
         try {
             TenantEntity tenant = tenantService.getCurrentTenant();
             String[] mots = nomProduit.toLowerCase().trim().split("\\s+");
             Map<String, Integer> scores = new LinkedHashMap<>();
+            int motsSensUsed = 0;
 
             for (String mot : mots) {
+                // Ignorer les mots purement numériques ou de type quantité/unité :
+                // "50kg", "25l", "100g", "1kg", "5litres", "200ml", "3kg", etc.
+                if (mot.matches("\\d+.*") || mot.matches(".*\\d+(kg|g|l|ml|cl|m|cm|mm|t)")) continue;
                 if (mot.length() < 3) continue;
+                motsSensUsed++;
                 achatRepository.findByNomProduitContainingAndTenant(mot, tenant)
                         .forEach(a -> scores.merge(a.getNomProduit(), 1, Integer::sum));
             }
 
-            if (scores.isEmpty()) return null;
+            // Si aucun mot porteur de sens n'a été trouvé → pas de suggestion
+            if (scores.isEmpty() || motsSensUsed == 0) return null;
 
+            // Garder uniquement les candidats qui partagent AU MOINS 1 mot de sens
+            // (évite les matches sur uniquement des unités qui auraient glissé)
             String meilleur = scores.entrySet().stream()
+                    .filter(e -> e.getValue() >= 1)
                     .max(Map.Entry.comparingByValue())
                     .map(Map.Entry::getKey)
                     .orElse(null);
