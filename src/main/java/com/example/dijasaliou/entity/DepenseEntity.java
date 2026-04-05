@@ -49,7 +49,7 @@ public class DepenseEntity  extends BaseEntity{
     private BigDecimal montant;
 
     @Column(name = "date_depense", nullable = false)
-    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.dijasaliou.config.FlexibleLocalDateTimeDeserializer.class)
     private LocalDateTime dateDepense;
 
     @NotNull(message = "La catégorie est obligatoire")
@@ -168,7 +168,8 @@ public class DepenseEntity  extends BaseEntity{
      * LIFECYCLE CALLBACKS
      */
 
-    protected void onCreate() {
+    @Override
+    protected void beforePersist() {
         // Date par défaut
         if (this.dateDepense == null) {
             this.dateDepense = LocalDateTime.now();
@@ -185,7 +186,8 @@ public class DepenseEntity  extends BaseEntity{
         }
     }
 
-    protected void onUpdate() {
+    @Override
+    protected void beforeUpdate() {
         // Validation métier supplémentaire si nécessaire
     }
 

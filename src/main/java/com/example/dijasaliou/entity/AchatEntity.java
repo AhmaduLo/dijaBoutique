@@ -57,7 +57,7 @@ public class AchatEntity extends BaseEntity{
     private BigDecimal prixTotal;
 
     @Column(name = "date_achat", nullable = false)
-    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.dijasaliou.config.FlexibleLocalDateTimeDeserializer.class)
     private LocalDateTime dateAchat;
 
     @Size(max = 100, message = "Le nom du fournisseur ne peut dépasser 100 caractères")
@@ -167,7 +167,8 @@ public class AchatEntity extends BaseEntity{
      * Utilité : Validation, calculs, valeurs par défaut
      */
 
-    protected void onCreate() {
+    @Override
+    protected void beforePersist() {
         // Calcul automatique du prix total si non défini
         if (this.prixTotal == null) {
             calculerPrixTotal();
@@ -187,8 +188,8 @@ public class AchatEntity extends BaseEntity{
     /**
      * @PreUpdate : Appelé AVANT l'UPDATE en base
      */
-
-    protected void onUpdate() {
+    @Override
+    protected void beforeUpdate() {
         // Recalculer le prix total si quantité ou prix unitaire changé
         calculerPrixTotal();
     }

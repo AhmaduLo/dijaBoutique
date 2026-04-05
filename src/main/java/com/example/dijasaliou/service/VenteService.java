@@ -222,7 +222,9 @@ public class VenteService {
         venteExistante.setQuantite(venteModifiee.getQuantite());
         venteExistante.setNomProduit(venteModifiee.getNomProduit());
         venteExistante.setPrixUnitaire(venteModifiee.getPrixUnitaire());
-        // dateVente intentionnellement non modifiable : c'est l'horodatage de création
+        if (venteModifiee.getDateVente() != null) {
+            venteExistante.setDateVente(venteModifiee.getDateVente());
+        }
         venteExistante.setClient(venteModifiee.getClient());
         venteExistante.setTelephoneClient(venteModifiee.getTelephoneClient());
         venteExistante.setAdresseClient(venteModifiee.getAdresseClient());
