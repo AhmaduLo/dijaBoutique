@@ -498,8 +498,9 @@ public class ImportService {
         } catch (IllegalArgumentException e) {
             throw e; // relancer les erreurs métier (stock insuffisant ou produit introuvable)
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException(
-                    "[nomProduit] Produit '" + nomProduit + "' introuvable dans le stock — vérifiez le nom exact");
+            String suggestion = suggererProduit(nomProduit);
+            String msg = "[nomProduit] Produit '" + nomProduit + "' introuvable dans le stock";
+            throw new IllegalArgumentException(suggestion != null ? msg + " — " + suggestion : msg + " — vérifiez le nom exact");
         }
 
         d.put("quantite", quantite);
@@ -820,6 +821,44 @@ public class ImportService {
     }
 
     /** Supprime le préfixe technique [colonne] pour afficher un message lisible par le client. */
+    /**
+     * Cherche un produit dont le nom ressemble à nomProduit parmi les achats du tenant.
+     * Retourne une chaîne de suggestion (avec le stock disponible) ou null si rien trouvé.
+     * Exemple : "produit similaire trouvé : 'sucre 50 kg' (stock disponible : 45)"
+     */
+    private String suggererProduit(String nomProduit) {
+        try {
+            TenantEntity tenant = tenantService.getCurrentTenant();
+            String[] mots = nomProduit.toLowerCase().trim().split("\\s+");
+            Map<String, Integer> scores = new LinkedHashMap<>();
+
+            for (String mot : mots) {
+                if (mot.length() < 3) continue;
+                achatRepository.findByNomProduitContainingAndTenant(mot, tenant)
+                        .forEach(a -> scores.merge(a.getNomProduit(), 1, Integer::sum));
+            }
+
+            if (scores.isEmpty()) return null;
+
+            String meilleur = scores.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey)
+                    .orElse(null);
+
+            if (meilleur == null || meilleur.equalsIgnoreCase(nomProduit)) return null;
+
+            try {
+                var stock = stockService.obtenirStockParNomProduit(meilleur);
+                double dispo = stock.getStockDisponible() != null ? stock.getStockDisponible() : 0.0;
+                return String.format("produit similaire trouvé : '%s' (stock disponible : %.0f)", meilleur, dispo);
+            } catch (RuntimeException ignored) {
+                return String.format("produit similaire trouvé : '%s'", meilleur);
+            }
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
     private String nettoyerMessage(String message) {
         if (message == null) return "Erreur inconnue dans cette ligne.";
         if (message.startsWith("[") && message.contains("]")) {
