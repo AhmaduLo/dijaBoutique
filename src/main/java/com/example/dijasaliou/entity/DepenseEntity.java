@@ -168,7 +168,8 @@ public class DepenseEntity  extends BaseEntity{
      * LIFECYCLE CALLBACKS
      */
 
-    protected void onCreate() {
+    @Override
+    protected void beforePersist() {
         // Date par défaut
         if (this.dateDepense == null) {
             this.dateDepense = LocalDateTime.now();
@@ -185,7 +186,8 @@ public class DepenseEntity  extends BaseEntity{
         }
     }
 
-    protected void onUpdate() {
+    @Override
+    protected void beforeUpdate() {
         // Validation métier supplémentaire si nécessaire
     }
 

@@ -120,6 +120,12 @@
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
         </dependency>
+        <!-- Apache POI pour l'import de fichiers Excel -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
         <!-- OpenPDF pour la génération de rapports PDF -->
         <dependency>
             <groupId>com.github.librepdf</groupId>

@@ -167,7 +167,8 @@ public class AchatEntity extends BaseEntity{
      * Utilité : Validation, calculs, valeurs par défaut
      */
 
-    protected void onCreate() {
+    @Override
+    protected void beforePersist() {
         // Calcul automatique du prix total si non défini
         if (this.prixTotal == null) {
             calculerPrixTotal();
@@ -187,8 +188,8 @@ public class AchatEntity extends BaseEntity{
     /**
      * @PreUpdate : Appelé AVANT l'UPDATE en base
      */
-
-    protected void onUpdate() {
+    @Override
+    protected void beforeUpdate() {
         // Recalculer le prix total si quantité ou prix unitaire changé
         calculerPrixTotal();
     }
