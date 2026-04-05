@@ -204,12 +204,24 @@ public class StockController {
                 .filter(s -> s.getStockDisponible() > 0 && s.getStockDisponible() < 10)
                 .count();
 
+        double quantiteTotaleDisponible = stocks.stream()
+                .mapToDouble(s -> s.getStockDisponible() != null && s.getStockDisponible() > 0 ? s.getStockDisponible() : 0.0)
+                .sum();
+
+        BigDecimal margeGlobale = stocks.stream()
+                .map(s -> s.getMargeUnitaire() != null && s.getStockDisponible() != null && s.getStockDisponible() > 0
+                        ? s.getMargeUnitaire().multiply(BigDecimal.valueOf(s.getStockDisponible()))
+                        : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         Map<String, Object> resume = new HashMap<>();
-        resume.put("nombreTotalProduits", stocks.size());
+        resume.put("totalProduits", stocks.size());
         resume.put("produitsEnStock", produitsEnStock);
         resume.put("produitsEnRupture", produitsRupture);
         resume.put("produitsStockBas", produitsStockBas);
         resume.put("valeurTotaleStock", valeurTotale);
+        resume.put("quantiteTotaleDisponible", quantiteTotaleDisponible);
+        resume.put("margeGlobale", margeGlobale);
 
         return ResponseEntity.ok(resume);
     }
