@@ -1,5 +1,6 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.exception.ConflictException;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.VenteDto;
@@ -311,12 +312,14 @@ public class VenteService {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
 
-        // Bloquer la suppression si un crédit lié a des paiements enregistrés (incohérence comptable)
+        // Bloquer la suppression uniquement si un crédit NON soldé a des paiements (incohérence comptable)
+        // Un crédit déjà SOLDE avec paiements → suppression autorisée (historique préservé via vente=null)
         List<CreditClientEntity> credits = creditClientRepository.findByVenteIdWithPaiements(id); // JOIN FETCH évite N+1
         for (CreditClientEntity credit : credits) {
-            if (credit.getPaiements() != null && !credit.getPaiements().isEmpty()) {
-                throw new IllegalStateException(
-                        "Impossible de supprimer cette vente : le crédit associé a des paiements enregistrés. " +
+            if (credit.getStatut() != StatutCredit.SOLDE
+                    && credit.getPaiements() != null && !credit.getPaiements().isEmpty()) {
+                throw new ConflictException(
+                        "Impossible de supprimer cette vente : le crédit associé a des paiements en cours. " +
                         "Soldez d'abord le crédit.");
             }
         }

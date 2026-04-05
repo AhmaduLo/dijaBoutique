@@ -158,17 +158,38 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Gestion de IllegalStateException
-     * SÉCURITÉ : message générique au client, détails loggés serveur uniquement
+     * Gestion des conflits métier (409 Conflict) — suppression bloquée par une dépendance.
+     * Le message est retourné directement au frontend via l'intercepteur case 409.
+     */
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflictException(ConflictException ex) {
+        log.warn("ConflictException: {}", ex.getMessage());
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.CONFLICT.value());
+        errorResponse.put("error", "Conflit");
+        errorResponse.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
+
+    /**
+     * Gestion de IllegalStateException (erreurs métier : contraintes, blocages)
+     * Le message est retourné au client s'il est court et sans stack trace.
      */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException ex) {
-        log.error("IllegalStateException: {}", ex.getMessage(), ex);
+        log.warn("IllegalStateException: {}", ex.getMessage());
+        String message = ex.getMessage();
+        boolean isUserFacing = message != null
+                && message.length() < 300
+                && !message.contains("Exception")
+                && !message.contains("at com.")
+                && !message.contains("at java.");
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
         errorResponse.put("error", "Opération non autorisée");
-        errorResponse.put("message", "Opération non autorisée.");
+        errorResponse.put("message", isUserFacing ? message : "Opération non autorisée.");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 

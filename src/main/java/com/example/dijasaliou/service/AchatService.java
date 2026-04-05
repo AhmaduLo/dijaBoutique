@@ -6,7 +6,9 @@ import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.exception.ConflictException;
 import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,15 +38,18 @@ public class AchatService {
 
     private final StockService stockService;
 
+    private final VenteRepository venteRepository;
+
     /**
      * Constructeur
-     * Spring injecte automatiquement achatRepository, tenantService et stockService
+     * Spring injecte automatiquement achatRepository, tenantService, stockService et venteRepository
      */
     public AchatService(AchatRepository achatRepository, TenantService tenantService,
-                        StockService stockService) {
+                        StockService stockService, VenteRepository venteRepository) {
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
         this.stockService = stockService;
+        this.venteRepository = venteRepository;
     }
 
     /**
@@ -207,7 +212,17 @@ public class AchatService {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
 
-        // 3. Supprimer + invalider le cache tenant
+        // 3. Bloquer si des ventes existent pour ce produit (évite stock incohérent)
+        var ventesExistantes = venteRepository.findByNomProduitAndTenant(
+                achatExistant.getNomProduit(), tenantActuel);
+        if (!ventesExistantes.isEmpty()) {
+            throw new ConflictException(
+                    "Impossible de supprimer cet achat : le produit \"" + achatExistant.getNomProduit() + "\" " +
+                    "est lié à " + ventesExistantes.size() + " vente(s) enregistrée(s). " +
+                    "Supprimez d'abord les ventes de ce produit avant de pouvoir supprimer l'achat.");
+        }
+
+        // 4. Supprimer + invalider le cache tenant
         achatRepository.deleteById(id);
         stockService.invalidateStockCache(tenantActuel.getTenantUuid());
     }
