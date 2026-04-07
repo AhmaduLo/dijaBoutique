@@ -123,6 +123,7 @@ public class SecurityConfig {
                         .requestMatchers("/achats/produits-pour-vente").authenticated()
                         .requestMatchers("/tenant/info").authenticated() // Info entreprise pour factures
                         .requestMatchers("/contact").authenticated() // Formulaire de contact
+                        .requestMatchers("/config/**").authenticated() // Config publique (WhatsApp support, etc.)
 
                         // Routes accessibles aux GERANT et ADMIN : achats (lecture accessible à USER pour voir les produits)
                         .requestMatchers(HttpMethod.GET, "/achats/**").hasAnyAuthority("USER", "GERANT", "ADMIN") // USER peut lire les achats

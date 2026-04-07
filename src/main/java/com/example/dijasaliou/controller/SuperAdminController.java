@@ -9,7 +9,9 @@ import com.example.dijasaliou.dto.TenantAdminDto;
 import com.example.dijasaliou.dto.UtilisateurTenantDto;
 import com.example.dijasaliou.dto.ValiderPaiementRequest;
 import com.example.dijasaliou.entity.NoteInterne;
+import com.example.dijasaliou.entity.PlatformConfigEntity;
 import com.example.dijasaliou.entity.TenantEntity;
+import com.example.dijasaliou.service.PlatformConfigService;
 import com.example.dijasaliou.service.SuperAdminService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -42,9 +44,11 @@ import java.util.Map;
 public class SuperAdminController {
 
     private final SuperAdminService superAdminService;
+    private final PlatformConfigService platformConfigService;
 
-    public SuperAdminController(SuperAdminService superAdminService) {
+    public SuperAdminController(SuperAdminService superAdminService, PlatformConfigService platformConfigService) {
         this.superAdminService = superAdminService;
+        this.platformConfigService = platformConfigService;
     }
 
     /**
@@ -332,5 +336,26 @@ public class SuperAdminController {
     public ResponseEntity<List<Map<String, Object>>> getRevenusMenuels(Authentication auth) {
         log.info("[SUPER_ADMIN] {} consulte les revenus mensuels", auth.getName());
         return ResponseEntity.ok(superAdminService.getRevenusMenuels());
+    }
+
+    // ─── Configuration plateforme ────────────────────────────────────────────
+
+    @GetMapping("/config")
+    public ResponseEntity<List<PlatformConfigEntity>> getConfigs(Authentication auth) {
+        log.info("[SUPER_ADMIN] {} consulte la configuration plateforme", auth.getName());
+        return ResponseEntity.ok(platformConfigService.obtenirToutes());
+    }
+
+    @PutMapping("/config/{cle}")
+    public ResponseEntity<PlatformConfigEntity> updateConfig(
+            @PathVariable String cle,
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        String nouvelleValeur = body.get("valeur");
+        if (nouvelleValeur == null) {
+            throw new IllegalArgumentException("Le champ 'valeur' est obligatoire");
+        }
+        log.info("[SUPER_ADMIN] {} modifie la config '{}' → '{}'", auth.getName(), cle, nouvelleValeur);
+        return ResponseEntity.ok(platformConfigService.modifier(cle, nouvelleValeur));
     }
 }
