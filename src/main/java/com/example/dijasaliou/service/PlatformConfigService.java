@@ -32,6 +32,10 @@ public class PlatformConfigService {
         return result;
     }
 
+    private static final Map<String, String> VALEURS_DEFAUT = Map.of(
+            "whatsapp_support", "+33751130937"
+    );
+
     @Transactional(readOnly = true)
     public String obtenirConfigPublique(String cle) {
         if (!CLES_PUBLIQUES.contains(cle)) {
@@ -39,7 +43,7 @@ public class PlatformConfigService {
         }
         return platformConfigRepository.findByCle(cle)
                 .map(PlatformConfigEntity::getValeur)
-                .orElseThrow(() -> new IllegalArgumentException("Configuration introuvable : " + cle));
+                .orElse(VALEURS_DEFAUT.getOrDefault(cle, ""));
     }
 
     @Transactional
