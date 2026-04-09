@@ -110,7 +110,7 @@ public class RapportService {
         List<VenteEntity>   ventes   = venteService.obtenirVentesParPeriode(debut, fin);
         List<AchatEntity>   achats   = achatRepository.findByDateAchatBetween(debutDt, finDt);
         List<DepenseEntity> depenses = depenseRepository.findByDateDepenseBetween(debutDt, finDt);
-        List<StockDto>      stocks   = stockService.obtenirTousLesStocks(null);
+        List<StockDto>      stocks   = stockService.obtenirTousLesStocks(codeDeviseRapport);
 
         BigDecimal montantDuCredits      = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
         BigDecimal montantInitialCredits = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid);

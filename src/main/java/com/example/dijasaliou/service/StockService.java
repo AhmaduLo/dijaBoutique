@@ -125,7 +125,6 @@ public class StockService {
             throw new RuntimeException("Produit non trouvé : " + nomProduit);
         }
 
-        TenantEntity tenant = tenantService.getCurrentTenant();
         String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
         DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
         double tauxRapport = (deviseRapport != null && deviseRapport.getTauxChange() != null)
