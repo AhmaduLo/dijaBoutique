@@ -190,7 +190,8 @@ public class VenteController {
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> obtenirStatistiques(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
         List<VenteEntity> ventes = venteService.obtenirVentesParPeriode(debut, fin);
 
@@ -199,9 +200,11 @@ public class VenteController {
                 .map(VenteDto::fromEntity)
                 .collect(Collectors.toList());
 
-        // Récupérer la devise préférée du tenant
+        // Devise de rapport : paramètre explicite ou devise préférée du tenant
         TenantEntity tenant = tenantService.getCurrentTenant();
-        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
         DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
         double tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
                 ? deviseRapport.getTauxChange() : 1.0;

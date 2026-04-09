@@ -34,12 +34,19 @@ public class RapportController {
      * Accès : ADMIN ou GERANT uniquement.
      * Plan requis : BUSINESS.
      */
+    /**
+     * GET /api/rapports/pdf?debut=2026-01-01&fin=2026-01-31&devise=EUR
+     *
+     * Le paramètre `devise` est optionnel. S'il est absent, la devise préférée
+     * du tenant est utilisée. Exemples : XOF, EUR, USD.
+     */
     @GetMapping(value = "/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
     @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
     public ResponseEntity<byte[]> genererRapportPdf(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
         if (fin.isBefore(debut)) {
             throw new IllegalArgumentException("La date de fin doit être après la date de début");
@@ -48,7 +55,7 @@ public class RapportController {
             throw new IllegalArgumentException("La période ne peut pas dépasser 366 jours");
         }
 
-        byte[] pdfBytes = rapportService.genererRapportPdf(debut, fin);
+        byte[] pdfBytes = rapportService.genererRapportPdf(debut, fin, devise);
 
         String filename = String.format("rapport-%s-%s.pdf", debut, fin);
 

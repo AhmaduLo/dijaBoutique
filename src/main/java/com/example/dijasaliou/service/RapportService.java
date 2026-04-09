@@ -79,15 +79,24 @@ public class RapportService {
     // ─────────────────────────────────────────────────────────────────────────
     // POINT D'ENTRÉE
     // ─────────────────────────────────────────────────────────────────────────
-    public byte[] genererRapportPdf(LocalDate debut, LocalDate fin) {
+    /**
+     * @param devise Code devise pour le rapport (ex: "EUR", "XOF"). Si null,
+     *               utilise la devise préférée du tenant.
+     */
+    public byte[] genererRapportPdf(LocalDate debut, LocalDate fin, String devise) {
 
         TenantEntity tenant    = tenantService.getCurrentTenant();
         String tenantUuid      = tenant.getTenantUuid();
         LocalDateTime debutDt  = debut.atStartOfDay();
         LocalDateTime finDt    = fin.atTime(23, 59, 59);
 
-        // ── Devise de rapport : préférence du tenant ──────────────────────────
-        String codeDeviseRapport = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        // ── Devise de rapport : paramètre explicite, sinon préférence du tenant ──
+        String codeDeviseRapport;
+        if (devise != null && !devise.isBlank()) {
+            codeDeviseRapport = devise.toUpperCase().trim();
+        } else {
+            codeDeviseRapport = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        }
         try {
             DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDeviseRapport);
             symboleRapport.set(deviseRapport.getSymbole());
