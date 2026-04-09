@@ -77,6 +77,11 @@ public class StockDto {
     private StatutStock statut;
 
     /**
+     * Code devise dans laquelle les prix sont exprimés (devise préférée du tenant)
+     */
+    private String deviseCode;
+
+    /**
      * Enum pour le statut du stock
      */
     public enum StatutStock {

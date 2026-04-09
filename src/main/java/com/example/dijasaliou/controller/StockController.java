@@ -214,6 +214,11 @@ public class StockController {
                         : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        String deviseCode = "XOF";
+        if (!stocks.isEmpty() && stocks.get(0).getDeviseCode() != null) {
+            deviseCode = stocks.get(0).getDeviseCode();
+        }
+
         Map<String, Object> resume = new HashMap<>();
         resume.put("totalProduits", stocks.size());
         resume.put("produitsEnStock", produitsEnStock);
@@ -222,6 +227,7 @@ public class StockController {
         resume.put("valeurTotaleStock", valeurTotale);
         resume.put("quantiteTotaleDisponible", quantiteTotaleDisponible);
         resume.put("margeGlobale", margeGlobale);
+        resume.put("deviseCode", deviseCode);
 
         return ResponseEntity.ok(resume);
     }

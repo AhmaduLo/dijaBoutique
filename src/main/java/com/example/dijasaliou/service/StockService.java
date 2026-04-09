@@ -2,6 +2,7 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
@@ -30,11 +31,14 @@ public class StockService {
     private final AchatRepository achatRepository;
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
+    private final DeviseService deviseService;
 
-    public StockService(AchatRepository achatRepository, VenteRepository venteRepository, TenantService tenantService) {
+    public StockService(AchatRepository achatRepository, VenteRepository venteRepository,
+                        TenantService tenantService, DeviseService deviseService) {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
         this.tenantService = tenantService;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -50,6 +54,12 @@ public class StockService {
         TenantEntity tenant = tenantService.getCurrentTenant();
         List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
         List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+
+        // Récupérer la devise préférée du tenant pour la conversion
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+        double tauxRapport = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                ? deviseRapport.getTauxChange() : 1.0;
 
         // 2. Grouper les achats par nom de produit et calculer les totaux
         Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
@@ -72,7 +82,7 @@ public class StockService {
             List<AchatEntity> achatsProduitsListe = entry.getValue();
             List<VenteEntity> ventesProduitsListe = ventesParProduit.getOrDefault(nomProduit, new ArrayList<>());
 
-            stocks.add(calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe));
+            stocks.add(calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe, tauxRapport, codeDevise));
         }
 
         // 6. Trier par stock disponible (du plus faible au plus élevé pour voir les alertes)
@@ -110,7 +120,13 @@ public class StockService {
             throw new RuntimeException("Produit non trouvé : " + nomProduit);
         }
 
-        return calculerStock(nomProduit, achats, ventes);
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+        double tauxRapport = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                ? deviseRapport.getTauxChange() : 1.0;
+
+        return calculerStock(nomProduit, achats, ventes, tauxRapport, codeDevise);
     }
 
     /**
@@ -195,7 +211,8 @@ public class StockService {
      * @param ventes Liste des ventes
      * @return StockDto calculé
      */
-    private StockDto calculerStock(String nomProduit, List<AchatEntity> achats, List<VenteEntity> ventes) {
+    private StockDto calculerStock(String nomProduit, List<AchatEntity> achats, List<VenteEntity> ventes,
+                                   double tauxDeviceTenant, String deviseCode) {
         // Calculer la quantité totale achetée
         Double quantiteAchetee = achats.stream()
                 .mapToDouble(AchatEntity::getQuantite)
@@ -209,11 +226,17 @@ public class StockService {
         // Calculer le stock disponible
         Double stockDisponible = quantiteAchetee - quantiteVendue;
 
-        // Calculer le prix moyen pondéré d'achat (somme(prix × qté) / totalQté)
+        // Calculer le prix moyen pondéré d'achat en devise tenant
+        // Formule : prixUnitaireXOF = prixUnitaire * tauxChangeApplique → prixTenant = prixXOF / tauxDeviceTenant
         BigDecimal prixMoyenAchat = BigDecimal.ZERO;
         if (quantiteAchetee > 0) {
             BigDecimal totalValeurAchats = achats.stream()
-                    .map(a -> a.getPrixUnitaire().multiply(BigDecimal.valueOf(a.getQuantite())))
+                    .map(a -> {
+                        double taux = (a.getTauxChangeApplique() != null) ? a.getTauxChangeApplique() : 1.0;
+                        BigDecimal prixXOF = a.getPrixUnitaire().multiply(BigDecimal.valueOf(taux));
+                        return prixXOF.divide(BigDecimal.valueOf(tauxDeviceTenant), 4, RoundingMode.HALF_UP)
+                                      .multiply(BigDecimal.valueOf(a.getQuantite()));
+                    })
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             prixMoyenAchat = totalValeurAchats.divide(
                     BigDecimal.valueOf(quantiteAchetee),
@@ -222,11 +245,16 @@ public class StockService {
             );
         }
 
-        // Calculer le prix moyen pondéré de vente (somme(prix × qté) / totalQté)
+        // Calculer le prix moyen pondéré de vente en devise tenant
         BigDecimal prixMoyenVente = BigDecimal.ZERO;
         if (quantiteVendue > 0) {
             BigDecimal totalValeurVentes = ventes.stream()
-                    .map(v -> v.getPrixUnitaire().multiply(BigDecimal.valueOf(v.getQuantite())))
+                    .map(v -> {
+                        double taux = (v.getTauxChangeApplique() != null) ? v.getTauxChangeApplique() : 1.0;
+                        BigDecimal prixXOF = v.getPrixUnitaire().multiply(BigDecimal.valueOf(taux));
+                        return prixXOF.divide(BigDecimal.valueOf(tauxDeviceTenant), 4, RoundingMode.HALF_UP)
+                                      .multiply(BigDecimal.valueOf(v.getQuantite()));
+                    })
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             prixMoyenVente = totalValeurVentes.divide(
                     BigDecimal.valueOf(quantiteVendue),
@@ -234,11 +262,15 @@ public class StockService {
                     RoundingMode.HALF_UP
             );
         } else {
-            // Aucune vente : utiliser le prixVenteSuggere du dernier achat comme référence
+            // Aucune vente : utiliser le prixVenteSuggere du dernier achat comme référence (converti)
             prixMoyenVente = achats.stream()
                     .filter(a -> a.getPrixVenteSuggere() != null && a.getPrixVenteSuggere().compareTo(BigDecimal.ZERO) > 0)
                     .max(Comparator.comparing(AchatEntity::getDateAchat))
-                    .map(AchatEntity::getPrixVenteSuggere)
+                    .map(a -> {
+                        double taux = (a.getTauxChangeApplique() != null) ? a.getTauxChangeApplique() : 1.0;
+                        BigDecimal suggXOF = a.getPrixVenteSuggere().multiply(BigDecimal.valueOf(taux));
+                        return suggXOF.divide(BigDecimal.valueOf(tauxDeviceTenant), 2, RoundingMode.HALF_UP);
+                    })
                     .orElse(BigDecimal.ZERO);
         }
 
@@ -289,6 +321,7 @@ public class StockService {
                 .valeurStock(valeurStock)
                 .margeUnitaire(margeUnitaire)
                 .statut(statut)
+                .deviseCode(deviseCode)
                 .build();
     }
 }
