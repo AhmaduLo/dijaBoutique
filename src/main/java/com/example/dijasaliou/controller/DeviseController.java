@@ -45,13 +45,18 @@ public class DeviseController {
 
     /**
      * GET /api/devises
-     * Lister toutes les devises
+     * Lister toutes les devises — isDefault reflète la PRÉFÉRENCE DU TENANT connecté, pas le flag global.
      */
     @GetMapping
     public ResponseEntity<List<DeviseDto>> obtenirToutesLesDevises() {
-        List<DeviseEntity> devises = deviseService.obtenirToutesLesDevises();
-        List<DeviseDto> devisesDto = devises.stream()
-                .map(DeviseDto::fromEntity)
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String devisePreferee = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        List<DeviseDto> devisesDto = deviseService.obtenirToutesLesDevises().stream()
+                .map(d -> {
+                    DeviseDto dto = DeviseDto.fromEntity(d);
+                    dto.setIsDefault(d.getCode().equals(devisePreferee));
+                    return dto;
+                })
                 .collect(Collectors.toList());
         return ResponseEntity.ok(devisesDto);
     }
