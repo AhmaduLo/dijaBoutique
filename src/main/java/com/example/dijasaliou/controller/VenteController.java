@@ -175,8 +175,9 @@ public class VenteController {
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> rapportModePaiement(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
-        return ResponseEntity.ok(venteService.calculerRapportModePaiement(debut, fin));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
+        return ResponseEntity.ok(venteService.calculerRapportModePaiement(debut, fin, devise));
     }
 
     /**

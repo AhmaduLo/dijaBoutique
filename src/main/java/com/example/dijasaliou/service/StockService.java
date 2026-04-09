@@ -47,16 +47,21 @@ public class StockService {
      *
      * @return Liste des stocks par produit
      */
-    @Cacheable(value = "stocks", key = "#root.target.getCurrentTenantKey()")
+    /**
+     * @param devise Code devise explicite (ex: "EUR"). Si null, utilise la devise préférée du tenant.
+     */
+    @Cacheable(value = "stocks", key = "#root.target.getCurrentTenantKey() + ':' + (#devise != null ? #devise : 'default')")
     @Transactional(readOnly = true)
-    public List<StockDto> obtenirTousLesStocks() {
+    public List<StockDto> obtenirTousLesStocks(String devise) {
         // 1. Récupérer les achats et ventes du tenant courant uniquement
         TenantEntity tenant = tenantService.getCurrentTenant();
         List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
         List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
 
-        // Récupérer la devise préférée du tenant pour la conversion
-        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        // Devise de rapport : paramètre explicite ou préférence du tenant
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
         DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
         double tauxRapport = (deviseRapport != null && deviseRapport.getTauxChange() != null)
                 ? deviseRapport.getTauxChange() : 1.0;
@@ -136,7 +141,7 @@ public class StockService {
      */
     @Transactional(readOnly = true)
     public List<StockDto> obtenirProduitsEnRupture() {
-        return obtenirTousLesStocks().stream()
+        return obtenirTousLesStocks(null).stream()
                 .filter(stock -> stock.getStockDisponible() <= 0)
                 .collect(Collectors.toList());
     }
@@ -148,7 +153,7 @@ public class StockService {
      */
     @Transactional(readOnly = true)
     public List<StockDto> obtenirProduitsStockBas() {
-        return obtenirTousLesStocks().stream()
+        return obtenirTousLesStocks(null).stream()
                 .filter(stock -> stock.getStockDisponible() > 0 && stock.getStockDisponible() < 10)
                 .collect(Collectors.toList());
     }
@@ -178,7 +183,7 @@ public class StockService {
      */
     @Transactional(readOnly = true)
     public BigDecimal obtenirValeurTotaleStock() {
-        return obtenirTousLesStocks().stream()
+        return obtenirTousLesStocks(null).stream()
                 .map(StockDto::getValeurStock)
                 .filter(valeur -> valeur != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -198,7 +203,7 @@ public class StockService {
      * Invalide le cache des stocks pour le tenant courant.
      * À appeler après chaque achat ou vente.
      */
-    @CacheEvict(value = "stocks", key = "#tenantUuid")
+    @CacheEvict(value = "stocks", allEntries = true)
     public void invalidateStockCache(String tenantUuid) {
         // méthode vide — l'annotation fait le travail
     }

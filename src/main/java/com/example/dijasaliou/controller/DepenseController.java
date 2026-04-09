@@ -151,9 +151,27 @@ public class DepenseController {
     @GetMapping("/total")
     public ResponseEntity<BigDecimal> calculerTotalDepenses(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
-        BigDecimal total = depenseService.calculerTotalDepenses(debut, fin);
+        List<DepenseEntity> depenses = depenseService.obtenirDepensesParPeriode(debut, fin);
+
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+        double tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                ? deviseRapport.getTauxChange() : 1.0;
+
+        BigDecimal total = depenses.stream()
+                .filter(d -> d.getMontant() != null && d.getTauxChangeApplique() != null)
+                .map(d -> d.getMontant()
+                        .multiply(BigDecimal.valueOf(d.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxTenant), 2, java.math.RoundingMode.HALF_UP))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
         return ResponseEntity.ok(total);
     }
 

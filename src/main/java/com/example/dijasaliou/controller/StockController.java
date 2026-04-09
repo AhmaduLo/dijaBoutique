@@ -42,8 +42,9 @@ public class StockController {
      * Exemple : GET /api/stock
      */
     @GetMapping
-    public ResponseEntity<List<StockDto>> obtenirTousLesStocks() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+    public ResponseEntity<List<StockDto>> obtenirTousLesStocks(
+            @RequestParam(required = false) String devise) {
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(devise);
         return ResponseEntity.ok(stocks);
     }
 
@@ -157,8 +158,9 @@ public class StockController {
      * Exemple : GET /api/stock/valeur-totale
      */
     @GetMapping("/valeur-totale")
-    public ResponseEntity<Map<String, Object>> obtenirValeurTotale() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+    public ResponseEntity<Map<String, Object>> obtenirValeurTotale(
+            @RequestParam(required = false) String devise) {
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(devise);
         BigDecimal valeurTotale = stocks.stream()
                 .map(StockDto::getValeurStock)
                 .filter(v -> v != null)
@@ -185,8 +187,9 @@ public class StockController {
      * Exemple : GET /api/stock/resume
      */
     @GetMapping("/resume")
-    public ResponseEntity<Map<String, Object>> obtenirResume() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+    public ResponseEntity<Map<String, Object>> obtenirResume(
+            @RequestParam(required = false) String devise) {
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(devise);
         BigDecimal valeurTotale = stocks.stream()
                 .map(StockDto::getValeurStock)
                 .filter(v -> v != null)
@@ -247,7 +250,7 @@ public class StockController {
      */
     @GetMapping("/produits-disponibles")
     public ResponseEntity<List<Map<String, Object>>> obtenirProduitsDisponibles() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(null);
 
         // Filtrer uniquement les produits avec stock > 0
         List<Map<String, Object>> produitsDisponibles = stocks.stream()
@@ -278,7 +281,7 @@ public class StockController {
      */
     @GetMapping("/noms-produits")
     public ResponseEntity<List<String>> obtenirNomsProduits() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(null);
 
         List<String> nomsProduits = stocks.stream()
                 .filter(s -> s.getStockDisponible() > 0)

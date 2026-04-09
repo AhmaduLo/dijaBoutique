@@ -22,9 +22,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import com.example.dijasaliou.entity.DeviseEntity;
@@ -384,69 +386,89 @@ public class VenteService {
      * Retourne une map : mode → {total, nombre}
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> calculerRapportModePaiement(LocalDate debut, LocalDate fin) {
-        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+    public Map<String, Object> calculerRapportModePaiement(LocalDate debut, LocalDate fin, String devise) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String tenantUuid = tenant.getTenantUuid();
 
-        Map<String, java.math.BigDecimal> totaux = new java.util.LinkedHashMap<>();
-        Map<String, Long> nombres = new java.util.LinkedHashMap<>();
+        // Devise de rapport : paramètre explicite ou préférence du tenant
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        double tauxTenant = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                    ? deviseRapport.getTauxChange() : 1.0;
+        } catch (RuntimeException e) {
+            tauxTenant = 1.0;
+        }
+        final double tauxFinal = tauxTenant;
+
+        Map<String, BigDecimal> totaux = new LinkedHashMap<>();
+        Map<String, Long> nombres = new LinkedHashMap<>();
         for (String mode : List.of("ESPECES", "WAVE", "ORANGE_MONEY", "CREDIT")) {
-            totaux.put(mode, java.math.BigDecimal.ZERO);
+            totaux.put(mode, BigDecimal.ZERO);
             nombres.put(mode, 0L);
         }
 
-        // 1. Ventes directes non-CREDIT groupées par mode
-        List<Object[]> directVentes = venteRepository.sumDirectVentesParModeEtPeriode(
-                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), VenteEntity.ModePaiementVente.CREDIT, tenantUuid);
-        for (Object[] row : directVentes) {
-            String mode = ((VenteEntity.ModePaiementVente) row[0]).name();
-            Long count = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
-            java.math.BigDecimal total = row[2] instanceof java.math.BigDecimal
-                    ? (java.math.BigDecimal) row[2]
-                    : (row[2] instanceof Number ? new java.math.BigDecimal(row[2].toString()) : java.math.BigDecimal.ZERO);
-            totaux.put(mode, total);
-            nombres.put(mode, count);
-        }
+        // 1. Ventes directes (non-CREDIT) : chargées individuellement pour conversion multi-devises
+        List<VenteEntity> toutesVentes = obtenirVentesParPeriode(debut, fin);
+        toutesVentes.stream()
+                .filter(v -> v.getModePaiement() != VenteEntity.ModePaiementVente.CREDIT)
+                .forEach(v -> {
+                    String mode = v.getModePaiement() != null ? v.getModePaiement().name() : "ESPECES";
+                    double taux = (v.getTauxChangeApplique() != null) ? v.getTauxChangeApplique() : 1.0;
+                    BigDecimal montantConverti = v.getPrixTotal() != null
+                            ? v.getPrixTotal()
+                                    .multiply(BigDecimal.valueOf(taux))
+                                    .divide(BigDecimal.valueOf(tauxFinal), 2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+                    totaux.merge(mode, montantConverti, BigDecimal::add);
+                    nombres.merge(mode, 1L, Long::sum);
+                });
 
-        // 2. Montant restant dû sur les crédits non soldés créés dans la période
+        // 2. Montant restant dû sur les crédits non soldés créés dans la période (supposés en XOF)
         List<Object[]> creditRows = creditClientRepository.sumCreditsRestantParPeriode(
                 debut.atStartOfDay(), fin.atTime(LocalTime.MAX), StatutCredit.SOLDE, tenantUuid);
         if (creditRows != null && !creditRows.isEmpty()) {
             Object[] creditRow = creditRows.get(0);
             if (creditRow != null && creditRow.length >= 2 && creditRow[1] != null) {
-                java.math.BigDecimal creditTotal = creditRow[1] instanceof java.math.BigDecimal
-                        ? (java.math.BigDecimal) creditRow[1]
-                        : new java.math.BigDecimal(creditRow[1].toString());
+                BigDecimal creditTotal = creditRow[1] instanceof BigDecimal
+                        ? (BigDecimal) creditRow[1]
+                        : new BigDecimal(creditRow[1].toString());
+                creditTotal = creditTotal.divide(BigDecimal.valueOf(tauxFinal), 2, RoundingMode.HALF_UP);
                 Long creditCount = creditRow[0] instanceof Number ? ((Number) creditRow[0]).longValue() : 0L;
                 totaux.put("CREDIT", creditTotal);
                 nombres.put("CREDIT", creditCount);
             }
         }
 
-        // 3. Remboursements de crédits par mode, additionnés aux totaux correspondants
-        List<Object[]> paiementsCredit = paiementCreditRepository.sumParModeEtPeriode(
-                debut, fin, tenantUuid);
+        // 3. Remboursements de crédits par mode (supposés en XOF)
+        List<Object[]> paiementsCredit = paiementCreditRepository.sumParModeEtPeriode(debut, fin, tenantUuid);
         for (Object[] row : paiementsCredit) {
             String mode = ((PaiementCreditEntity.ModePaiement) row[0]).name();
             Long count = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
-            java.math.BigDecimal total = row[2] instanceof java.math.BigDecimal
-                    ? (java.math.BigDecimal) row[2]
-                    : (row[2] instanceof Number ? new java.math.BigDecimal(row[2].toString()) : null);
+            BigDecimal total = row[2] instanceof BigDecimal
+                    ? (BigDecimal) row[2]
+                    : (row[2] instanceof Number ? new BigDecimal(row[2].toString()) : null);
             if (total != null) {
-                totaux.merge(mode, total, java.math.BigDecimal::add);
+                total = total.divide(BigDecimal.valueOf(tauxFinal), 2, RoundingMode.HALF_UP);
+                totaux.merge(mode, total, BigDecimal::add);
             }
             if (count > 0) {
                 nombres.merge(mode, count, Long::sum);
             }
         }
 
-        // Construire la réponse : {ESPECES: {total, nombre}, WAVE: {...}, ...}
-        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        // Construire la réponse avec deviseCode
+        Map<String, Object> result = new LinkedHashMap<>();
         for (String mode : totaux.keySet()) {
-            Map<String, Object> entry = new java.util.LinkedHashMap<>();
+            Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("total", totaux.get(mode));
             entry.put("nombre", nombres.get(mode));
             result.put(mode, entry);
         }
+        result.put("deviseCode", codeDevise);
         return result;
     }
 

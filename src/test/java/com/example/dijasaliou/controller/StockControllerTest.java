@@ -120,7 +120,7 @@ class StockControllerTest {
     void obtenirTousLesStocks_DevraitRetournerTousLesStocks() throws Exception {
         // Arrange
         List<StockDto> stocks = Arrays.asList(stockTest1, stockTest2, stockTest3);
-        when(stockService.obtenirTousLesStocks()).thenReturn(stocks);
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(stocks);
 
         // Act & Assert
         mockMvc.perform(get("/stock")
@@ -137,14 +137,14 @@ class StockControllerTest {
                 .andExpect(jsonPath("$[2].stockDisponible", is(0)))
                 .andExpect(jsonPath("$[2].statut", is("RUPTURE")));
 
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     @Test
     @DisplayName("GET /stock - Devrait retourner une liste vide quand aucun stock")
     void obtenirTousLesStocks_DevraitRetournerListeVide() throws Exception {
         // Arrange
-        when(stockService.obtenirTousLesStocks()).thenReturn(Arrays.asList());
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(Arrays.asList());
 
         // Act & Assert
         mockMvc.perform(get("/stock")
@@ -152,7 +152,7 @@ class StockControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
 
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     // ==================== Tests pour GET /stock/produit/{nomProduit} ====================
@@ -395,7 +395,7 @@ class StockControllerTest {
         BigDecimal valeurTotale = new BigDecimal("2250000.00");
         List<StockDto> stocks = Arrays.asList(stockTest1, stockTest2, stockTest3);
         when(stockService.obtenirValeurTotaleStock()).thenReturn(valeurTotale);
-        when(stockService.obtenirTousLesStocks()).thenReturn(stocks);
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(stocks);
 
         // Act & Assert
         mockMvc.perform(get("/stock/valeur-totale")
@@ -406,7 +406,7 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.details", hasSize(3)));
 
         verify(stockService, times(1)).obtenirValeurTotaleStock();
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     @Test
@@ -414,7 +414,7 @@ class StockControllerTest {
     void obtenirValeurTotale_DevraitRetournerZero() throws Exception {
         // Arrange
         when(stockService.obtenirValeurTotaleStock()).thenReturn(BigDecimal.ZERO);
-        when(stockService.obtenirTousLesStocks()).thenReturn(Arrays.asList());
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(Arrays.asList());
 
         // Act & Assert
         mockMvc.perform(get("/stock/valeur-totale")
@@ -424,7 +424,7 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.nombreProduits", is(0)));
 
         verify(stockService, times(1)).obtenirValeurTotaleStock();
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     // ==================== Tests pour GET /stock/resume ====================
@@ -435,7 +435,7 @@ class StockControllerTest {
         // Arrange
         List<StockDto> stocks = Arrays.asList(stockTest1, stockTest2, stockTest3);
         BigDecimal valeurTotale = new BigDecimal("2250000.00");
-        when(stockService.obtenirTousLesStocks()).thenReturn(stocks);
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(stocks);
         when(stockService.obtenirValeurTotaleStock()).thenReturn(valeurTotale);
 
         // Act & Assert
@@ -448,7 +448,7 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.produitsStockBas", is(1))) // stockTest2
                 .andExpect(jsonPath("$.valeurTotaleStock", is(2250000.00)));
 
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
         verify(stockService, times(1)).obtenirValeurTotaleStock();
     }
 
@@ -459,7 +459,7 @@ class StockControllerTest {
     void obtenirProduitsDisponibles_DevraitRetournerProduits() throws Exception {
         // Arrange
         List<StockDto> stocks = Arrays.asList(stockTest1, stockTest2, stockTest3);
-        when(stockService.obtenirTousLesStocks()).thenReturn(stocks);
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(stocks);
 
         // Act & Assert
         mockMvc.perform(get("/stock/produits-disponibles")
@@ -471,7 +471,7 @@ class StockControllerTest {
                 .andExpect(jsonPath("$[0].prixMoyenVente", notNullValue()))
                 .andExpect(jsonPath("$[0].statut", notNullValue()));
 
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     @Test
@@ -479,7 +479,7 @@ class StockControllerTest {
     void obtenirProduitsDisponibles_DevraitRetournerListeVide() throws Exception {
         // Arrange
         List<StockDto> stocks = Arrays.asList(stockTest3); // Seulement en rupture
-        when(stockService.obtenirTousLesStocks()).thenReturn(stocks);
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(stocks);
 
         // Act & Assert
         mockMvc.perform(get("/stock/produits-disponibles")
@@ -487,7 +487,7 @@ class StockControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
 
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     // ==================== Tests pour GET /stock/noms-produits ====================
@@ -497,7 +497,7 @@ class StockControllerTest {
     void obtenirNomsProduits_DevraitRetournerNoms() throws Exception {
         // Arrange
         List<StockDto> stocks = Arrays.asList(stockTest1, stockTest2, stockTest3);
-        when(stockService.obtenirTousLesStocks()).thenReturn(stocks);
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(stocks);
 
         // Act & Assert
         mockMvc.perform(get("/stock/noms-produits")
@@ -507,14 +507,14 @@ class StockControllerTest {
                 .andExpect(jsonPath("$[*]", hasItem("Collier en or")))
                 .andExpect(jsonPath("$[*]", hasItem("Bracelet en argent")));
 
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     @Test
     @DisplayName("GET /stock/noms-produits - Devrait retourner liste vide si aucun produit disponible")
     void obtenirNomsProduits_DevraitRetournerListeVide() throws Exception {
         // Arrange
-        when(stockService.obtenirTousLesStocks()).thenReturn(Arrays.asList());
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(Arrays.asList());
 
         // Act & Assert
         mockMvc.perform(get("/stock/noms-produits")
@@ -522,7 +522,7 @@ class StockControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
 
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     // ==================== Tests additionnels ====================
@@ -531,7 +531,7 @@ class StockControllerTest {
     @DisplayName("GET /stock - Devrait calculer correctement les valeurs de stock")
     void obtenirTousLesStocks_DevraitCalculerValeursCorrectement() throws Exception {
         // Arrange
-        when(stockService.obtenirTousLesStocks()).thenReturn(Arrays.asList(stockTest1));
+        when(stockService.obtenirTousLesStocks(any())).thenReturn(Arrays.asList(stockTest1));
 
         // Act & Assert
         mockMvc.perform(get("/stock")
@@ -543,7 +543,7 @@ class StockControllerTest {
                 .andExpect(jsonPath("$[0].valeurStock", is(2000000.00))) // 20 × 100000 = 2000000
                 .andExpect(jsonPath("$[0].margeUnitaire", is(50000.00))); // 150000 - 100000 = 50000
 
-        verify(stockService, times(1)).obtenirTousLesStocks();
+        verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
     @Test

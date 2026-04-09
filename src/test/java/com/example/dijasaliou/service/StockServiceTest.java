@@ -74,25 +74,25 @@ class StockServiceTest {
     // =========================================================
 
     @Test
-    @DisplayName("obtenirTousLesStocks() — calcule les stocks de 2 produits")
+    @DisplayName("obtenirTousLesStocks(null) — calcule les stocks de 2 produits")
     void obtenirTousLesStocks_calculeCorrectement() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.findAllByTenant(any())).thenReturn(Arrays.asList(achat1, achat2));
         when(venteRepository.findAllByTenant(any())).thenReturn(Arrays.asList(vente1));
 
-        List<StockDto> resultat = stockService.obtenirTousLesStocks();
+        List<StockDto> resultat = stockService.obtenirTousLesStocks(null);
 
         assertThat(resultat).hasSize(2);
     }
 
     @Test
-    @DisplayName("obtenirTousLesStocks() — liste vide si aucun achat")
+    @DisplayName("obtenirTousLesStocks(null) — liste vide si aucun achat")
     void obtenirTousLesStocks_retourneVideSiAucunAchat() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(achatRepository.findAllByTenant(any())).thenReturn(Collections.emptyList());
         when(venteRepository.findAllByTenant(any())).thenReturn(Collections.emptyList());
 
-        List<StockDto> resultat = stockService.obtenirTousLesStocks();
+        List<StockDto> resultat = stockService.obtenirTousLesStocks(null);
 
         assertThat(resultat).isEmpty();
     }
