@@ -139,18 +139,25 @@ public class AchatController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
 
         List<AchatEntity> achats = achatService.obtenirAchatsParPeriode(debut, fin);
-        BigDecimal total = achatService.calculerTotalAchats(debut, fin);
 
         // Convertir les achats en DTOs
         List<AchatDto> achatsDto = achats.stream()
                 .map(AchatDto::fromEntity)
                 .collect(Collectors.toList());
 
+        // Calculer le total en XOF : chaque montant est converti via son tauxChangeApplique stocké
+        BigDecimal total = achats.stream()
+                .filter(a -> a.getPrixTotal() != null && a.getTauxChangeApplique() != null)
+                .map(a -> a.getPrixTotal().multiply(BigDecimal.valueOf(a.getTauxChangeApplique())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
         stats.put("nombreAchats", achatsDto.size());
         stats.put("montantTotal", total);
+        stats.put("deviseCode", "XOF");
         stats.put("achats", achatsDto);
 
         return ResponseEntity.ok(stats);

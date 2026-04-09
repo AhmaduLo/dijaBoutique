@@ -184,18 +184,25 @@ public class VenteController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
 
         List<VenteEntity> ventes = venteService.obtenirVentesParPeriode(debut, fin);
-        BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
 
         // Convertir en DTOs
         List<VenteDto> ventesDto = ventes.stream()
                 .map(VenteDto::fromEntity)
                 .collect(Collectors.toList());
 
+        // Calculer le CA en XOF : chaque montant est converti via son tauxChangeApplique stocké
+        BigDecimal ca = ventes.stream()
+                .filter(v -> v.getPrixTotal() != null && v.getTauxChangeApplique() != null)
+                .map(v -> v.getPrixTotal().multiply(BigDecimal.valueOf(v.getTauxChangeApplique())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
         stats.put("nombreVentes", ventesDto.size());
         stats.put("chiffreAffaires", ca);
+        stats.put("deviseCode", "XOF");
         stats.put("ventes", ventesDto);
 
         return ResponseEntity.ok(stats);
