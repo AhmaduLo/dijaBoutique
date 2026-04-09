@@ -303,7 +303,7 @@ public class RapportService {
             stats.computeIfAbsent(v.getNomProduit(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
             stats.get(v.getNomProduit())[0] = stats.get(v.getNomProduit())[0].add(BigDecimal.valueOf(v.getQuantite()));
             stats.get(v.getNomProduit())[1] = stats.get(v.getNomProduit())[1]
-                    .add(v.getPrixTotal() != null ? v.getPrixTotal() : BigDecimal.ZERO);
+                    .add(convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique()));
         }
 
         List<Map.Entry<String, BigDecimal[]>> top5 = stats.entrySet().stream()
@@ -337,7 +337,7 @@ public class RapportService {
 
         for (VenteEntity v : ventes) {
             String mode = v.getModePaiement() != null ? v.getModePaiement().name() : "ESPECES";
-            totaux.merge(mode, v.getPrixTotal() != null ? v.getPrixTotal() : BigDecimal.ZERO, BigDecimal::add);
+            totaux.merge(mode, convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique()), BigDecimal::add);
         }
 
         PdfPTable table = tableau(new float[]{40, 35, 25}, "Mode de paiement", "Montant", "Pourcentage");
@@ -420,7 +420,7 @@ public class RapportService {
 
         BigDecimal panierMoyen = ventes.isEmpty() ? BigDecimal.ZERO
                 : ca.divide(BigDecimal.valueOf(ventes.size()), 0, RoundingMode.HALF_UP);
-        BigDecimal totalAchats   = somme(achats.stream().map(AchatEntity::getPrixTotal).collect(Collectors.toList()));
+        BigDecimal totalAchats   = somme(achats.stream().map(a -> convertirMontant(a.getPrixTotal(), a.getTauxChangeApplique())).collect(Collectors.toList()));
         BigDecimal margeBrute    = ca.subtract(totalAchats);
         BigDecimal tauxMarge     = ca.compareTo(BigDecimal.ZERO) > 0
                 ? margeBrute.multiply(new BigDecimal("100")).divide(ca, 1, RoundingMode.HALF_UP)
@@ -516,7 +516,7 @@ public class RapportService {
             stats.computeIfAbsent(a.getNomProduit(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
             stats.get(a.getNomProduit())[0] = stats.get(a.getNomProduit())[0].add(BigDecimal.valueOf(a.getQuantite()));
             stats.get(a.getNomProduit())[1] = stats.get(a.getNomProduit())[1]
-                    .add(a.getPrixTotal() != null ? a.getPrixTotal() : BigDecimal.ZERO);
+                    .add(convertirMontant(a.getPrixTotal(), a.getTauxChangeApplique()));
         }
 
         List<Map.Entry<String, BigDecimal[]>> top5 = stats.entrySet().stream()
@@ -545,7 +545,7 @@ public class RapportService {
         Map<String, BigDecimal> parCat = new LinkedHashMap<>();
         for (DepenseEntity d : depenses) {
             String cat = d.getCategorie() != null ? d.getCategorie().getLibelle() : "Autre";
-            parCat.merge(cat, d.getMontant() != null ? d.getMontant() : BigDecimal.ZERO, BigDecimal::add);
+            parCat.merge(cat, convertirMontant(d.getMontant(), d.getTauxChangeApplique()), BigDecimal::add);
         }
 
         List<Map.Entry<String, BigDecimal>> sorted = parCat.entrySet().stream()
@@ -615,7 +615,7 @@ public class RapportService {
                     v.getDateVente().format(FMT_DATETIME),
                     v.getNomProduit(),
                     fmt0(BigDecimal.valueOf(v.getQuantite())),
-                    formaterMontant(v.getPrixTotal()),
+                    formaterMontant(convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique())),
                     libellePaiement(v.getModePaiement() != null ? v.getModePaiement().name() : "ESPECES"));
         }
         if (ventes.isEmpty()) ligneVide(table, 5, "Aucune vente sur cette période");
