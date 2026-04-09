@@ -35,6 +35,8 @@ public class VenteDto {
     private String adresseClient;
     private String photoUrl;
     private String unite;
+    private String deviseCode;
+    private Double tauxChangeApplique;
 
     // Groupe de vente multi-produits (UUID partagé entre les articles du même panier)
     private String groupeVenteId;
@@ -80,6 +82,8 @@ public class VenteDto {
                 .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
+                .deviseCode(vente.getDeviseCode())
+                .tauxChangeApplique(vente.getTauxChangeApplique())
                 .groupeVenteId(vente.getGroupeVenteId())
                 .clientId(vente.getClientRef() != null ? vente.getClientRef().getId() : null)
                 .modePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : "ESPECES")
@@ -119,6 +123,8 @@ public class VenteDto {
                 .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
+                .deviseCode(vente.getDeviseCode())
+                .tauxChangeApplique(vente.getTauxChangeApplique())
                 .groupeVenteId(vente.getGroupeVenteId())
                 .estRecente(vente.estRecente())
                 .mois(vente.getMois())

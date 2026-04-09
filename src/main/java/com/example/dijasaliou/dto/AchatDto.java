@@ -34,6 +34,8 @@ public class AchatDto {
     private BigDecimal prixVenteSuggere;
     private String photoUrl;
     private String unite;
+    private String deviseCode;
+    private Double tauxChangeApplique;
 
     // Informations sur l'utilisateur qui a créé l'achat
     private UserDto utilisateur;
@@ -69,6 +71,8 @@ public class AchatDto {
                 .prixVenteSuggere(achat.getPrixVenteSuggere())
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .unite(achat.getUnite())
+                .deviseCode(achat.getDeviseCode())
+                .tauxChangeApplique(achat.getTauxChangeApplique())
                 .utilisateur(UserDto.fromEntityMinimal(achat.getUtilisateur()))
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())

@@ -30,6 +30,8 @@ public class DepenseDto {
     private DepenseEntity.CategorieDepense categorie;
     private String notes;
     private Boolean estRecurrente;
+    private String deviseCode;
+    private Double tauxChangeApplique;
 
     // Informations sur l'utilisateur qui a créé la dépense
     private UserDto utilisateur;
@@ -57,6 +59,8 @@ public class DepenseDto {
                 .categorie(depense.getCategorie())
                 .notes(depense.getNotes())
                 .estRecurrente(depense.getEstRecurrente())
+                .deviseCode(depense.getDeviseCode())
+                .tauxChangeApplique(depense.getTauxChangeApplique())
                 .utilisateur(UserDto.fromEntityMinimal(depense.getUtilisateur()))
                 .estRecente(depense.estRecente())
                 .mois(depense.getMois())
