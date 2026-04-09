@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import com.example.dijasaliou.entity.DeviseEntity;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -44,6 +45,7 @@ public class VenteService {
     private final ClientRepository clientRepository;
     private final CreditClientRepository creditClientRepository;
     private final PaiementCreditRepository paiementCreditRepository;
+    private final DeviseService deviseService;
 
     public VenteService(VenteRepository venteRepository,
                         @Lazy StockService stockService,
@@ -52,7 +54,8 @@ public class VenteService {
                         @Lazy CreditClientService creditClientService,
                         ClientRepository clientRepository,
                         CreditClientRepository creditClientRepository,
-                        PaiementCreditRepository paiementCreditRepository) {
+                        PaiementCreditRepository paiementCreditRepository,
+                        DeviseService deviseService) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
         this.tenantService = tenantService;
@@ -61,6 +64,7 @@ public class VenteService {
         this.clientRepository = clientRepository;
         this.creditClientRepository = creditClientRepository;
         this.paiementCreditRepository = paiementCreditRepository;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -132,7 +136,19 @@ public class VenteService {
         }
 
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
-        vente.setTenant(tenantService.getCurrentTenant());
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        vente.setTenant(tenantActuel);
+
+        // DEVISE : Stocker la devise active du tenant + son taux au moment de la saisie
+        String codeDevise = (tenantActuel.getDevisePreferee() != null) ? tenantActuel.getDevisePreferee() : "XOF";
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            vente.setDeviseCode(devise.getCode());
+            vente.setTauxChangeApplique(devise.getTauxChange());
+        } catch (RuntimeException e) {
+            vente.setDeviseCode("XOF");
+            vente.setTauxChangeApplique(1.0);
+        }
 
         // Récupérer automatiquement la photo du produit depuis le stock si non fournie
         if (vente.getPhotoUrl() == null || vente.getPhotoUrl().trim().isEmpty()) {

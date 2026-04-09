@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import com.example.dijasaliou.entity.DeviseEntity;
 
 /**
  * Service pour la logique métier des achats
@@ -40,16 +41,20 @@ public class AchatService {
 
     private final VenteRepository venteRepository;
 
+    private final DeviseService deviseService;
+
     /**
      * Constructeur
-     * Spring injecte automatiquement achatRepository, tenantService, stockService et venteRepository
+     * Spring injecte automatiquement achatRepository, tenantService, stockService, venteRepository et deviseService
      */
     public AchatService(AchatRepository achatRepository, TenantService tenantService,
-                        StockService stockService, VenteRepository venteRepository) {
+                        StockService stockService, VenteRepository venteRepository,
+                        DeviseService deviseService) {
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
         this.stockService = stockService;
         this.venteRepository = venteRepository;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -101,7 +106,19 @@ public class AchatService {
         achat.setUtilisateur(utilisateur);
 
         // 3. MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
-        achat.setTenant(tenantService.getCurrentTenant());
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        achat.setTenant(tenant);
+
+        // 3b. DEVISE : Stocker la devise active du tenant + son taux au moment de la saisie
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            achat.setDeviseCode(devise.getCode());
+            achat.setTauxChangeApplique(devise.getTauxChange());
+        } catch (RuntimeException e) {
+            achat.setDeviseCode("XOF");
+            achat.setTauxChangeApplique(1.0);
+        }
 
         // 4. DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
         if (achat.getDateAchat() == null) {

@@ -3,6 +3,7 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.DepenseDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.DepenseEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.repository.DepenseRepository;
@@ -26,10 +27,13 @@ public class DepenseService {
 
     private final DepenseRepository depenseRepository;
     private final TenantService tenantService;
+    private final DeviseService deviseService;
 
-    public DepenseService(DepenseRepository depenseRepository, TenantService tenantService) {
+    public DepenseService(DepenseRepository depenseRepository, TenantService tenantService,
+                          DeviseService deviseService) {
         this.depenseRepository = depenseRepository;
         this.tenantService = tenantService;
+        this.deviseService = deviseService;
     }
 
 
@@ -82,7 +86,19 @@ public class DepenseService {
         depense.setUtilisateur(utilisateur);
 
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
-        depense.setTenant(tenantService.getCurrentTenant());
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        depense.setTenant(tenant);
+
+        // DEVISE : Stocker la devise active du tenant + son taux au moment de la saisie
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            depense.setDeviseCode(devise.getCode());
+            depense.setTauxChangeApplique(devise.getTauxChange());
+        } catch (RuntimeException e) {
+            depense.setDeviseCode("XOF");
+            depense.setTauxChangeApplique(1.0);
+        }
 
         // DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
         if (depense.getDateDepense() == null) {

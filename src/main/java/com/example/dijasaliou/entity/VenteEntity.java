@@ -95,6 +95,15 @@ public class VenteEntity  extends BaseEntity{
     @Builder.Default
     private String unite = "pièce";
 
+    /** Devise dans laquelle cette vente a été saisie (code ISO ex: XOF, EUR, USD) */
+    @Column(name = "devise_code", length = 10, nullable = false)
+    @Builder.Default
+    private String deviseCode = "XOF";
+
+    /** Taux de change appliqué au moment de la saisie (1 unité devise → XOF) */
+    @Column(name = "taux_change_applique", nullable = false)
+    @Builder.Default
+    private Double tauxChangeApplique = 1.0;
 
     /**
      * Relation avec Utilisateur
