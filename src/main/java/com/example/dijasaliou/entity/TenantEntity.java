@@ -83,6 +83,11 @@ public class TenantEntity {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
+    /** Devise préférée de cette boutique (code ISO ex: XOF, EUR, USD). Chaque boutique a la sienne. */
+    @Column(name = "devise_preferee", length = 10)
+    @Builder.Default
+    private String devisePreferee = "XOF";
+
     /**
      * Permet de désactiver un tenant temporairement (suspension réversible)
      * Si actif = false, l'entreprise ne peut plus se connecter

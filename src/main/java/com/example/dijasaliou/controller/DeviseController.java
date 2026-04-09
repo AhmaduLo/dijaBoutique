@@ -4,7 +4,10 @@ import com.example.dijasaliou.dto.CreateDeviseDto;
 import com.example.dijasaliou.dto.DeviseDto;
 import com.example.dijasaliou.dto.UpdateDeviseDto;
 import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
+import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.service.DeviseService;
+import com.example.dijasaliou.service.TenantService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,16 +25,22 @@ import java.util.stream.Collectors;
  * SÉCURITÉ :
  * - Lecture (GET) : Accessible à tous les utilisateurs authentifiés
  * - Modification (POST/PUT/DELETE) : Réservé aux ADMIN
+ *
+ * La devise "par défaut" est désormais une PRÉFÉRENCE PAR BOUTIQUE
+ * stockée dans tenants.devise_preferee — pas un flag global partagé.
  */
 @RestController
 @RequestMapping("/devises")
-
 public class DeviseController {
 
     private final DeviseService deviseService;
+    private final TenantService tenantService;
+    private final TenantRepository tenantRepository;
 
-    public DeviseController(DeviseService deviseService) {
+    public DeviseController(DeviseService deviseService, TenantService tenantService, TenantRepository tenantRepository) {
         this.deviseService = deviseService;
+        this.tenantService = tenantService;
+        this.tenantRepository = tenantRepository;
     }
 
     /**
@@ -59,11 +68,13 @@ public class DeviseController {
 
     /**
      * GET /api/devises/default
-     * Récupérer la devise par défaut
+     * Récupérer la devise préférée de CETTE boutique (pas le flag global)
      */
     @GetMapping("/default")
     public ResponseEntity<DeviseDto> obtenirDeviseParDefaut() {
-        DeviseEntity devise = deviseService.obtenirDeviseParDefaut();
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codePreferee = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        DeviseEntity devise = deviseService.obtenirDeviseParCode(codePreferee);
         return ResponseEntity.ok(DeviseDto.fromEntity(devise));
     }
 
@@ -107,13 +118,17 @@ public class DeviseController {
 
     /**
      * PUT /api/devises/{id}/set-default
-     * Définir une devise comme devise par défaut
+     * Définir la devise préférée de CETTE boutique uniquement — sans affecter les autres.
      * ADMIN uniquement
      */
     @PutMapping("/{id}/set-default")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<DeviseDto> definirDeviseParDefaut(@PathVariable Long id) {
-        DeviseEntity devise = deviseService.definirDeviseParDefaut(id);
+        DeviseEntity devise = deviseService.obtenirDeviseParId(id);
+        TenantEntity tenant = tenantRepository.findById(tenantService.getCurrentTenant().getId())
+                .orElseThrow(() -> new RuntimeException("Tenant introuvable"));
+        tenant.setDevisePreferee(devise.getCode());
+        tenantRepository.save(tenant);
         return ResponseEntity.ok(DeviseDto.fromEntity(devise));
     }
 
