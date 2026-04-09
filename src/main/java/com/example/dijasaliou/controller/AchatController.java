@@ -4,8 +4,12 @@ import com.example.dijasaliou.dto.AchatDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.ProduitPourVenteDto;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AchatService;
+import com.example.dijasaliou.service.DeviseService;
+import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -36,10 +40,15 @@ public class AchatController {
 
     private final AchatService achatService;
     private final UserService userService;
+    private final TenantService tenantService;
+    private final DeviseService deviseService;
 
-    public AchatController(AchatService achatService, UserService userService) {
+    public AchatController(AchatService achatService, UserService userService,
+                           TenantService tenantService, DeviseService deviseService) {
         this.achatService = achatService;
         this.userService = userService;
+        this.tenantService = tenantService;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -145,10 +154,19 @@ public class AchatController {
                 .map(AchatDto::fromEntity)
                 .collect(Collectors.toList());
 
-        // Calculer le total en XOF : chaque montant est converti via son tauxChangeApplique stocké
+        // Récupérer la devise préférée du tenant
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+        double tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                ? deviseRapport.getTauxChange() : 1.0;
+
+        // Calculer le total dans la devise du tenant : montant × tauxChangeApplique → XOF → / tauxTenant
         BigDecimal total = achats.stream()
                 .filter(a -> a.getPrixTotal() != null && a.getTauxChangeApplique() != null)
-                .map(a -> a.getPrixTotal().multiply(BigDecimal.valueOf(a.getTauxChangeApplique())))
+                .map(a -> a.getPrixTotal()
+                        .multiply(BigDecimal.valueOf(a.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxTenant), 2, java.math.RoundingMode.HALF_UP))
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, java.math.RoundingMode.HALF_UP);
 
@@ -157,7 +175,7 @@ public class AchatController {
         stats.put("dateFin", fin);
         stats.put("nombreAchats", achatsDto.size());
         stats.put("montantTotal", total);
-        stats.put("deviseCode", "XOF");
+        stats.put("deviseCode", codeDevise);
         stats.put("achats", achatsDto);
 
         return ResponseEntity.ok(stats);

@@ -2,8 +2,12 @@ package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.VenteDto;
+import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
+import com.example.dijasaliou.service.DeviseService;
+import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.UserService;
 import com.example.dijasaliou.service.VenteService;
 import jakarta.validation.Valid;
@@ -32,10 +36,15 @@ public class VenteController {
 
     private final VenteService venteService;
     private final UserService userService;
+    private final TenantService tenantService;
+    private final DeviseService deviseService;
 
-    public VenteController(VenteService venteService, UserService userService) {
+    public VenteController(VenteService venteService, UserService userService,
+                           TenantService tenantService, DeviseService deviseService) {
         this.venteService = venteService;
         this.userService = userService;
+        this.tenantService = tenantService;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -190,10 +199,19 @@ public class VenteController {
                 .map(VenteDto::fromEntity)
                 .collect(Collectors.toList());
 
-        // Calculer le CA en XOF : chaque montant est converti via son tauxChangeApplique stocké
+        // Récupérer la devise préférée du tenant
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+        double tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                ? deviseRapport.getTauxChange() : 1.0;
+
+        // Calculer le CA dans la devise du tenant : montant × tauxChangeApplique → XOF → / tauxTenant
         BigDecimal ca = ventes.stream()
                 .filter(v -> v.getPrixTotal() != null && v.getTauxChangeApplique() != null)
-                .map(v -> v.getPrixTotal().multiply(BigDecimal.valueOf(v.getTauxChangeApplique())))
+                .map(v -> v.getPrixTotal()
+                        .multiply(BigDecimal.valueOf(v.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxTenant), 2, java.math.RoundingMode.HALF_UP))
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, java.math.RoundingMode.HALF_UP);
 
@@ -202,7 +220,7 @@ public class VenteController {
         stats.put("dateFin", fin);
         stats.put("nombreVentes", ventesDto.size());
         stats.put("chiffreAffaires", ca);
-        stats.put("deviseCode", "XOF");
+        stats.put("deviseCode", codeDevise);
         stats.put("ventes", ventesDto);
 
         return ResponseEntity.ok(stats);

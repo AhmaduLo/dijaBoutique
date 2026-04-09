@@ -3,8 +3,12 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.DepenseDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.DepenseEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.DepenseService;
+import com.example.dijasaliou.service.DeviseService;
+import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -29,10 +33,15 @@ public class DepenseController {
 
     private final DepenseService depenseService;
     private final UserService userService;
+    private final TenantService tenantService;
+    private final DeviseService deviseService;
 
-    public DepenseController(DepenseService depenseService, UserService userService) {
+    public DepenseController(DepenseService depenseService, UserService userService,
+                             TenantService tenantService, DeviseService deviseService) {
         this.depenseService = depenseService;
         this.userService = userService;
+        this.tenantService = tenantService;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -158,18 +167,34 @@ public class DepenseController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
 
         List<DepenseEntity> depenses = depenseService.obtenirDepensesParPeriode(debut, fin);
-        BigDecimal total = depenseService.calculerTotalDepenses(debut, fin);
 
         // Convertir en DTOs
         List<DepenseDto> depensesDto = depenses.stream()
                 .map(DepenseDto::fromEntity)
                 .collect(Collectors.toList());
 
+        // Récupérer la devise préférée du tenant
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+        double tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                ? deviseRapport.getTauxChange() : 1.0;
+
+        // Calculer le total dans la devise du tenant : montant × tauxChangeApplique → XOF → / tauxTenant
+        BigDecimal total = depenses.stream()
+                .filter(d -> d.getMontant() != null && d.getTauxChangeApplique() != null)
+                .map(d -> d.getMontant()
+                        .multiply(BigDecimal.valueOf(d.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxTenant), 2, java.math.RoundingMode.HALF_UP))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
         stats.put("nombreDepenses", depensesDto.size());
         stats.put("montantTotal", total);
+        stats.put("deviseCode", codeDevise);
         stats.put("depenses", depensesDto);
 
         return ResponseEntity.ok(stats);
