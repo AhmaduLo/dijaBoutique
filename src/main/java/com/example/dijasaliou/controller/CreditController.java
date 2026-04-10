@@ -108,7 +108,8 @@ public class CreditController {
     @GetMapping("/stats")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
     @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
-    public ResponseEntity<Map<String, Object>> obtenirStats() {
-        return ResponseEntity.ok(creditClientService.obtenirStats());
+    public ResponseEntity<Map<String, Object>> obtenirStats(
+            @RequestParam(required = false) String devise) {
+        return ResponseEntity.ok(creditClientService.obtenirStats(devise));
     }
 }

@@ -50,6 +50,12 @@ public class PaiementCreditEntity {
     @Column(name = "montant_paye", nullable = false, precision = 15, scale = 2)
     private BigDecimal montantPaye;
 
+    @Column(name = "devise_code", length = 10, nullable = false)
+    private String deviseCode = "XOF";
+
+    @Column(name = "taux_change_applique", nullable = false)
+    private Double tauxChangeApplique = 1.0;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "mode_paiement", nullable = false, length = 20)
     private ModePaiement modePaiement;

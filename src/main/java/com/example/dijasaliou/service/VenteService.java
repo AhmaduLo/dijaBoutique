@@ -427,7 +427,7 @@ public class VenteService {
                     nombres.merge(mode, 1L, Long::sum);
                 });
 
-        // 2. Montant restant dû sur les crédits non soldés créés dans la période (supposés en XOF)
+        // 2. Montant restant dû sur les crédits non soldés créés dans la période (en XOF via SUM × taux)
         List<Object[]> creditRows = creditClientRepository.sumCreditsRestantParPeriode(
                 debut.atStartOfDay(), fin.atTime(LocalTime.MAX), StatutCredit.SOLDE, tenantUuid);
         if (creditRows != null && !creditRows.isEmpty()) {
@@ -443,7 +443,7 @@ public class VenteService {
             }
         }
 
-        // 3. Remboursements de crédits par mode (supposés en XOF)
+        // 3. Remboursements de crédits par mode (en XOF via SUM × taux)
         List<Object[]> paiementsCredit = paiementCreditRepository.sumParModeEtPeriode(debut, fin, tenantUuid);
         for (Object[] row : paiementsCredit) {
             String mode = ((PaiementCreditEntity.ModePaiement) row[0]).name();

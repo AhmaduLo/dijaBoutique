@@ -112,8 +112,13 @@ public class RapportService {
         List<DepenseEntity> depenses = depenseRepository.findByDateDepenseBetween(debutDt, finDt);
         List<StockDto>      stocks   = stockService.obtenirTousLesStocks(codeDeviseRapport);
 
-        BigDecimal montantDuCredits      = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
-        BigDecimal montantInitialCredits = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid);
+        // sumMontantRestantActif/sumMontantInitialActif retournent des montants en XOF (montant × tauxChangeApplique)
+        // On divise par le taux du rapport pour obtenir la devise demandée
+        double tauxRapportVal = tauxRapport.get() > 0 ? tauxRapport.get() : 1.0;
+        BigDecimal montantDuCredits = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid)
+                .divide(BigDecimal.valueOf(tauxRapportVal), 2, RoundingMode.HALF_UP);
+        BigDecimal montantInitialCredits = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid)
+                .divide(BigDecimal.valueOf(tauxRapportVal), 2, RoundingMode.HALF_UP);
         long nbCreditsActifs  = creditClientRepository.countCreditsActifs(StatutCredit.SOLDE, tenantUuid);
         long nbCreditsRetard  = creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, LocalDate.now(), tenantUuid);
 

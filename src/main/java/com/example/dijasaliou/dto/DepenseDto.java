@@ -86,6 +86,8 @@ public class DepenseDto {
                 .categorie(depense.getCategorie())
                 .notes(depense.getNotes())
                 .estRecurrente(depense.getEstRecurrente())
+                .deviseCode(depense.getDeviseCode())
+                .tauxChangeApplique(depense.getTauxChangeApplique())
                 .estRecente(depense.estRecente())
                 .mois(depense.getMois())
                 .annee(depense.getAnnee())

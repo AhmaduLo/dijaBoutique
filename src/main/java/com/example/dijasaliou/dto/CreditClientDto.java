@@ -29,6 +29,8 @@ public class CreditClientDto {
     private BigDecimal montantPaye;
     private Integer pourcentageRembourse;
     private String statut;
+    private String deviseCode;
+    private Double tauxChangeApplique;
     private LocalDate dateEcheance;
     private String employeNom;
     private LocalDateTime createdDate;
@@ -62,6 +64,8 @@ public class CreditClientDto {
                 .montantPaye(paye)
                 .pourcentageRembourse(pourcentage)
                 .statut(credit.getStatut() != null ? credit.getStatut().name() : null)
+                .deviseCode(credit.getDeviseCode())
+                .tauxChangeApplique(credit.getTauxChangeApplique())
                 .dateEcheance(credit.getDateEcheance())
                 .employeNom(credit.getEmployeNom())
                 .createdDate(credit.getCreatedDate())

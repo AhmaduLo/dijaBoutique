@@ -9,6 +9,7 @@ import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import java.math.RoundingMode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,6 +42,7 @@ public class CreditClientService {
     private final ClientRepository clientRepository;
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
+    private final DeviseService deviseService;
 
     /**
      * Appelé par VenteService quand mode_paiement = CREDIT
@@ -57,11 +59,16 @@ public class CreditClientService {
                     .orElseThrow(() -> new IllegalStateException("Crédit actif introuvable malgré le garde"));
         }
 
+        String deviseCode = (vente.getDeviseCode() != null) ? vente.getDeviseCode() : "XOF";
+        Double tauxChange = (vente.getTauxChangeApplique() != null) ? vente.getTauxChangeApplique() : 1.0;
+
         CreditClientEntity credit = CreditClientEntity.builder()
                 .client(client)
                 .vente(vente)
                 .montantInitial(vente.getPrixTotal())
                 .montantRestant(vente.getPrixTotal())
+                .deviseCode(deviseCode)
+                .tauxChangeApplique(tauxChange)
                 .statut(StatutCredit.EN_ATTENTE)
                 .dateEcheance(dateEcheance)
                 .employe(employe)
@@ -145,10 +152,12 @@ public class CreditClientService {
                     "Le montant (" + montant + ") dépasse le restant dû (" + credit.getMontantRestant() + ")");
         }
 
-        // 5. Créer le paiement
+        // 5. Créer le paiement (hérite de la devise du crédit)
         PaiementCreditEntity paiement = PaiementCreditEntity.builder()
                 .credit(credit)
                 .montantPaye(montant)
+                .deviseCode(credit.getDeviseCode() != null ? credit.getDeviseCode() : "XOF")
+                .tauxChangeApplique(credit.getTauxChangeApplique() != null ? credit.getTauxChangeApplique() : 1.0)
                 .modePaiement(modePaiement)
                 .datePaiement(LocalDate.now())
                 .employe(employe)
@@ -369,24 +378,47 @@ public class CreditClientService {
         }
     }
 
+    /**
+     * @param devise Code devise explicite (ex: "EUR"). Si null, utilise la devise préférée du tenant.
+     *               Les SUM retournent des montants en XOF (montant × tauxChangeApplique).
+     *               On divise par le taux de la devise demandée pour obtenir le bon montant.
+     */
     @Transactional(readOnly = true)
-    public Map<String, Object> obtenirStats() {
+    public Map<String, Object> obtenirStats(String devise) {
         Map<String, Object> stats = new HashMap<>();
-        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String tenantUuid = tenant.getTenantUuid();
 
-        BigDecimal montantTotalDu = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
-        if (montantTotalDu == null) montantTotalDu = BigDecimal.ZERO;
+        // Montants en XOF (après fix V17 : SUM × tauxChangeApplique)
+        BigDecimal montantTotalDuXOF = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
+        if (montantTotalDuXOF == null) montantTotalDuXOF = BigDecimal.ZERO;
 
-        BigDecimal montantInitialTotal = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid);
-        if (montantInitialTotal == null) montantInitialTotal = BigDecimal.ZERO;
+        BigDecimal montantInitialTotalXOF = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid);
+        if (montantInitialTotalXOF == null) montantInitialTotalXOF = BigDecimal.ZERO;
 
+        // Taux de recouvrement calculé en XOF (le ratio est indépendant de la devise)
         double tauxRecouvrement = 0.0;
-        if (montantInitialTotal.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal montantPaye = montantInitialTotal.subtract(montantTotalDu);
-            tauxRecouvrement = montantPaye.multiply(new BigDecimal("100"))
-                    .divide(montantInitialTotal, 1, java.math.RoundingMode.HALF_UP)
+        if (montantInitialTotalXOF.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal montantPayeXOF = montantInitialTotalXOF.subtract(montantTotalDuXOF);
+            tauxRecouvrement = montantPayeXOF.multiply(new BigDecimal("100"))
+                    .divide(montantInitialTotalXOF, 1, RoundingMode.HALF_UP)
                     .doubleValue();
         }
+
+        // Conversion vers la devise de rapport
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        double tauxRapport = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null && deviseRapport.getTauxChange() > 0) {
+                tauxRapport = deviseRapport.getTauxChange();
+            }
+        } catch (RuntimeException ignored) {}
+
+        BigDecimal montantTotalDu = montantTotalDuXOF.divide(BigDecimal.valueOf(tauxRapport), 2, RoundingMode.HALF_UP);
+        BigDecimal montantInitialTotal = montantInitialTotalXOF.divide(BigDecimal.valueOf(tauxRapport), 2, RoundingMode.HALF_UP);
 
         stats.put("totalEnAttente", montantTotalDu);
         stats.put("montantTotalDu", montantTotalDu);

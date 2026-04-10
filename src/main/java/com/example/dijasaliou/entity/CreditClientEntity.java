@@ -63,6 +63,14 @@ public class CreditClientEntity extends BaseEntity {
     @Builder.Default
     private StatutCredit statut = StatutCredit.EN_ATTENTE;
 
+    @Column(name = "devise_code", length = 10, nullable = false)
+    @Builder.Default
+    private String deviseCode = "XOF";
+
+    @Column(name = "taux_change_applique", nullable = false)
+    @Builder.Default
+    private Double tauxChangeApplique = 1.0;
+
     @Column(name = "date_echeance")
     private LocalDate dateEcheance;
 
