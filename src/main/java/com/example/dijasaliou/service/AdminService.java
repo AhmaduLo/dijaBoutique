@@ -269,7 +269,7 @@ public class AdminService {
         // Utilisateurs créés dans les 7 derniers jours
         LocalDateTime il7Jours = LocalDateTime.now().minusDays(7);
         long nouveauxUtilisateurs = utilisateursActifs.stream()
-                .filter(u -> u.getDateCreation().isAfter(il7Jours))
+                .filter(u -> u.getDateCreation() != null && u.getDateCreation().isAfter(il7Jours))
                 .count();
 
         Map<String, Object> stats = new HashMap<>();

@@ -121,7 +121,7 @@ public class SecurityConfig {
 
                         // Routes spéciales accessibles à TOUS les utilisateurs authentifiés
                         .requestMatchers("/achats/produits-pour-vente").authenticated()
-                        .requestMatchers("/tenant/info").authenticated() // Info entreprise pour factures
+                        .requestMatchers(HttpMethod.GET, "/tenant/info").authenticated() // Info entreprise pour factures (lecture)
                         .requestMatchers("/contact").authenticated() // Formulaire de contact
                         .requestMatchers("/config/**").authenticated() // Config publique (WhatsApp support, etc.)
 

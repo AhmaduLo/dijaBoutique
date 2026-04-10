@@ -98,7 +98,41 @@ public class TenantController {
     }
 
     /**
-     * Modifie les informations de l'entreprise
+     * Modifie les informations de l'entreprise (GERANT + ADMIN)
+     *
+     * PUT /api/tenant/info
+     *
+     * Endpoint accessible aux GERANT et ADMIN (sécurisé par SecurityConfig /tenant/**)
+     */
+    @PutMapping("/tenant/info")
+    public ResponseEntity<TenantResponse> updateEntrepriseInfo(
+            @Valid @RequestBody UpdateTenantRequest request,
+            Authentication authentication
+    ) {
+        log.info("Utilisateur {} modifie les informations de son entreprise", authentication.getName());
+
+        TenantEntity tenantMisAJour = tenantService.updateTenant(request);
+        UserEntity admin = tenantService.getAdminProprietaire(tenantMisAJour);
+
+        TenantResponse response = new TenantResponse(
+                tenantMisAJour.getTenantUuid(),
+                tenantMisAJour.getNomEntreprise(),
+                tenantMisAJour.getNumeroTelephone(),
+                tenantMisAJour.getAdresse(),
+                tenantMisAJour.getVille(),
+                tenantMisAJour.getPays(),
+                tenantMisAJour.getNineaSiret(),
+                tenantMisAJour.getLogoUrl(),
+                admin != null ? admin.getNom() : null,
+                admin != null ? admin.getPrenom() : null,
+                admin != null ? admin.getEmail() : null
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Modifie les informations de l'entreprise (ADMIN uniquement)
      *
      * PUT /api/admin/entreprise
      *
