@@ -40,7 +40,8 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Trouver tous les achats d'un utilisateur
      */
-    List<AchatEntity> findByUtilisateur(UserEntity utilisateur);
+    @Query("SELECT a FROM AchatEntity a WHERE a.utilisateur = :utilisateur ORDER BY a.dateAchat DESC, a.id DESC")
+    List<AchatEntity> findByUtilisateur(@Param("utilisateur") UserEntity utilisateur);
 
     /**
      * Trouver les achats d'une date précise
@@ -50,7 +51,8 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Trouver les achats entre deux dates
      */
-    List<AchatEntity> findByDateAchatBetween(LocalDateTime debut, LocalDateTime fin);
+    @Query("SELECT a FROM AchatEntity a WHERE a.dateAchat BETWEEN :debut AND :fin ORDER BY a.dateAchat DESC, a.id DESC")
+    List<AchatEntity> findByDateAchatBetween(@Param("debut") LocalDateTime debut, @Param("fin") LocalDateTime fin);
 
     /**
      * Compter les achats d'un produit
@@ -72,7 +74,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Récupère tous les achats d'un tenant (filtre explicite — évite findAll())
      */
-    @Query("SELECT a FROM AchatEntity a WHERE a.tenant = :tenant ORDER BY a.nomProduit")
+    @Query("SELECT a FROM AchatEntity a WHERE a.tenant = :tenant ORDER BY a.dateAchat DESC, a.id DESC")
     List<AchatEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
