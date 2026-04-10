@@ -380,15 +380,16 @@ public class VenteService {
      * Calcule la répartition du CA par mode de paiement pour une période.
      *
      * Logique :
-     * - ESPECES / WAVE / ORANGE_MONEY = ventes directes + remboursements de crédits du même mode
-     * - CREDIT = somme des montants restants dus sur les crédits non soldés (créés dans la période)
+     * - ESPECES / WAVE / ORANGE_MONEY = ventes directes dans ce mode
+     * - CREDIT = toutes les ventes à crédit (soldées ou non) — le mode de paiement reste CREDIT
+     *
+     * Les remboursements de crédits ne modifient pas le mode de paiement original de la vente.
      *
      * Retourne une map : mode → {total, nombre}
      */
     @Transactional(readOnly = true)
     public Map<String, Object> calculerRapportModePaiement(LocalDate debut, LocalDate fin, String devise) {
         TenantEntity tenant = tenantService.getCurrentTenant();
-        String tenantUuid = tenant.getTenantUuid();
 
         // Devise de rapport : paramètre explicite ou préférence du tenant
         String codeDevise = (devise != null && !devise.isBlank())
@@ -411,54 +412,19 @@ public class VenteService {
             nombres.put(mode, 0L);
         }
 
-        // 1. Ventes directes (non-CREDIT) : chargées individuellement pour conversion multi-devises
+        // Toutes les ventes de la période, regroupées par modePaiement (CREDIT inclus)
         List<VenteEntity> toutesVentes = obtenirVentesParPeriode(debut, fin);
-        toutesVentes.stream()
-                .filter(v -> v.getModePaiement() != VenteEntity.ModePaiementVente.CREDIT)
-                .forEach(v -> {
-                    String mode = v.getModePaiement() != null ? v.getModePaiement().name() : "ESPECES";
-                    double taux = (v.getTauxChangeApplique() != null) ? v.getTauxChangeApplique() : 1.0;
-                    BigDecimal montantConverti = v.getPrixTotal() != null
-                            ? v.getPrixTotal()
-                                    .multiply(BigDecimal.valueOf(taux))
-                                    .divide(BigDecimal.valueOf(tauxFinal), 2, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-                    totaux.merge(mode, montantConverti, BigDecimal::add);
-                    nombres.merge(mode, 1L, Long::sum);
-                });
-
-        // 2. Montant restant dû sur les crédits non soldés créés dans la période (en XOF via SUM × taux)
-        List<Object[]> creditRows = creditClientRepository.sumCreditsRestantParPeriode(
-                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), StatutCredit.SOLDE, tenantUuid);
-        if (creditRows != null && !creditRows.isEmpty()) {
-            Object[] creditRow = creditRows.get(0);
-            if (creditRow != null && creditRow.length >= 2 && creditRow[1] != null) {
-                BigDecimal creditTotal = creditRow[1] instanceof BigDecimal
-                        ? (BigDecimal) creditRow[1]
-                        : new BigDecimal(creditRow[1].toString());
-                creditTotal = creditTotal.divide(BigDecimal.valueOf(tauxFinal), 2, RoundingMode.HALF_UP);
-                Long creditCount = creditRow[0] instanceof Number ? ((Number) creditRow[0]).longValue() : 0L;
-                totaux.put("CREDIT", creditTotal);
-                nombres.put("CREDIT", creditCount);
-            }
-        }
-
-        // 3. Remboursements de crédits par mode (en XOF via SUM × taux)
-        List<Object[]> paiementsCredit = paiementCreditRepository.sumParModeEtPeriode(debut, fin, tenantUuid);
-        for (Object[] row : paiementsCredit) {
-            String mode = ((PaiementCreditEntity.ModePaiement) row[0]).name();
-            Long count = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
-            BigDecimal total = row[2] instanceof BigDecimal
-                    ? (BigDecimal) row[2]
-                    : (row[2] instanceof Number ? new BigDecimal(row[2].toString()) : null);
-            if (total != null) {
-                total = total.divide(BigDecimal.valueOf(tauxFinal), 2, RoundingMode.HALF_UP);
-                totaux.merge(mode, total, BigDecimal::add);
-            }
-            if (count > 0) {
-                nombres.merge(mode, count, Long::sum);
-            }
-        }
+        toutesVentes.forEach(v -> {
+            String mode = v.getModePaiement() != null ? v.getModePaiement().name() : "ESPECES";
+            double taux = (v.getTauxChangeApplique() != null) ? v.getTauxChangeApplique() : 1.0;
+            BigDecimal montantConverti = v.getPrixTotal() != null
+                    ? v.getPrixTotal()
+                            .multiply(BigDecimal.valueOf(taux))
+                            .divide(BigDecimal.valueOf(tauxFinal), 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            totaux.merge(mode, montantConverti, BigDecimal::add);
+            nombres.merge(mode, 1L, Long::sum);
+        });
 
         // Construire la réponse avec deviseCode
         Map<String, Object> result = new LinkedHashMap<>();
