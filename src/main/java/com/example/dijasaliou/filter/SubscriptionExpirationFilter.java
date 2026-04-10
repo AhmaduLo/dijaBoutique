@@ -115,7 +115,7 @@ public class SubscriptionExpirationFilter extends OncePerRequestFilter {
                 || requestURI.startsWith("/api/auth/logout")
                 || requestURI.startsWith("/api/payment/")
                 || requestURI.startsWith("/api/tenant/info")
-                || requestURI.startsWith("/api/admin/entreprise");
+                || requestURI.startsWith("/api/admin/"); // Toutes les routes admin (gestion utilisateurs, stats, entreprise)
     }
 
     /**

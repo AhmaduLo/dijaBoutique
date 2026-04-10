@@ -206,9 +206,16 @@ public class VenteController {
         String codeDevise = (devise != null && !devise.isBlank())
                 ? devise.toUpperCase().trim()
                 : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
-        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
-        double tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
-                ? deviseRapport.getTauxChange() : 1.0;
+        double tauxTemp = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null) {
+                tauxTemp = deviseRapport.getTauxChange().doubleValue();
+            }
+        } catch (RuntimeException e) {
+            // fallback to default 1.0
+        }
+        final double tauxTenant = tauxTemp;
 
         // Calculer le CA dans la devise du tenant : montant × tauxChangeApplique → XOF → / tauxTenant
         BigDecimal ca = ventes.stream()

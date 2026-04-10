@@ -165,15 +165,22 @@ public class DepenseController {
         String codeDevise = (devise != null && !devise.isBlank())
                 ? devise.toUpperCase().trim()
                 : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
-        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
-        double tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
-                ? deviseRapport.getTauxChange() : 1.0;
+        double tauxTemp = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null) {
+                tauxTemp = deviseRapport.getTauxChange().doubleValue();
+            }
+        } catch (RuntimeException e) {
+            // fallback to default 1.0
+        }
+        final double tauxFinal = tauxTemp;
 
         BigDecimal total = depenses.stream()
                 .filter(d -> d.getMontant() != null && d.getTauxChangeApplique() != null)
                 .map(d -> d.getMontant()
                         .multiply(BigDecimal.valueOf(d.getTauxChangeApplique()))
-                        .divide(BigDecimal.valueOf(tauxTenant), 2, java.math.RoundingMode.HALF_UP))
+                        .divide(BigDecimal.valueOf(tauxFinal), 2, java.math.RoundingMode.HALF_UP))
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, java.math.RoundingMode.HALF_UP);
 
@@ -202,18 +209,37 @@ public class DepenseController {
         String codeDevise = (devise != null && !devise.isBlank())
                 ? devise.toUpperCase().trim()
                 : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
-        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
-        double tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
-                ? deviseRapport.getTauxChange() : 1.0;
+        double tauxTemp2 = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null) {
+                tauxTemp2 = deviseRapport.getTauxChange().doubleValue();
+            }
+        } catch (RuntimeException e) {
+            // fallback to default 1.0
+        }
+        final double tauxFinal = tauxTemp2;
 
         // Calculer le total dans la devise du tenant : montant × tauxChangeApplique → XOF → / tauxTenant
         BigDecimal total = depenses.stream()
                 .filter(d -> d.getMontant() != null && d.getTauxChangeApplique() != null)
                 .map(d -> d.getMontant()
                         .multiply(BigDecimal.valueOf(d.getTauxChangeApplique()))
-                        .divide(BigDecimal.valueOf(tauxTenant), 2, java.math.RoundingMode.HALF_UP))
+                        .divide(BigDecimal.valueOf(tauxFinal), 2, java.math.RoundingMode.HALF_UP))
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, java.math.RoundingMode.HALF_UP);
+
+        // Répartition par catégorie (attendue par le frontend pour les rapports)
+        Map<String, BigDecimal> repartitionParCategorie = new HashMap<>();
+        for (DepenseEntity d : depenses) {
+            if (d.getCategorie() != null && d.getMontant() != null && d.getTauxChangeApplique() != null) {
+                String cat = d.getCategorie().name();
+                BigDecimal montantConverti = d.getMontant()
+                        .multiply(BigDecimal.valueOf(d.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxFinal), 2, java.math.RoundingMode.HALF_UP);
+                repartitionParCategorie.merge(cat, montantConverti, BigDecimal::add);
+            }
+        }
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
@@ -222,6 +248,7 @@ public class DepenseController {
         stats.put("montantTotal", total);
         stats.put("deviseCode", codeDevise);
         stats.put("depenses", depensesDto);
+        stats.put("repartitionParCategorie", repartitionParCategorie);
 
         return ResponseEntity.ok(stats);
     }
