@@ -211,11 +211,17 @@ public class StockController {
                 .mapToDouble(s -> s.getStockDisponible() != null && s.getStockDisponible() > 0 ? s.getStockDisponible() : 0.0)
                 .sum();
 
-        BigDecimal margeGlobale = stocks.stream()
+        BigDecimal margeGlobaleMontant = stocks.stream()
                 .map(s -> s.getMargeUnitaire() != null && s.getStockDisponible() != null && s.getStockDisponible() > 0
                         ? s.getMargeUnitaire().multiply(BigDecimal.valueOf(s.getStockDisponible()))
                         : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Vrai pourcentage : indépendant de la devise (même ratio quelle que soit la devise)
+        BigDecimal margeGlobalePct = valeurTotale.compareTo(BigDecimal.ZERO) > 0
+                ? margeGlobaleMontant.multiply(new BigDecimal("100"))
+                        .divide(valeurTotale, 2, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
 
         String deviseCode = "XOF";
         if (!stocks.isEmpty() && stocks.get(0).getDeviseCode() != null) {
@@ -229,7 +235,8 @@ public class StockController {
         resume.put("produitsStockBas", produitsStockBas);
         resume.put("valeurTotaleStock", valeurTotale);
         resume.put("quantiteTotaleDisponible", quantiteTotaleDisponible);
-        resume.put("margeGlobale", margeGlobale);
+        resume.put("margeGlobale", margeGlobalePct);
+        resume.put("margeGlobaleMontant", margeGlobaleMontant);
         resume.put("deviseCode", deviseCode);
 
         return ResponseEntity.ok(resume);
