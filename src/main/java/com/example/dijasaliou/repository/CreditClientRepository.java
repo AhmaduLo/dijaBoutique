@@ -62,6 +62,11 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
     @Query("SELECT COALESCE(SUM(c.montantInitial * c.tauxChangeApplique), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     BigDecimal sumMontantInitialActif(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
+    /** Retourne le montant initial total en XOF de TOUS les crédits (actifs + soldés).
+     *  Utilisé comme dénominateur du taux de recouvrement global. */
+    @Query("SELECT COALESCE(SUM(c.montantInitial * c.tauxChangeApplique), 0) FROM CreditClientEntity c WHERE c.tenant.tenantUuid = :tenantUuid")
+    BigDecimal sumMontantInitialTous(@Param("tenantUuid") String tenantUuid);
+
     @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     long countCreditsActifs(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 

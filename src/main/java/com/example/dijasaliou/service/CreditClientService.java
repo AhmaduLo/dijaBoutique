@@ -390,18 +390,21 @@ public class CreditClientService {
         String tenantUuid = tenant.getTenantUuid();
 
         // Montants en XOF (après fix V17 : SUM × tauxChangeApplique)
+        // montantTotalDuXOF = ce qui reste à payer sur les crédits ACTIFS
         BigDecimal montantTotalDuXOF = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
         if (montantTotalDuXOF == null) montantTotalDuXOF = BigDecimal.ZERO;
 
-        BigDecimal montantInitialTotalXOF = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid);
-        if (montantInitialTotalXOF == null) montantInitialTotalXOF = BigDecimal.ZERO;
+        // Dénominateur du taux de recouvrement = montantInitial de TOUS les crédits (actifs + soldés)
+        BigDecimal montantInitialTousXOF = creditClientRepository.sumMontantInitialTous(tenantUuid);
+        if (montantInitialTousXOF == null) montantInitialTousXOF = BigDecimal.ZERO;
 
-        // Taux de recouvrement calculé en XOF (le ratio est indépendant de la devise)
+        // Taux de recouvrement = (total initial - restant actif) / total initial × 100
+        // Calculé en XOF (le ratio est indépendant de la devise)
         double tauxRecouvrement = 0.0;
-        if (montantInitialTotalXOF.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal montantPayeXOF = montantInitialTotalXOF.subtract(montantTotalDuXOF);
+        if (montantInitialTousXOF.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal montantPayeXOF = montantInitialTousXOF.subtract(montantTotalDuXOF);
             tauxRecouvrement = montantPayeXOF.multiply(new BigDecimal("100"))
-                    .divide(montantInitialTotalXOF, 1, RoundingMode.HALF_UP)
+                    .divide(montantInitialTousXOF, 1, RoundingMode.HALF_UP)
                     .doubleValue();
         }
 
@@ -418,10 +421,11 @@ public class CreditClientService {
         } catch (RuntimeException ignored) {}
 
         BigDecimal montantTotalDu = montantTotalDuXOF.divide(BigDecimal.valueOf(tauxRapport), 2, RoundingMode.HALF_UP);
-        BigDecimal montantInitialTotal = montantInitialTotalXOF.divide(BigDecimal.valueOf(tauxRapport), 2, RoundingMode.HALF_UP);
+        BigDecimal montantInitialTotal = montantInitialTousXOF.divide(BigDecimal.valueOf(tauxRapport), 2, RoundingMode.HALF_UP);
 
         stats.put("totalEnAttente", montantTotalDu);
         stats.put("montantTotalDu", montantTotalDu);
+        stats.put("montantInitialTotal", montantInitialTotal);
         stats.put("nombreCreditsActifs", creditClientRepository.countCreditsActifs(StatutCredit.SOLDE, tenantUuid));
         stats.put("nombreClientsCrediteurs", creditClientRepository.countClientsCrediteurs(StatutCredit.SOLDE, tenantUuid));
         stats.put("creditsEnRetard", creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, LocalDate.now(), tenantUuid));

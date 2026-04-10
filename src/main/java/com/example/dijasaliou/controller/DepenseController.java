@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -86,13 +87,15 @@ public class DepenseController {
 
     /**
      * POST /api/depenses
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PostMapping
     public ResponseEntity<DepenseDto> creer(
             @Valid @RequestBody DepenseEntity depense,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
         DepenseEntity depenseCree = depenseService.creerDepense(depense, utilisateur);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(DepenseDto.fromEntity(depenseCree));
@@ -100,15 +103,17 @@ public class DepenseController {
 
     /**
      * PUT /api/depenses/{id}
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PutMapping("/{id}")
     public ResponseEntity<DepenseDto> modifier(
             @PathVariable String id,
             @Valid @RequestBody DepenseEntity depenseModifiee,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        // Récupérer l'utilisateur qui modifie
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        // Récupérer l'utilisateur authentifié (depuis le JWT, pas d'un paramètre client)
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
 
         // Mettre à jour l'utilisateur de la dépense
         depenseModifiee.setUtilisateur(utilisateur);
