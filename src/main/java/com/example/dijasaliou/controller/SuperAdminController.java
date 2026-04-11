@@ -186,6 +186,21 @@ public class SuperAdminController {
     }
 
     /**
+     * POST /superadmin/tenants/{tenantId}/utilisateurs/{userId}/resend-verification
+     * Renvoie l'email de vérification à un utilisateur (support super admin)
+     */
+    @PostMapping("/tenants/{tenantId}/utilisateurs/{userId}/resend-verification")
+    public ResponseEntity<Map<String, String>> resendVerification(
+            @PathVariable Long tenantId,
+            @PathVariable Long userId,
+            Authentication auth) {
+        log.info("[SUPER_ADMIN] {} renvoie l'email de vérification à userId={} (tenant={})",
+                auth.getName(), userId, tenantId);
+        superAdminService.resendVerificationEmailForUser(tenantId, userId);
+        return ResponseEntity.ok(Map.of("message", "Email de vérification renvoyé avec succès."));
+    }
+
+    /**
      * GET /superadmin/tenants/{id}/notes
      * Liste les notes internes d'un tenant
      */

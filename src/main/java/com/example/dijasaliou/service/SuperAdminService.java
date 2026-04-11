@@ -22,6 +22,7 @@ import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -62,6 +63,7 @@ public class SuperAdminService {
     private final FactureRepository factureRepository;
     private final TenantCacheService tenantCacheService;
     private final PaiementSuperAdminRepository paiementSuperAdminRepository;
+    private final AuthService authService;
 
     public SuperAdminService(TenantRepository tenantRepository,
                              UserRepository userRepository,
@@ -71,7 +73,8 @@ public class SuperAdminService {
                              FactureService factureService,
                              FactureRepository factureRepository,
                              TenantCacheService tenantCacheService,
-                             PaiementSuperAdminRepository paiementSuperAdminRepository) {
+                             PaiementSuperAdminRepository paiementSuperAdminRepository,
+                             @Lazy AuthService authService) {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.venteRepository = venteRepository;
@@ -81,6 +84,7 @@ public class SuperAdminService {
         this.factureRepository = factureRepository;
         this.tenantCacheService = tenantCacheService;
         this.paiementSuperAdminRepository = paiementSuperAdminRepository;
+        this.authService = authService;
     }
 
     /**
@@ -353,6 +357,20 @@ public class SuperAdminService {
                 .stream()
                 .map(UtilisateurTenantDto::fromEntity)
                 .toList();
+    }
+
+    /**
+     * Renvoie l'email de vérification à un utilisateur d'un tenant.
+     * Utilisé par le super admin pour aider un utilisateur qui n'a pas vérifié son email.
+     */
+    @Transactional
+    public void resendVerificationEmailForUser(Long tenantId, Long userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé : " + userId));
+        if (user.getTenant() == null || !tenantId.equals(user.getTenant().getId())) {
+            throw new RuntimeException("Cet utilisateur n'appartient pas à ce tenant.");
+        }
+        authService.resendVerificationEmail(user.getEmail());
     }
 
     // ==================== NOTES INTERNES ====================

@@ -13,7 +13,8 @@ public record UtilisateurTenantDto(
         String email,
         String role,
         boolean actif,
-        OffsetDateTime derniereConnexion
+        OffsetDateTime derniereConnexion,
+        boolean emailVerifie
 ) {
     public static UtilisateurTenantDto fromEntity(UserEntity user) {
         LocalDateTime dc = user.getDerniereConnexion();
@@ -24,7 +25,8 @@ public record UtilisateurTenantDto(
                 user.getEmail(),
                 user.getRole().name(),
                 !Boolean.TRUE.equals(user.getDeleted()),
-                dc != null ? dc.atOffset(ZoneOffset.UTC) : null
+                dc != null ? dc.atOffset(ZoneOffset.UTC) : null,
+                Boolean.TRUE.equals(user.getEmailVerifie())
         );
     }
 }
