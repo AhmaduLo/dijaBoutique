@@ -148,6 +148,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/clients/**").hasAnyAuthority("ADMIN")
                         .requestMatchers("/credits/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
 
+                        // Routes code-barre : scan accessible à tous les utilisateurs authentifiés
+                        .requestMatchers("/codebarre/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+
                         // Routes devises : lecture accessible à tous, modification ADMIN uniquement
                         .requestMatchers("/devises/**").authenticated()
 

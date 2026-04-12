@@ -76,6 +76,12 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     List<AchatEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
+     * Trouver les achats par code-barre pour un tenant donné
+     */
+    @Query("SELECT a FROM AchatEntity a WHERE a.codeBarre = :codeBarre AND a.tenant = :tenant ORDER BY a.dateAchat DESC, a.id DESC")
+    List<AchatEntity> findByCodeBarreAndTenant(@Param("codeBarre") String codeBarre, @Param("tenant") TenantEntity tenant);
+
+    /**
      * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_achat_tenant_date.
      */
     @Query(value = "SELECT a FROM AchatEntity a WHERE " +
