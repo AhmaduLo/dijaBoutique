@@ -44,12 +44,16 @@ public class AchatService {
      * Constructeur
      * Spring injecte automatiquement achatRepository, tenantService, stockService et venteRepository
      */
+    private final ProduitReferenceService produitReferenceService;
+
     public AchatService(AchatRepository achatRepository, TenantService tenantService,
-                        StockService stockService, VenteRepository venteRepository) {
+                        StockService stockService, VenteRepository venteRepository,
+                        ProduitReferenceService produitReferenceService) {
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
         this.stockService = stockService;
         this.venteRepository = venteRepository;
+        this.produitReferenceService = produitReferenceService;
     }
 
     /**
@@ -121,9 +125,24 @@ public class AchatService {
             achat.calculerPrixTotal();
         }
 
-        // 5. SAUVEGARDE : Enregistrer en base
+        // 7. SAUVEGARDE : Enregistrer en base
         AchatEntity saved = achatRepository.save(achat);
         stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
+
+        // 8. CONTRIBUTION : Si code-barre présent, copier dans la base partagée
+        if (saved.getCodeBarre() != null && !saved.getCodeBarre().isBlank()) {
+            try {
+                produitReferenceService.contribuer(
+                        saved.getCodeBarre(),
+                        saved.getNomProduit(),
+                        saved.getPhotoUrl(),
+                        saved.getTenant().getNomEntreprise()
+                );
+            } catch (Exception e) {
+                // Ne pas bloquer l'achat si la contribution échoue
+            }
+        }
+
         return saved;
     }
 

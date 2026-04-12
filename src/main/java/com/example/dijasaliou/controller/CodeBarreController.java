@@ -3,9 +3,11 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.dto.CodeBarreLookupDto;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.ProduitReferenceEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.service.OpenFoodFactsService;
+import com.example.dijasaliou.service.ProduitReferenceService;
 import com.example.dijasaliou.service.StockService;
 import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.dto.StockDto;
@@ -31,6 +33,7 @@ public class CodeBarreController {
     private final AchatRepository achatRepository;
     private final TenantService tenantService;
     private final OpenFoodFactsService openFoodFactsService;
+    private final ProduitReferenceService produitReferenceService;
     private final StockService stockService;
 
     /**
@@ -51,7 +54,21 @@ public class CodeBarreController {
             return ResponseEntity.ok(local);
         }
 
-        // 2. Chercher sur Open Food Facts
+        // 2. Chercher dans la base partagée (communauté HeasyStock)
+        var refOpt = produitReferenceService.rechercherParCodeBarre(codeBarre);
+        if (refOpt.isPresent()) {
+            ProduitReferenceEntity ref = refOpt.get();
+            return ResponseEntity.ok(CodeBarreLookupDto.builder()
+                    .trouve(true)
+                    .codeBarre(codeBarre)
+                    .source("COMMUNAUTE")
+                    .nomProduit(ref.getNomProduit())
+                    .photoUrl(ref.getPhotoUrl())
+                    .categorie(ref.getCategorie())
+                    .build());
+        }
+
+        // 3. Chercher sur Open Food Facts
         CodeBarreLookupDto externe = openFoodFactsService.rechercherParCodeBarre(codeBarre);
         return ResponseEntity.ok(externe);
     }
@@ -67,7 +84,27 @@ public class CodeBarreController {
                   message = "Le scan code-barre est réservé au plan Pro. Passez au plan Pro pour débloquer cette fonctionnalité.")
     public ResponseEntity<CodeBarreLookupDto> recherche(@PathVariable String code) {
         String codeBarre = code.trim();
+
+        // 1. Chercher en local
         CodeBarreLookupDto result = rechercherEnLocal(codeBarre);
+        if (result.isTrouve()) {
+            return ResponseEntity.ok(result);
+        }
+
+        // 2. Chercher dans la base partagée (pas d'appel réseau)
+        var refOpt = produitReferenceService.rechercherParCodeBarre(codeBarre);
+        if (refOpt.isPresent()) {
+            ProduitReferenceEntity ref = refOpt.get();
+            return ResponseEntity.ok(CodeBarreLookupDto.builder()
+                    .trouve(true)
+                    .codeBarre(codeBarre)
+                    .source("COMMUNAUTE")
+                    .nomProduit(ref.getNomProduit())
+                    .photoUrl(ref.getPhotoUrl())
+                    .categorie(ref.getCategorie())
+                    .build());
+        }
+
         return ResponseEntity.ok(result);
     }
 
