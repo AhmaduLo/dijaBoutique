@@ -171,6 +171,12 @@ public class PaymentController {
         log.info("Réception webhook Wave");
 
         try {
+            // Rejeter si aucune signature et que le secret est configuré (production)
+            if ((signature == null || signature.isEmpty()) && waveService.isSignatureRequired()) {
+                log.error("❌ SÉCURITÉ: Webhook Wave reçu SANS signature en production !");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Signature manquante");
+            }
+
             boolean isSignatureValid = waveService.verifyWebhookSignature(payload, signature);
 
             if (!isSignatureValid) {

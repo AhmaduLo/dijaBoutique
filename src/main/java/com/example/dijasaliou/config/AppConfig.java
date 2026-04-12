@@ -49,6 +49,13 @@ public class AppConfig {
                         .maximumSize(500)
                         .build());
 
+        // Cache platformConfig : 30 min (données rarement modifiées)
+        manager.registerCustomCache("platformConfig",
+                Caffeine.newBuilder()
+                        .expireAfterWrite(30, TimeUnit.MINUTES)
+                        .maximumSize(50)
+                        .build());
+
         return manager;
     }
 

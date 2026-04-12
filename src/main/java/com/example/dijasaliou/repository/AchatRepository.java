@@ -84,7 +84,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_achat_tenant_date.
      */
-    @Query(value = "SELECT a FROM AchatEntity a WHERE " +
+    @Query(value = "SELECT a FROM AchatEntity a JOIN FETCH a.utilisateur JOIN FETCH a.tenant WHERE " +
            "a.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(a.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +

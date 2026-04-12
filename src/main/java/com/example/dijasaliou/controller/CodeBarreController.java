@@ -1,5 +1,6 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.dto.CodeBarreLookupDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
@@ -39,6 +40,8 @@ public class CodeBarreController {
      * Utilisé lors de l'ajout d'un nouvel achat (préremplissage).
      */
     @GetMapping("/lookup/{code}")
+    @RequiresPlan(plans = {TenantEntity.Plan.PRO},
+                  message = "Le scan code-barre est réservé au plan Pro. Passez au plan Pro pour débloquer cette fonctionnalité.")
     public ResponseEntity<CodeBarreLookupDto> lookup(@PathVariable String code) {
         String codeBarre = code.trim();
 
@@ -60,6 +63,8 @@ public class CodeBarreController {
      * Utilisé lors d'une vente : on scanne → on retrouve le produit instantanément.
      */
     @GetMapping("/recherche/{code}")
+    @RequiresPlan(plans = {TenantEntity.Plan.PRO},
+                  message = "Le scan code-barre est réservé au plan Pro. Passez au plan Pro pour débloquer cette fonctionnalité.")
     public ResponseEntity<CodeBarreLookupDto> recherche(@PathVariable String code) {
         String codeBarre = code.trim();
         CodeBarreLookupDto result = rechercherEnLocal(codeBarre);

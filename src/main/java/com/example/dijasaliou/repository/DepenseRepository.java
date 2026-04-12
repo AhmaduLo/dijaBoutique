@@ -54,7 +54,7 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
     /**
      * Recherche paginée avec filtre tenant EXPLICITE.
      */
-    @Query(value = "SELECT d FROM DepenseEntity d WHERE " +
+    @Query(value = "SELECT d FROM DepenseEntity d JOIN FETCH d.utilisateur JOIN FETCH d.tenant WHERE " +
            "d.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(d.libelle) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:categorie IS NULL OR d.categorie = :categorie) " +

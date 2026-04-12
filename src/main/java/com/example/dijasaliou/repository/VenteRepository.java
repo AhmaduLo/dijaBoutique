@@ -93,7 +93,7 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     /**
      * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_vente_tenant_date.
      */
-    @Query(value = "SELECT v FROM VenteEntity v WHERE " +
+    @Query(value = "SELECT v FROM VenteEntity v JOIN FETCH v.utilisateur JOIN FETCH v.tenant WHERE " +
            "v.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +

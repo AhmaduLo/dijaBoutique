@@ -221,6 +221,13 @@ public class WaveService {
      * @param signature La signature fournie par Wave dans l'en-tête X-Wave-Signature
      * @return true si la signature est valide
      */
+    /**
+     * Indique si la signature webhook est requise (secret API configuré en production).
+     */
+    public boolean isSignatureRequired() {
+        return waveApiSecret != null && !waveApiSecret.isEmpty() && !"disabled".equals(waveApiSecret);
+    }
+
     public boolean verifyWebhookSignature(String payload, String signature) {
         // En mode développement sans clés API, autoriser tous les webhooks
         if (waveApiSecret == null || waveApiSecret.isEmpty()) {

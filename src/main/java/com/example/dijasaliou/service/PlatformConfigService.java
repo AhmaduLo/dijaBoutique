@@ -3,6 +3,8 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.entity.PlatformConfigEntity;
 import com.example.dijasaliou.repository.PlatformConfigRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,11 +19,13 @@ public class PlatformConfigService {
 
     private final PlatformConfigRepository platformConfigRepository;
 
+    @Cacheable(value = "platformConfig", key = "'all'")
     @Transactional(readOnly = true)
     public List<PlatformConfigEntity> obtenirToutes() {
         return platformConfigRepository.findAll();
     }
 
+    @Cacheable(value = "platformConfig", key = "'publiques'")
     @Transactional(readOnly = true)
     public Map<String, String> obtenirConfigsPubliques() {
         Map<String, String> result = new java.util.LinkedHashMap<>();
@@ -46,6 +50,7 @@ public class PlatformConfigService {
                 .orElse(VALEURS_DEFAUT.getOrDefault(cle, ""));
     }
 
+    @CacheEvict(value = "platformConfig", allEntries = true)
     @Transactional
     public PlatformConfigEntity modifier(String cle, String nouvelleValeur) {
         PlatformConfigEntity config = platformConfigRepository.findByCle(cle)
