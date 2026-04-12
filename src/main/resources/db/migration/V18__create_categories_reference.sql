@@ -1,13 +1,13 @@
 -- Table des catégories de produits — gérée par le super admin
 
 CREATE TABLE IF NOT EXISTS categories_reference (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     nom VARCHAR(100) NOT NULL UNIQUE,
     ordre INTEGER NOT NULL DEFAULT 0
 );
 
 -- Catégories par défaut adaptées au commerce sénégalais
-INSERT INTO categories_reference (nom, ordre) VALUES
+INSERT IGNORE INTO categories_reference (nom, ordre) VALUES
     ('Alimentaire', 1),
     ('Boissons', 2),
     ('Cosmétiques & Hygiène', 3),
@@ -18,5 +18,4 @@ INSERT INTO categories_reference (nom, ordre) VALUES
     ('Téléphonie & Recharge', 8),
     ('Papeterie & Bureau', 9),
     ('Santé', 10),
-    ('Autre', 99)
-ON CONFLICT (nom) DO NOTHING;
+    ('Autre', 99);
