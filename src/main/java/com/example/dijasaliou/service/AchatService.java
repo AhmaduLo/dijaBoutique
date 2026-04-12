@@ -220,14 +220,25 @@ public class AchatService {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
 
-        // 3. Bloquer si des ventes existent pour ce produit (évite stock incohérent)
-        var ventesExistantes = venteRepository.findByNomProduitAndTenant(
-                achatExistant.getNomProduit(), tenantActuel);
-        if (!ventesExistantes.isEmpty()) {
+        // 3. Bloquer seulement si la suppression rendrait le stock négatif
+        String nomProduit = achatExistant.getNomProduit();
+        Double quantiteAchatSupprime = achatExistant.getQuantite() != null ? achatExistant.getQuantite() : 0.0;
+
+        Double totalAchats = achatRepository.sumQuantiteByNomProduitAndTenant(nomProduit, tenantActuel);
+        if (totalAchats == null) totalAchats = 0.0;
+
+        var ventesExistantes = venteRepository.findByNomProduitAndTenant(nomProduit, tenantActuel);
+        Double totalVentes = ventesExistantes.stream()
+                .mapToDouble(v -> v.getQuantite() != null ? v.getQuantite() : 0.0)
+                .sum();
+
+        Double stockApresSupp = (totalAchats - quantiteAchatSupprime) - totalVentes;
+
+        if (stockApresSupp < 0) {
             throw new ConflictException(
-                    "Impossible de supprimer cet achat : le produit \"" + achatExistant.getNomProduit() + "\" " +
-                    "est lié à " + ventesExistantes.size() + " vente(s) enregistrée(s). " +
-                    "Supprimez d'abord les ventes de ce produit avant de pouvoir supprimer l'achat.");
+                    "Impossible de supprimer cet achat : le stock de \"" + nomProduit + "\" " +
+                    "deviendrait négatif (" + String.format("%.0f", stockApresSupp) + "). " +
+                    "Il y a " + String.format("%.0f", totalVentes) + " vente(s) pour ce produit.");
         }
 
         // 4. Supprimer + invalider le cache tenant
