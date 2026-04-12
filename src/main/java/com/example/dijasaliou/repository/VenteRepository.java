@@ -41,7 +41,8 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     // Recherche par date
     List<VenteEntity> findByDateVente(LocalDateTime date);
 
-    List<VenteEntity> findByDateVenteBetween(LocalDateTime debut, LocalDateTime fin);
+    @Query("SELECT v FROM VenteEntity v JOIN FETCH v.utilisateur JOIN FETCH v.tenant WHERE v.dateVente BETWEEN :debut AND :fin ORDER BY v.dateVente DESC, v.id DESC")
+    List<VenteEntity> findByDateVenteBetween(@Param("debut") LocalDateTime debut, @Param("fin") LocalDateTime fin);
 
     // Recherche par client
     List<VenteEntity> findByClient(String client);

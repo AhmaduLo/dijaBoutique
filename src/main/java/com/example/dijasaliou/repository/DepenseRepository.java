@@ -26,7 +26,8 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
     // Recherche par date
     List<DepenseEntity> findByDateDepense(LocalDateTime date);
 
-    List<DepenseEntity> findByDateDepenseBetween(LocalDateTime debut, LocalDateTime fin);
+    @Query("SELECT d FROM DepenseEntity d JOIN FETCH d.utilisateur JOIN FETCH d.tenant WHERE d.dateDepense BETWEEN :debut AND :fin ORDER BY d.dateDepense DESC, d.id DESC")
+    List<DepenseEntity> findByDateDepenseBetween(@Param("debut") LocalDateTime debut, @Param("fin") LocalDateTime fin);
 
     // Recherche par récurrence
     List<DepenseEntity> findByEstRecurrente(Boolean estRecurrente);

@@ -50,7 +50,8 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Trouver les achats entre deux dates
      */
-    List<AchatEntity> findByDateAchatBetween(LocalDateTime debut, LocalDateTime fin);
+    @Query("SELECT a FROM AchatEntity a JOIN FETCH a.utilisateur JOIN FETCH a.tenant WHERE a.dateAchat BETWEEN :debut AND :fin ORDER BY a.dateAchat DESC, a.id DESC")
+    List<AchatEntity> findByDateAchatBetween(@Param("debut") LocalDateTime debut, @Param("fin") LocalDateTime fin);
 
     /**
      * Compter les achats d'un produit
