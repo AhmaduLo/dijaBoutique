@@ -32,6 +32,11 @@ public class StockDto {
     private String photoUrl;
 
     /**
+     * Code-barre du produit (EAN-13, EAN-8, UPC-A, etc.)
+     */
+    private String codeBarre;
+
+    /**
      * Unité de mesure du produit (pièce, kg, litre, mètre, etc.)
      */
     private String unite;

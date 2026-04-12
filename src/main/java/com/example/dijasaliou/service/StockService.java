@@ -277,9 +277,17 @@ public class StockService {
         // Récupérer l'unité depuis le dernier achat
         String unite = dernierAchat != null ? dernierAchat.getUnite() : "pièce";
 
+        // Récupérer le code-barre depuis le dernier achat qui en a un
+        String codeBarre = achats.stream()
+                .filter(a -> a.getCodeBarre() != null && !a.getCodeBarre().isEmpty())
+                .max(Comparator.comparing(AchatEntity::getDateAchat))
+                .map(AchatEntity::getCodeBarre)
+                .orElse(null);
+
         return StockDto.builder()
                 .nomProduit(nomProduit)
                 .photoUrl(photoUrl)
+                .codeBarre(codeBarre)
                 .unite(unite)
                 .quantiteAchetee(quantiteAchetee)
                 .quantiteVendue(quantiteVendue)

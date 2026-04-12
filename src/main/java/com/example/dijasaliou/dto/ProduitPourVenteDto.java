@@ -27,6 +27,9 @@ public class ProduitPourVenteDto {
 
     private String nomProduit;
     private BigDecimal prixVenteSuggere;
+    private String codeBarre;
+    private String photoUrl;
+    private String unite;
 
     /**
      * Convertit un achat en DTO simplifié pour la vente
@@ -39,6 +42,9 @@ public class ProduitPourVenteDto {
         return ProduitPourVenteDto.builder()
                 .nomProduit(achat.getNomProduit())
                 .prixVenteSuggere(achat.getPrixVenteSuggere())
+                .codeBarre(achat.getCodeBarre())
+                .photoUrl(achat.getPhotoUrl())
+                .unite(achat.getUnite())
                 .build();
     }
 }

@@ -90,6 +90,10 @@ public class VenteEntity  extends BaseEntity{
     @Column(name = "photo_url", length = 500)
     private String photoUrl;
 
+    @Size(max = 50, message = "Le code-barre ne peut dépasser 50 caractères")
+    @Column(name = "code_barre", length = 50)
+    private String codeBarre;
+
     @Size(max = 20, message = "L'unité ne peut dépasser 20 caractères")
     @Column(name = "unite", length = 20)
     @Builder.Default

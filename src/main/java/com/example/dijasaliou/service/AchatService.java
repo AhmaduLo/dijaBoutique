@@ -103,12 +103,20 @@ public class AchatService {
         // 3. MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
         achat.setTenant(tenantService.getCurrentTenant());
 
-        // 4. DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
+        // 4. CODE-BARRE : Nettoyer si présent
+        if (achat.getCodeBarre() != null) {
+            achat.setCodeBarre(achat.getCodeBarre().trim());
+            if (achat.getCodeBarre().isEmpty()) {
+                achat.setCodeBarre(null);
+            }
+        }
+
+        // 5. DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
         if (achat.getDateAchat() == null) {
             achat.setDateAchat(LocalDateTime.now());
         }
 
-        // 4. LOGIQUE : Calculer le prix total (si pas fait)
+        // 6. LOGIQUE : Calculer le prix total (si pas fait)
         if (achat.getPrixTotal() == null) {
             achat.calculerPrixTotal();
         }
