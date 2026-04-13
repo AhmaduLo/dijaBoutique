@@ -43,8 +43,8 @@ public class CodeBarreController {
      * Utilisé lors de l'ajout d'un nouvel achat (préremplissage).
      */
     @GetMapping("/lookup/{code}")
-    @RequiresPlan(plans = {TenantEntity.Plan.PRO},
-                  message = "Le scan code-barre est réservé au plan Pro. Passez au plan Pro pour débloquer cette fonctionnalité.")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS},
+                  message = "Le scan code-barre est réservé au plan Business. Passez au plan Business pour débloquer cette fonctionnalité.")
     public ResponseEntity<CodeBarreLookupDto> lookup(@PathVariable String code) {
         String codeBarre = code.trim();
 
@@ -80,8 +80,8 @@ public class CodeBarreController {
      * Utilisé lors d'une vente : on scanne → on retrouve le produit instantanément.
      */
     @GetMapping("/recherche/{code}")
-    @RequiresPlan(plans = {TenantEntity.Plan.PRO},
-                  message = "Le scan code-barre est réservé au plan Pro. Passez au plan Pro pour débloquer cette fonctionnalité.")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS},
+                  message = "Le scan code-barre est réservé au plan Business. Passez au plan Business pour débloquer cette fonctionnalité.")
     public ResponseEntity<CodeBarreLookupDto> recherche(@PathVariable String code) {
         String codeBarre = code.trim();
 
