@@ -4,6 +4,7 @@ import com.example.dijasaliou.entity.ProduitReferenceEntity;
 import com.example.dijasaliou.repository.ProduitReferenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -56,15 +57,25 @@ public class ProduitReferenceService {
             produitReferenceRepository.save(ref);
         } else {
             // Nouveau produit — créer l'entrée partagée
-            ProduitReferenceEntity ref = ProduitReferenceEntity.builder()
-                    .codeBarre(codeBarre.trim())
-                    .nomProduit(nomProduit.trim())
-                    .photoUrl(photoUrl)
-                    .categorie(categorie != null && !categorie.isBlank() ? categorie.trim() : null)
-                    .contribueParTenantNom(tenantNom)
-                    .build();
-            produitReferenceRepository.save(ref);
-            log.info("Nouveau produit référencé : {} ({}) catégorie: {}", nomProduit, codeBarre, categorie);
+            try {
+                ProduitReferenceEntity ref = ProduitReferenceEntity.builder()
+                        .codeBarre(codeBarre.trim())
+                        .nomProduit(nomProduit.trim())
+                        .photoUrl(photoUrl)
+                        .categorie(categorie != null && !categorie.isBlank() ? categorie.trim() : null)
+                        .contribueParTenantNom(tenantNom)
+                        .build();
+                produitReferenceRepository.save(ref);
+                log.info("Nouveau produit référencé : {} ({}) catégorie: {}", nomProduit, codeBarre, categorie);
+            } catch (DataIntegrityViolationException e) {
+                // Race condition : un autre tenant a créé le même code-barre en même temps
+                // → on incrémente simplement le compteur
+                log.info("Produit {} déjà créé par un autre tenant, incrémentation du compteur", codeBarre);
+                produitReferenceRepository.findByCodeBarre(codeBarre.trim()).ifPresent(ref -> {
+                    ref.setNbUtilisations(ref.getNbUtilisations() + 1);
+                    produitReferenceRepository.save(ref);
+                });
+            }
         }
     }
 
