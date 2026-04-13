@@ -111,7 +111,7 @@ public class SecurityConfig {
 
 
                         // Routes de gestion des fichiers
-                        .requestMatchers("/files/upload").hasAuthority("ADMIN") // Upload réservé aux ADMIN
+                        .requestMatchers("/files/upload").hasAnyAuthority("USER", "GERANT", "ADMIN") // Upload photos pour tous les utilisateurs
                         .requestMatchers("/files/photos/**").authenticated() // Récupération des photos pour tous les utilisateurs authentifiés
                         .requestMatchers("/files/health").permitAll() // Health check public
 
