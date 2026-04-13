@@ -90,6 +90,13 @@ public class AchatEntity extends BaseEntity{
     @Column(name = "code_barre", length = 50)
     private String codeBarre;
 
+    /**
+     * Catégorie du produit — champ transient pour la base partagée.
+     * Non sauvegardé dans la table achats, transmis à produit_reference.
+     */
+    @Transient
+    private String categorie;
+
     @Size(max = 20, message = "L'unité ne peut dépasser 20 caractères")
     @Column(name = "unite", length = 20)
     @Builder.Default

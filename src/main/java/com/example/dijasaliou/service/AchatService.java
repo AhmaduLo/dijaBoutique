@@ -136,6 +136,7 @@ public class AchatService {
                         saved.getCodeBarre(),
                         saved.getNomProduit(),
                         saved.getPhotoUrl(),
+                        achat.getCategorie(),
                         saved.getTenant().getNomEntreprise()
                 );
             } catch (Exception e) {

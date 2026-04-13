@@ -34,7 +34,7 @@ public class ProduitReferenceService {
      * Si le code-barre existe déjà, incrémente le compteur d'utilisations.
      */
     @Transactional
-    public void contribuer(String codeBarre, String nomProduit, String photoUrl, String tenantNom) {
+    public void contribuer(String codeBarre, String nomProduit, String photoUrl, String categorie, String tenantNom) {
         if (codeBarre == null || codeBarre.isBlank() || nomProduit == null || nomProduit.isBlank()) {
             return;
         }
@@ -45,9 +45,13 @@ public class ProduitReferenceService {
             // Produit déjà connu — incrémenter le compteur
             ProduitReferenceEntity ref = existant.get();
             ref.setNbUtilisations(ref.getNbUtilisations() + 1);
-            // Mettre à jour la photo si elle était absente et qu'on en a une maintenant
+            // Mettre à jour la photo si elle était absente
             if ((ref.getPhotoUrl() == null || ref.getPhotoUrl().isBlank()) && photoUrl != null && !photoUrl.isBlank()) {
                 ref.setPhotoUrl(photoUrl);
+            }
+            // Mettre à jour la catégorie si elle était absente
+            if ((ref.getCategorie() == null || ref.getCategorie().isBlank()) && categorie != null && !categorie.isBlank()) {
+                ref.setCategorie(categorie.trim());
             }
             produitReferenceRepository.save(ref);
         } else {
@@ -56,10 +60,11 @@ public class ProduitReferenceService {
                     .codeBarre(codeBarre.trim())
                     .nomProduit(nomProduit.trim())
                     .photoUrl(photoUrl)
+                    .categorie(categorie != null && !categorie.isBlank() ? categorie.trim() : null)
                     .contribueParTenantNom(tenantNom)
                     .build();
             produitReferenceRepository.save(ref);
-            log.info("Nouveau produit référencé : {} ({})", nomProduit, codeBarre);
+            log.info("Nouveau produit référencé : {} ({}) catégorie: {}", nomProduit, codeBarre, categorie);
         }
     }
 
