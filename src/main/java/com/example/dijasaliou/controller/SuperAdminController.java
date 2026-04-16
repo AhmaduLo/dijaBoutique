@@ -62,6 +62,16 @@ public class SuperAdminController {
     }
 
     /**
+     * GET /superadmin/stats/monitoring
+     * Monitoring : utilisateurs connectés, dernières connexions, taille BDD, connexions actives
+     */
+    @GetMapping("/stats/monitoring")
+    public ResponseEntity<Map<String, Object>> getMonitoring(Authentication auth) {
+        log.info("[SUPER_ADMIN] {} consulte le monitoring", auth.getName());
+        return ResponseEntity.ok(superAdminService.getMonitoringStats());
+    }
+
+    /**
      * GET /superadmin/tenants
      * Liste tous les tenants avec leurs stats
      */

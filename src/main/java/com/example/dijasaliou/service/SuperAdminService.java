@@ -21,6 +21,8 @@ import com.example.dijasaliou.repository.PaiementSuperAdminRepository;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -64,6 +66,9 @@ public class SuperAdminService {
     private final TenantCacheService tenantCacheService;
     private final PaiementSuperAdminRepository paiementSuperAdminRepository;
     private final AuthService authService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public SuperAdminService(TenantRepository tenantRepository,
                              UserRepository userRepository,
@@ -348,6 +353,144 @@ public class SuperAdminService {
         stats.put("totalEssaiHistorique", totalEssaiHistorique);
         stats.put("totalConvertis", totalConvertis);
         stats.put("tauxConversion", Math.round(tauxConversion * 10.0) / 10.0);
+
+        return stats;
+    }
+
+    /**
+     * Stats de monitoring : utilisateurs connectés, BDD, activité récente
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getMonitoringStats() {
+        Map<String, Object> stats = new LinkedHashMap<>();
+        LocalDateTime maintenant = LocalDateTime.now();
+
+        // 1. Utilisateurs connectés (dernière activité < 5 min)
+        LocalDateTime il5min = maintenant.minusMinutes(5);
+        List<UserEntity> allUsers = userRepository.findByDeletedFalse();
+        long connectesMaintenant = allUsers.stream()
+                .filter(u -> u.getDerniereConnexion() != null && u.getDerniereConnexion().isAfter(il5min))
+                .count();
+        stats.put("connectesMaintenant", connectesMaintenant);
+
+        // 2. Dernières connexions (top 20)
+        List<Map<String, Object>> dernieresConnexions = allUsers.stream()
+                .filter(u -> u.getDerniereConnexion() != null)
+                .sorted((a, b) -> b.getDerniereConnexion().compareTo(a.getDerniereConnexion()))
+                .limit(20)
+                .map(u -> {
+                    Map<String, Object> entry = new LinkedHashMap<>();
+                    entry.put("nom", u.getPrenom() + " " + u.getNom());
+                    entry.put("email", u.getEmail());
+                    entry.put("role", u.getRole().name());
+                    entry.put("boutique", u.getTenant() != null ? u.getTenant().getNomEntreprise() : "Super Admin");
+                    entry.put("derniereConnexion", u.getDerniereConnexion());
+                    entry.put("enLigne", u.getDerniereConnexion().isAfter(il5min));
+                    return entry;
+                })
+                .toList();
+        stats.put("dernieresConnexions", dernieresConnexions);
+
+        // 3. Boutiques actives aujourd'hui (au moins 1 utilisateur connecté aujourd'hui)
+        LocalDateTime debutJour = maintenant.toLocalDate().atStartOfDay();
+        long boutiquesActivesAujourdhui = allUsers.stream()
+                .filter(u -> u.getDerniereConnexion() != null && u.getDerniereConnexion().isAfter(debutJour))
+                .map(u -> u.getTenant() != null ? u.getTenant().getId() : -1L)
+                .distinct()
+                .filter(id -> id != -1L)
+                .count();
+        stats.put("boutiquesActivesAujourdhui", boutiquesActivesAujourdhui);
+
+        // 4. Taille de la BDD
+        try {
+            @SuppressWarnings("deprecation")
+            List<Object[]> dbSize = entityManager
+                    .createNativeQuery("SELECT table_name, data_length, index_length FROM information_schema.tables WHERE table_schema = DATABASE()")
+                    .getResultList();
+            long totalDataBytes = 0;
+            long totalIndexBytes = 0;
+            List<Map<String, Object>> tables = new ArrayList<>();
+            for (Object[] row : dbSize) {
+                String tableName = row[0].toString();
+                long dataLen = row[1] != null ? ((Number) row[1]).longValue() : 0;
+                long indexLen = row[2] != null ? ((Number) row[2]).longValue() : 0;
+                totalDataBytes += dataLen;
+                totalIndexBytes += indexLen;
+                Map<String, Object> t = new LinkedHashMap<>();
+                t.put("table", tableName);
+                t.put("dataKB", dataLen / 1024);
+                t.put("indexKB", indexLen / 1024);
+                t.put("totalKB", (dataLen + indexLen) / 1024);
+                tables.add(t);
+            }
+            long totalBytes = totalDataBytes + totalIndexBytes;
+            long totalMB = totalBytes / (1024 * 1024);
+            long maxMB = 1000; // 1 GB par défaut Railway
+            int pourcentageBdd = maxMB > 0 ? (int) (totalMB * 100 / maxMB) : 0;
+
+            stats.put("bddTotalMB", totalMB);
+            stats.put("bddMaxMB", maxMB);
+            stats.put("bddPourcentage", pourcentageBdd);
+            stats.put("bddStatut", pourcentageBdd < 60 ? "OK" : pourcentageBdd < 80 ? "ATTENTION" : "CRITIQUE");
+            stats.put("bddMessage", pourcentageBdd < 60
+                    ? "Base de données en bonne santé"
+                    : pourcentageBdd < 80
+                    ? "Attention : base de données à " + pourcentageBdd + "%, pensez à upgrader"
+                    : "URGENT : base de données presque pleine (" + pourcentageBdd + "%) !");
+            stats.put("bddTables", tables);
+        } catch (Exception e) {
+            stats.put("bddTotalMB", "N/A");
+            stats.put("bddMaxMB", 1000);
+            stats.put("bddPourcentage", 0);
+            stats.put("bddStatut", "N/A");
+            stats.put("bddMessage", "Impossible de récupérer la taille de la BDD");
+            stats.put("bddTables", List.of());
+        }
+
+        // 5. Connexions BDD actives + alerte
+        int maxConnexions = 100;
+        try {
+            @SuppressWarnings("deprecation")
+            Object connResult = entityManager
+                    .createNativeQuery("SELECT COUNT(*) FROM information_schema.processlist")
+                    .getSingleResult();
+            int connexionsActives = ((Number) connResult).intValue();
+            int pourcentageConn = maxConnexions > 0 ? (connexionsActives * 100 / maxConnexions) : 0;
+
+            stats.put("connexionsBddActives", connexionsActives);
+            stats.put("connexionsBddMax", maxConnexions);
+            stats.put("connexionsPourcentage", pourcentageConn);
+            stats.put("connexionsStatut", pourcentageConn < 60 ? "OK" : pourcentageConn < 80 ? "ATTENTION" : "CRITIQUE");
+            stats.put("connexionsMessage", pourcentageConn < 60
+                    ? "Connexions normales"
+                    : pourcentageConn < 80
+                    ? "Charge élevée : " + connexionsActives + "/" + maxConnexions + " connexions"
+                    : "CRITIQUE : connexions saturées (" + connexionsActives + "/" + maxConnexions + ") !");
+        } catch (Exception e) {
+            stats.put("connexionsBddActives", "N/A");
+            stats.put("connexionsBddMax", maxConnexions);
+            stats.put("connexionsPourcentage", 0);
+            stats.put("connexionsStatut", "N/A");
+            stats.put("connexionsMessage", "Impossible de récupérer les connexions");
+        }
+
+        // 6. Alertes globales
+        List<Map<String, String>> alertes = new ArrayList<>();
+        Object bddStatut = stats.get("bddStatut");
+        if ("ATTENTION".equals(bddStatut) || "CRITIQUE".equals(bddStatut)) {
+            Map<String, String> alerte = new LinkedHashMap<>();
+            alerte.put("type", bddStatut.toString());
+            alerte.put("message", stats.get("bddMessage").toString());
+            alertes.add(alerte);
+        }
+        Object connStatut = stats.get("connexionsStatut");
+        if ("ATTENTION".equals(connStatut) || "CRITIQUE".equals(connStatut)) {
+            Map<String, String> alerte = new LinkedHashMap<>();
+            alerte.put("type", connStatut.toString());
+            alerte.put("message", stats.get("connexionsMessage").toString());
+            alertes.add(alerte);
+        }
+        stats.put("alertes", alertes);
 
         return stats;
     }
