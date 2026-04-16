@@ -1040,6 +1040,13 @@ public class EmailService {
     }
 
     /**
+     * Méthode publique pour envoyer un email HTML — utilisée par NotificationService
+     */
+    public void sendHtmlEmailPublic(String to, String subject, String htmlContent) {
+        sendViaBrevo(to, subject, htmlContent, null);
+    }
+
+    /**
      * Méthode pour envoyer un email HTML avec Reply-To personnalisé via Brevo
      */
     private void sendHtmlEmailWithReplyTo(String to, String subject, String htmlContent, String replyTo) {
