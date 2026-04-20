@@ -113,7 +113,7 @@ class SuperAdminControllerTest {
     void getAllTenants_DevraitRetournerTousLesTenants() throws Exception {
         PagedResponse<TenantAdminDto> pagedResponse = PagedResponse.from(
                 new PageImpl<>(List.of(tenantDto1, tenantDto2), PageRequest.of(0, 20), 2));
-        when(superAdminService.getAllTenants(0, 20)).thenReturn(pagedResponse);
+        when(superAdminService.getAllTenants(0, 20, null)).thenReturn(pagedResponse);
 
         mockMvc.perform(get("/superadmin/tenants")
                         .principal(principal)
@@ -123,7 +123,7 @@ class SuperAdminControllerTest {
                 .andExpect(jsonPath("$.content[0].tenantUuid", is("tenant-001")))
                 .andExpect(jsonPath("$.content[0].nomEntreprise", is("Boutique Alpha")));
 
-        verify(superAdminService, times(1)).getAllTenants(0, 20);
+        verify(superAdminService, times(1)).getAllTenants(0, 20, null);
     }
 
     @Test
@@ -131,7 +131,7 @@ class SuperAdminControllerTest {
     void getAllTenants_DevraitRetournerListeVide() throws Exception {
         PagedResponse<TenantAdminDto> pagedResponse = PagedResponse.from(
                 new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-        when(superAdminService.getAllTenants(0, 20)).thenReturn(pagedResponse);
+        when(superAdminService.getAllTenants(0, 20, null)).thenReturn(pagedResponse);
 
         mockMvc.perform(get("/superadmin/tenants")
                         .principal(principal)
