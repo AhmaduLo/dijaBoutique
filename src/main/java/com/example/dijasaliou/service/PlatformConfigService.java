@@ -36,10 +36,9 @@ public class PlatformConfigService {
         return result;
     }
 
-    private static final Map<String, String> VALEURS_DEFAUT = Map.of(
-            "whatsapp_support", "+33751130937"
-    );
+    private static final Map<String, String> VALEURS_DEFAUT = Map.of();
 
+    @Cacheable(value = "platformConfig", key = "'config_' + #cle")
     @Transactional(readOnly = true)
     public String obtenirConfigPublique(String cle) {
         if (!CLES_PUBLIQUES.contains(cle)) {
