@@ -71,8 +71,13 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
     /**
      * Recherche paginée par nom d'entreprise ou email admin — pour SuperAdmin
      */
-    @Query("SELECT t FROM TenantEntity t WHERE t.deleted = false AND " +
-           "(:search IS NULL OR LOWER(t.nomEntreprise) LIKE LOWER(CONCAT('%', :search, '%')))")
+    @Query("SELECT DISTINCT t FROM TenantEntity t LEFT JOIN UserEntity u ON u.tenant = t AND u.role = 'ADMIN' AND u.deleted = false " +
+           "WHERE t.deleted = false AND " +
+           "(:search IS NULL OR LOWER(t.nomEntreprise) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.nom) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.prenom) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR t.numeroTelephone LIKE CONCAT('%', :search, '%'))")
     Page<TenantEntity> findByDeletedFalseWithSearch(@Param("search") String search, Pageable pageable);
 
     /**
