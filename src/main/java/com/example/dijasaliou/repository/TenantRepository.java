@@ -69,6 +69,13 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
     Page<TenantEntity> findByDeletedFalse(Pageable pageable);
 
     /**
+     * Recherche paginée par nom d'entreprise ou email admin — pour SuperAdmin
+     */
+    @Query("SELECT t FROM TenantEntity t WHERE t.deleted = false AND " +
+           "(:search IS NULL OR LOWER(t.nomEntreprise) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<TenantEntity> findByDeletedFalseWithSearch(@Param("search") String search, Pageable pageable);
+
+    /**
      * Liste complète sans pagination — pour les stats (exclut les tenants supprimés)
      */
     List<TenantEntity> findByDeletedFalse();

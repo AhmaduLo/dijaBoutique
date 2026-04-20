@@ -79,10 +79,11 @@ public class SuperAdminController {
     public ResponseEntity<PagedResponse<TenantAdminDto>> getAllTenants(
             Authentication auth,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        log.info("[SUPER_ADMIN] {} consulte tous les tenants", auth.getName());
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search) {
+        log.info("[SUPER_ADMIN] {} consulte tous les tenants (search={})", auth.getName(), search);
         if (size > 100) size = 100;
-        return ResponseEntity.ok(superAdminService.getAllTenants(page, size));
+        return ResponseEntity.ok(superAdminService.getAllTenants(page, size, search));
     }
 
     /**

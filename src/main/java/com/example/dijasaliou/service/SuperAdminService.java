@@ -95,9 +95,10 @@ public class SuperAdminService {
     /**
      * Retourne tous les tenants avec leurs stats — paginé
      */
-    public PagedResponse<TenantAdminDto> getAllTenants(int page, int size) {
+    public PagedResponse<TenantAdminDto> getAllTenants(int page, int size, String search) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        Page<TenantEntity> tenantsPage = tenantRepository.findByDeletedFalse(pageable);
+        String searchParam = (search != null && !search.isBlank()) ? search : null;
+        Page<TenantEntity> tenantsPage = tenantRepository.findByDeletedFalseWithSearch(searchParam, pageable);
         return PagedResponse.from(tenantsPage.map(this::toDto));
     }
 
