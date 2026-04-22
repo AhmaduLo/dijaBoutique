@@ -2,8 +2,12 @@ package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.VenteDto;
+import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
+import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.UserService;
 import com.example.dijasaliou.service.VenteService;
 import jakarta.validation.Valid;
@@ -32,10 +36,15 @@ public class VenteController {
 
     private final VenteService venteService;
     private final UserService userService;
+    private final AchatRepository achatRepository;
+    private final TenantService tenantService;
 
-    public VenteController(VenteService venteService, UserService userService) {
+    public VenteController(VenteService venteService, UserService userService,
+                           AchatRepository achatRepository, TenantService tenantService) {
         this.venteService = venteService;
         this.userService = userService;
+        this.achatRepository = achatRepository;
+        this.tenantService = tenantService;
     }
 
     /**
@@ -67,14 +76,36 @@ public class VenteController {
      * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PostMapping
-    public ResponseEntity<VenteDto> creer(
+    public ResponseEntity<Map<String, Object>> creer(
             @Valid @RequestBody VenteEntity vente,
             Authentication authentication) {
 
         UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
         VenteEntity venteCree = venteService.creerVente(vente, utilisateur);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(VenteDto.fromEntity(venteCree));
+        Map<String, Object> response = new HashMap<>();
+        response.put("vente", VenteDto.fromEntity(venteCree));
+
+        // Vérifier si la date de vente est avant le premier achat du produit
+        if (venteCree.getDateVente() != null) {
+            try {
+                TenantEntity tenant = tenantService.getCurrentTenant();
+                List<AchatEntity> achats = achatRepository.findByNomProduitAndTenant(
+                        venteCree.getNomProduit(), tenant);
+                if (!achats.isEmpty()) {
+                    AchatEntity premierAchat = achats.stream()
+                            .min((a, b) -> a.getDateAchat().compareTo(b.getDateAchat()))
+                            .orElse(null);
+                    if (premierAchat != null && venteCree.getDateVente().isBefore(premierAchat.getDateAchat())) {
+                        response.put("warning", "Attention : vous vendez ce produit avant sa date d'achat ("
+                                + premierAchat.getDateAchat().toLocalDate() + "). Cela peut affecter vos rapports.");
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
