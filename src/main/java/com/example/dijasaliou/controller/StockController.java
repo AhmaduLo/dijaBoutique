@@ -28,6 +28,15 @@ public class StockController {
     }
 
     /**
+     * GET /api/stock/archives
+     * Produits archivés (en rupture depuis 30+ jours)
+     */
+    @GetMapping("/archives")
+    public ResponseEntity<List<StockDto>> obtenirStocksArchives() {
+        return ResponseEntity.ok(stockService.obtenirStocksArchives());
+    }
+
+    /**
      * GET /api/stock
      * Obtenir le stock de tous les produits
      *

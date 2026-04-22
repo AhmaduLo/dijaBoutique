@@ -97,6 +97,14 @@ public class AchatEntity extends BaseEntity{
     @Transient
     private String categorie;
 
+    @Column(name = "devise_code", length = 10, nullable = false)
+    @Builder.Default
+    private String deviseCode = "XOF";
+
+    @Column(name = "taux_change_applique", nullable = false)
+    @Builder.Default
+    private Double tauxChangeApplique = 1.0;
+
     @Size(max = 20, message = "L'unité ne peut dépasser 20 caractères")
     @Column(name = "unite", length = 20)
     @Builder.Default

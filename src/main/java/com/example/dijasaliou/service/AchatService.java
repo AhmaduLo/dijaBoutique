@@ -45,15 +45,18 @@ public class AchatService {
      * Spring injecte automatiquement achatRepository, tenantService, stockService et venteRepository
      */
     private final ProduitReferenceService produitReferenceService;
+    private final ArchiveStockService archiveStockService;
 
     public AchatService(AchatRepository achatRepository, TenantService tenantService,
                         StockService stockService, VenteRepository venteRepository,
-                        ProduitReferenceService produitReferenceService) {
+                        ProduitReferenceService produitReferenceService,
+                        ArchiveStockService archiveStockService) {
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
         this.stockService = stockService;
         this.venteRepository = venteRepository;
         this.produitReferenceService = produitReferenceService;
+        this.archiveStockService = archiveStockService;
     }
 
     /**
@@ -129,7 +132,14 @@ public class AchatService {
         AchatEntity saved = achatRepository.save(achat);
         stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
 
-        // 8. CONTRIBUTION : Si code-barre présent, copier dans la base partagée
+        // 8. DÉSARCHIVAGE : Si le produit était archivé, le désarchiver
+        try {
+            archiveStockService.desarchiverSiNecessaire(saved.getTenant(), saved.getNomProduit());
+        } catch (Exception e) {
+            // Ne pas bloquer l'achat
+        }
+
+        // 9. CONTRIBUTION : Si code-barre présent, copier dans la base partagée
         if (saved.getCodeBarre() != null && !saved.getCodeBarre().isBlank()) {
             try {
                 produitReferenceService.contribuer(

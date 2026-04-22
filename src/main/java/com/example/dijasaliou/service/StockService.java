@@ -5,6 +5,7 @@ import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.repository.ProduitArchiveRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -30,11 +31,14 @@ public class StockService {
     private final AchatRepository achatRepository;
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
+    private final ProduitArchiveRepository produitArchiveRepository;
 
-    public StockService(AchatRepository achatRepository, VenteRepository venteRepository, TenantService tenantService) {
+    public StockService(AchatRepository achatRepository, VenteRepository venteRepository,
+                        TenantService tenantService, ProduitArchiveRepository produitArchiveRepository) {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
         this.tenantService = tenantService;
+        this.produitArchiveRepository = produitArchiveRepository;
     }
 
     /**
@@ -75,9 +79,67 @@ public class StockService {
             stocks.add(calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe));
         }
 
-        // 6. Trier par stock disponible (du plus faible au plus élevé pour voir les alertes)
+        // 6. Filtrer les produits archivés
+        java.util.Set<String> archives = produitArchiveRepository.findNomsArchivesParTenant(tenant);
+        if (!archives.isEmpty()) {
+            stocks.removeIf(s -> archives.contains(s.getNomProduit().toLowerCase().trim()));
+        }
+
+        // 7. Trier par stock disponible (du plus faible au plus élevé pour voir les alertes)
         stocks.sort((s1, s2) -> Double.compare(s1.getStockDisponible(), s2.getStockDisponible()));
 
+        return stocks;
+    }
+
+    /**
+     * Obtenir les stocks des produits archivés du tenant courant.
+     */
+    @Transactional(readOnly = true)
+    public List<StockDto> obtenirStocksArchives() {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        java.util.Set<String> archives = produitArchiveRepository.findNomsArchivesParTenant(tenant);
+
+        if (archives.isEmpty()) return new ArrayList<>();
+
+        List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
+        List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+
+        Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
+                .collect(Collectors.groupingBy(a -> a.getNomProduit().toLowerCase().trim()));
+        Map<String, List<VenteEntity>> ventesParProduit = ventes.stream()
+                .collect(Collectors.groupingBy(v -> v.getNomProduit().toLowerCase().trim()));
+
+        List<StockDto> stocksArchives = new ArrayList<>();
+        for (String nomArchive : archives) {
+            List<AchatEntity> achatsP = achatsParProduit.getOrDefault(nomArchive, new ArrayList<>());
+            List<VenteEntity> ventesP = ventesParProduit.getOrDefault(nomArchive, new ArrayList<>());
+            if (!achatsP.isEmpty()) {
+                stocksArchives.add(calculerStock(nomArchive, achatsP, ventesP));
+            }
+        }
+
+        return stocksArchives;
+    }
+
+    /**
+     * Obtenir les stocks d'un tenant spécifique (sans contexte tenant).
+     * Utilisé par le job d'archivage automatique.
+     */
+    @Transactional(readOnly = true)
+    public List<StockDto> obtenirTousLesStocksParTenant(TenantEntity tenant) {
+        List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
+        List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+
+        Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
+                .collect(Collectors.groupingBy(a -> a.getNomProduit().toLowerCase().trim()));
+        Map<String, List<VenteEntity>> ventesParProduit = ventes.stream()
+                .collect(Collectors.groupingBy(v -> v.getNomProduit().toLowerCase().trim()));
+
+        List<StockDto> stocks = new ArrayList<>();
+        for (Map.Entry<String, List<AchatEntity>> entry : achatsParProduit.entrySet()) {
+            stocks.add(calculerStock(entry.getKey(), entry.getValue(),
+                    ventesParProduit.getOrDefault(entry.getKey(), new ArrayList<>())));
+        }
         return stocks;
     }
 
