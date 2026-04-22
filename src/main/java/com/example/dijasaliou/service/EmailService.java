@@ -85,7 +85,7 @@ public class EmailService {
         try {
             String resetLink = frontendUrl + "/reset-password/" + token;
 
-            String subject = "Réinitialisation de votre mot de passe - Dija Saliou";
+            String subject = "Réinitialisation de votre mot de passe - HeasyStock";
 
             String htmlContent = buildPasswordResetEmailContent(userName, resetLink);
 
@@ -166,7 +166,7 @@ public class EmailService {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>Dija Saliou</h1>
+                        <h1>HeasyStock</h1>
                         <p>Gestion de Boutique</p>
                     </div>
 
@@ -194,7 +194,7 @@ public class EmailService {
 
                     <div class="footer">
                         <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
-                        <p>&copy; 2025 Dija Saliou - Tous droits réservés</p>
+                        <p>&copy; 2025 HeasyStock - Tous droits réservés</p>
                     </div>
                 </div>
             </body>
@@ -304,7 +304,7 @@ public class EmailService {
                 <div class="container">
                     <div class="header">
                         <h1>📧 Nouveau Message de Contact</h1>
-                        <p style="margin: 5px 0;">Dija Saliou - Application de Gestion</p>
+                        <p style="margin: 5px 0;">HeasyStock - Application de Gestion</p>
                     </div>
 
                     <div class="content">
@@ -342,8 +342,8 @@ public class EmailService {
                     </div>
 
                     <div class="footer">
-                        <p>Cet email a été envoyé automatiquement depuis l'application Dija Saliou.</p>
-                        <p>&copy; 2025 Dija Saliou - Tous droits réservés</p>
+                        <p>Cet email a été envoyé automatiquement depuis l'application HeasyStock.</p>
+                        <p>&copy; 2025 HeasyStock - Tous droits réservés</p>
                     </div>
                 </div>
             </body>
@@ -538,7 +538,7 @@ public class EmailService {
                         <p style="font-size: 16px;">
                             Nous avons bien reçu votre paiement. Votre abonnement <strong>%s</strong>
                             est maintenant actif et vous pouvez profiter pleinement de toutes les fonctionnalités
-                            de Dija Saliou !
+                            de HeasyStock !
                         </p>
 
                         <div class="info-box">
@@ -595,7 +595,7 @@ public class EmailService {
                     <div class="footer">
                         <p><strong>Merci de votre confiance !</strong></p>
                         <p>Cet email a été envoyé automatiquement suite à votre paiement.</p>
-                        <p>&copy; 2025 Dija Saliou - Gestion de Boutique - Tous droits réservés</p>
+                        <p>&copy; 2025 HeasyStock - Gestion de Boutique - Tous droits réservés</p>
                     </div>
                 </div>
             </body>
@@ -872,7 +872,7 @@ public class EmailService {
 
                     <div class="footer">
                         <p>Cet email a été envoyé automatiquement par le système d'alerte de stock.</p>
-                        <p>&copy; 2025 Dija Saliou - Gestion de Boutique - Tous droits réservés</p>
+                        <p>&copy; 2025 HeasyStock - Gestion de Boutique - Tous droits réservés</p>
                     </div>
                 </div>
             </body>
