@@ -39,6 +39,9 @@ public class EmailService {
     @Value("${app.email.support:contact@heasystock.com}")
     private String supportEmail;
 
+    @Value("${app.email.reply-to:${app.email.support:contact@heasystock.com}}")
+    private String replyToEmail;
+
     @Value("${app.frontend.url:http://localhost:4200}")
     private String frontendUrl;
 
@@ -967,7 +970,7 @@ public class EmailService {
                     <h3>Émetteur</h3>
                     <p class="company">HeasyStock</p>
                     <p>Plateforme SaaS de gestion de boutique</p>
-                    <p>support@heasystock.com</p>
+                    <p>%s</p>
                   </div>
                   <div class="col">
                     <h3>Client</h3>
@@ -1005,7 +1008,7 @@ public class EmailService {
 
                 <p style="font-size:13px;color:#666;margin-top:20px;">
                   Merci pour votre confiance. Pour toute question concernant cette facture,
-                  contactez-nous à <a href="mailto:support@heasystock.com">support@heasystock.com</a>
+                  contactez-nous à <a href="mailto:%s">%s</a>
                 </p>
               </div>
               <div class="footer">
@@ -1028,7 +1031,10 @@ public class EmailService {
                 facture.getPlan() != null ? facture.getPlan() : "—",
                 dateDebut, dateFin,
                 montantCFA, montantEur,
-                montantCFA, montantEur
+                montantCFA, montantEur,
+                // Email support dans le footer
+                supportEmail,
+                supportEmail, supportEmail
         );
     }
 
@@ -1067,8 +1073,10 @@ public class EmailService {
         body.put("to", List.of(Map.of("email", to)));
         body.put("subject", subject);
         body.put("htmlContent", htmlContent);
-        if (replyTo != null) {
-            body.put("replyTo", Map.of("email", replyTo));
+        // Reply-To : si spécifié → utiliser, sinon → email par défaut (variable d'env)
+        String effectiveReplyTo = (replyTo != null) ? replyTo : replyToEmail;
+        if (effectiveReplyTo != null && !effectiveReplyTo.isBlank()) {
+            body.put("replyTo", Map.of("email", effectiveReplyTo));
         }
         body.put("trackClicks", false);
         body.put("trackOpens", false);
