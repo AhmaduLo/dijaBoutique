@@ -52,11 +52,12 @@ public class ImportService {
     private static final String K_STATUT             = "statut";
     private static final String STATUT_VALIDE        = "VALIDE";
 
-    private final AchatRepository   achatRepository;
-    private final VenteRepository   venteRepository;
-    private final DepenseRepository depenseRepository;
-    private final StockService      stockService;
-    private final TenantService     tenantService;
+    private final AchatRepository    achatRepository;
+    private final VenteRepository    venteRepository;
+    private final DepenseRepository  depenseRepository;
+    private final StockService       stockService;
+    private final TenantService      tenantService;
+    private final FifoBackfillService fifoBackfillService;
 
     /** Auto-injection différée pour appeler les méthodes @Transactional via le proxy Spring */
     @Autowired @Lazy
@@ -181,6 +182,25 @@ public class ImportService {
         if (resultat.getImportees() > 0 && (type.equals("achats") || type.equals("ventes"))) {
             TenantEntity tenant = tenantService.getCurrentTenant();
             stockService.invalidateStockCache(tenant.getTenantUuid());
+
+            // FIFO : rejouer l'historique chronologique pour calculer les bénéfices
+            // de toutes les ventes (importées ou non) du tenant.
+            // On reset les quantite_restante et on recrée les lignes vente_lot_consommation
+            // avec le bon ordre FIFO. Idempotent : peut tourner plusieurs fois sans risque.
+            //
+            // Non bloquant : si le FIFO échoue, l'import reste valide.
+            try {
+                var rapport = fifoBackfillService.executerBackfill(tenant, false);
+                log.info("FIFO auto-backfill après import : {} ventes traitées, " +
+                        "{} entièrement tracées, bénéfice reconstitué = {}",
+                        rapport.getNbVentesTraitees(),
+                        rapport.getNbVentesEntierementTracees(),
+                        rapport.getBeneficeTotalReconstitue());
+            } catch (Exception e) {
+                log.error("FIFO auto-backfill après import : échec — {} " +
+                        "(l'import reste valide, lancez le backfill manuellement si besoin)",
+                        e.getMessage(), e);
+            }
         }
 
         return resultat;
