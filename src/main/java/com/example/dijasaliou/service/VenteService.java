@@ -1,6 +1,7 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.exception.ConflictException;
+import com.example.dijasaliou.dto.BeneficeStatistiquesDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.VenteDto;
@@ -14,6 +15,7 @@ import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
+import com.example.dijasaliou.repository.VenteLotConsommationRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -44,6 +46,8 @@ public class VenteService {
     private final ClientRepository clientRepository;
     private final CreditClientRepository creditClientRepository;
     private final PaiementCreditRepository paiementCreditRepository;
+    private final FifoCalculService fifoCalculService;
+    private final VenteLotConsommationRepository consommationRepository;
 
     public VenteService(VenteRepository venteRepository,
                         @Lazy StockService stockService,
@@ -52,7 +56,9 @@ public class VenteService {
                         @Lazy CreditClientService creditClientService,
                         ClientRepository clientRepository,
                         CreditClientRepository creditClientRepository,
-                        PaiementCreditRepository paiementCreditRepository) {
+                        PaiementCreditRepository paiementCreditRepository,
+                        FifoCalculService fifoCalculService,
+                        VenteLotConsommationRepository consommationRepository) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
         this.tenantService = tenantService;
@@ -61,6 +67,8 @@ public class VenteService {
         this.clientRepository = clientRepository;
         this.creditClientRepository = creditClientRepository;
         this.paiementCreditRepository = paiementCreditRepository;
+        this.fifoCalculService = fifoCalculService;
+        this.consommationRepository = consommationRepository;
     }
 
     /**
@@ -153,6 +161,16 @@ public class VenteService {
         // Sauvegarder la vente
         VenteEntity venteSauvegardee = venteRepository.save(vente);
         stockService.invalidateStockCache(venteSauvegardee.getTenant().getTenantUuid());
+
+        // FIFO : consommer le stock dans les lots d'achat (du plus ancien au plus récent)
+        // et calculer le bénéfice net de la vente.
+        // Ne JAMAIS bloquer la vente si le FIFO échoue (logique non critique).
+        try {
+            fifoCalculService.consommerStockFifo(venteSauvegardee);
+        } catch (Exception e) {
+            log.error("FIFO : échec du calcul de bénéfice pour la vente {} : {}",
+                    venteSauvegardee.getId(), e.getMessage(), e);
+        }
 
         // ALERTE DE STOCK : Vérifier le stock après la vente et envoyer une alerte si nécessaire
         // (uniquement pour les plans PREMIUM et ENTREPRISE)
@@ -269,6 +287,15 @@ public class VenteService {
             creditClientService.creerCreditDepuisVente(
                     venteSauvegardee, client, employe, venteModifiee.getDateEcheance());
             stockService.invalidateStockCache(venteSauvegardee.getTenant().getTenantUuid());
+
+            // FIFO : recalculer après modification
+            try {
+                fifoCalculService.recalculerFifo(venteSauvegardee);
+            } catch (Exception e) {
+                log.error("FIFO : échec du recalcul de bénéfice pour la vente {} : {}",
+                        venteSauvegardee.getId(), e.getMessage(), e);
+            }
+
             return venteSauvegardee;
 
         } else if (aUnCreditActif) {
@@ -281,6 +308,16 @@ public class VenteService {
 
         VenteEntity saved = venteRepository.save(venteExistante);
         stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
+
+        // FIFO : recalculer les lignes de consommation
+        // (rend les unités aux lots puis refait le calcul avec les nouvelles valeurs)
+        try {
+            fifoCalculService.recalculerFifo(saved);
+        } catch (Exception e) {
+            log.error("FIFO : échec du recalcul de bénéfice pour la vente {} : {}",
+                    saved.getId(), e.getMessage(), e);
+        }
+
         return saved;
     }
 
@@ -327,6 +364,15 @@ public class VenteService {
         // Option A : solder les crédits actifs + détacher la FK vente → historique préservé
         creditClientService.solderEtDetacherCreditsDeLaVente(id);
 
+        // FIFO : annuler la consommation (rendre les unités aux lots) AVANT la suppression
+        // pour que les FK soient propres et que le stock soit cohérent.
+        try {
+            fifoCalculService.annulerConsommationFifo(id);
+        } catch (Exception e) {
+            log.error("FIFO : échec de l'annulation de bénéfice pour la vente {} : {}",
+                    id, e.getMessage(), e);
+        }
+
         venteRepository.deleteById(id);
         stockService.invalidateStockCache(tenantActuel.getTenantUuid());
     }
@@ -356,6 +402,52 @@ public class VenteService {
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
         return venteRepository.sumChiffreAffairesPeriode(
                 debut.atStartOfDay(), fin.atTime(LocalTime.MAX), tenantUuid);
+    }
+
+    /**
+     * Calculer les statistiques de bénéfice net (FIFO) sur une période.
+     *
+     * Le bénéfice est obtenu en sommant les benefice_total_ligne des lignes
+     * vente_lot_consommation pour la période. Les ventes sans ligne de consommation
+     * (produit jamais acheté) sont comptées séparément dans nbVentesSansBenefice.
+     */
+    @Transactional(readOnly = true)
+    public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        LocalDateTime debutDt = debut.atStartOfDay();
+        LocalDateTime finDt   = fin.atTime(LocalTime.MAX);
+
+        BigDecimal ca           = venteRepository.sumChiffreAffairesPeriode(debutDt, finDt, tenant.getTenantUuid());
+        if (ca == null) ca = BigDecimal.ZERO;
+
+        BigDecimal coutAchat    = consommationRepository.sumCoutAchatBetween(tenant, debutDt, finDt);
+        if (coutAchat == null) coutAchat = BigDecimal.ZERO;
+
+        BigDecimal benefice     = consommationRepository.sumBeneficeBetween(tenant, debutDt, finDt);
+        if (benefice == null) benefice = BigDecimal.ZERO;
+
+        long nbVentes              = venteRepository.findByDateVenteBetween(debutDt, finDt).size();
+        long nbVentesAvecBenefice  = consommationRepository.countVentesAvecBeneficeBetween(tenant, debutDt, finDt);
+        long nbVentesSansBenefice  = Math.max(0L, nbVentes - nbVentesAvecBenefice);
+
+        BigDecimal marge = BigDecimal.ZERO;
+        if (ca.compareTo(BigDecimal.ZERO) > 0) {
+            marge = benefice
+                    .multiply(new BigDecimal("100"))
+                    .divide(ca, 2, java.math.RoundingMode.HALF_UP);
+        }
+
+        return BeneficeStatistiquesDto.builder()
+                .dateDebut(debut)
+                .dateFin(fin)
+                .chiffreAffaires(ca)
+                .totalCoutAchat(coutAchat)
+                .beneficeNet(benefice)
+                .margePourcentage(marge)
+                .nbVentes(nbVentes)
+                .nbVentesAvecBenefice(nbVentesAvecBenefice)
+                .nbVentesSansBenefice(nbVentesSansBenefice)
+                .build();
     }
 
     /**

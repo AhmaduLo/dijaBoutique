@@ -103,4 +103,26 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
                                         @Param("dateDebut") LocalDateTime dateDebut,
                                         @Param("dateFin") LocalDateTime dateFin,
                                         Pageable pageable);
+
+    /**
+     * FIFO : lots d'achat disponibles pour un produit (quantité restante > 0),
+     * triés par date d'achat croissante (le plus ancien d'abord).
+     * Filtre tenant EXPLICITE pour sécurité multi-tenant.
+     */
+    @Query("""
+            SELECT a FROM AchatEntity a
+            WHERE a.tenant = :tenant
+              AND a.nomProduit = :nomProduit
+              AND a.quantiteRestante IS NOT NULL
+              AND a.quantiteRestante > 0
+            ORDER BY a.dateAchat ASC, a.id ASC
+            """)
+    List<AchatEntity> findLotsDisponiblesFifo(@Param("nomProduit") String nomProduit,
+                                              @Param("tenant") TenantEntity tenant);
+
+    /**
+     * Tous les achats d'un tenant triés par date d'achat ASC (pour le backfill FIFO).
+     */
+    @Query("SELECT a FROM AchatEntity a WHERE a.tenant = :tenant ORDER BY a.dateAchat ASC, a.id ASC")
+    List<AchatEntity> findAllByTenantOrderByDateAsc(@Param("tenant") TenantEntity tenant);
 }
