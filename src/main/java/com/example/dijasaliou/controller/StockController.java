@@ -1,7 +1,9 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.StockExportDto;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.StockService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -75,6 +77,10 @@ public class StockController {
      */
     @GetMapping("/export-data")
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    @RequiresPlan(
+            plans = {TenantEntity.Plan.PRO, TenantEntity.Plan.BUSINESS},
+            message = "L'export et l'inventaire du stock sont réservés aux plans PRO et BUSINESS"
+    )
     public ResponseEntity<List<StockExportDto>> obtenirStocksPourExport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
