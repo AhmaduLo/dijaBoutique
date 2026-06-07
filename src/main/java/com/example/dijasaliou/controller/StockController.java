@@ -1,11 +1,15 @@
 package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.StockDto;
+import com.example.dijasaliou.dto.StockExportDto;
 import com.example.dijasaliou.service.StockService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +58,27 @@ public class StockController {
     public ResponseEntity<List<StockDto>> obtenirTousLesStocks() {
         List<StockDto> stocks = stockService.obtenirTousLesStocks();
         return ResponseEntity.ok(stocks);
+    }
+
+    /**
+     * GET /api/stock/export-data?debut=2026-03-01&fin=2026-03-31
+     *
+     * Données de stock enrichies pour export :
+     *   - État actuel de chaque produit (stock, valeur, bénéfice)
+     *   - + Activité (quantités achetées/vendues) sur la période optionnelle
+     *
+     * Si debut ET fin sont absents → tous les produits.
+     * Si une période est précisée → seulement les produits avec activité dans la période.
+     *
+     * Le filtre par statut (rupture / stock_bas / en_stock) est appliqué côté frontend
+     * pour permettre des combinaisons rapides sans relancer la requête.
+     */
+    @GetMapping("/export-data")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    public ResponseEntity<List<StockExportDto>> obtenirStocksPourExport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        return ResponseEntity.ok(stockService.obtenirStocksPourExport(debut, fin));
     }
 
     /**
