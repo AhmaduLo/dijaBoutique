@@ -41,6 +41,14 @@ public class AchatEntity extends BaseEntity{
     @Column(name = "quantite", nullable = false)
     private Double quantite;
 
+    /**
+     * Quantité restante dans ce lot d'achat (FIFO).
+     * Décrémentée à chaque vente qui puise dans ce lot.
+     * Initialisée à quantite lors de la création de l'achat.
+     */
+    @Column(name = "quantite_restante")
+    private Double quantiteRestante;
+
     @NotBlank(message = "Le nom du produit est obligatoire")
     @Size(min = 2, max = 100, message = "Le nom doit faire entre 2 et 100 caractères")
     @Column(name = "nom_produit", nullable = false, length = 100)
@@ -201,6 +209,11 @@ public class AchatEntity extends BaseEntity{
         // Nettoyer le nom du produit
         if (this.nomProduit != null) {
             this.nomProduit = this.nomProduit.trim();
+        }
+
+        // FIFO : initialiser quantiteRestante avec quantite
+        if (this.quantiteRestante == null) {
+            this.quantiteRestante = this.quantite;
         }
     }
 

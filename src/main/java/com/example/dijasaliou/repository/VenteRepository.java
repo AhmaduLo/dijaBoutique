@@ -76,6 +76,12 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     List<VenteEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
+     * Toutes les ventes d'un tenant triées par date de vente ASC (pour le backfill FIFO).
+     */
+    @Query("SELECT v FROM VenteEntity v WHERE v.tenant = :tenant ORDER BY v.dateVente ASC, v.id ASC")
+    List<VenteEntity> findAllByTenantOrderByDateAsc(@Param("tenant") TenantEntity tenant);
+
+    /**
      * Calcule le chiffre d'affaires d'une période directement en SQL (évite le chargement en mémoire)
      */
     @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +

@@ -6,6 +6,7 @@ import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.repository.ProduitArchiveRepository;
+import com.example.dijasaliou.repository.VenteLotConsommationRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -32,13 +33,50 @@ public class StockService {
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
     private final ProduitArchiveRepository produitArchiveRepository;
+    private final VenteLotConsommationRepository venteLotConsommationRepository;
 
     public StockService(AchatRepository achatRepository, VenteRepository venteRepository,
-                        TenantService tenantService, ProduitArchiveRepository produitArchiveRepository) {
+                        TenantService tenantService, ProduitArchiveRepository produitArchiveRepository,
+                        VenteLotConsommationRepository venteLotConsommationRepository) {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
         this.tenantService = tenantService;
         this.produitArchiveRepository = produitArchiveRepository;
+        this.venteLotConsommationRepository = venteLotConsommationRepository;
+    }
+
+    /**
+     * Pré-charge un Map nomProduit (lowercase) → [beneficeTotal, quantiteVendueAvecBenefice]
+     * pour éviter les requêtes N+1 lors du calcul des stocks.
+     */
+    private Map<String, BigDecimal[]> chargerBeneficesParProduit(TenantEntity tenant) {
+        Map<String, BigDecimal[]> resultat = new java.util.HashMap<>();
+        List<Object[]> rows = venteLotConsommationRepository.sumBeneficeAndQuantiteByProduit(tenant);
+        for (Object[] row : rows) {
+            String nom = ((String) row[0]).toLowerCase().trim();
+            BigDecimal benefice = (BigDecimal) row[1];
+            Double quantite = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+            resultat.put(nom, new BigDecimal[]{
+                    benefice != null ? benefice : BigDecimal.ZERO,
+                    BigDecimal.valueOf(quantite)
+            });
+        }
+        return resultat;
+    }
+
+    /**
+     * Enrichit un StockDto avec le bénéfice FIFO total et la quantité vendue avec bénéfice.
+     */
+    private void enrichirAvecBenefice(StockDto stock, Map<String, BigDecimal[]> beneficesParProduit) {
+        String key = stock.getNomProduit().toLowerCase().trim();
+        BigDecimal[] benef = beneficesParProduit.get(key);
+        if (benef != null) {
+            stock.setBeneficeTotal(benef[0]);
+            stock.setQuantiteVendueAvecBenefice(benef[1].doubleValue());
+        } else {
+            stock.setBeneficeTotal(BigDecimal.ZERO);
+            stock.setQuantiteVendueAvecBenefice(0.0);
+        }
     }
 
     /**
@@ -54,6 +92,8 @@ public class StockService {
         TenantEntity tenant = tenantService.getCurrentTenant();
         List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
         List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+        // Pré-charger les bénéfices FIFO par produit (1 seule requête)
+        Map<String, BigDecimal[]> beneficesParProduit = chargerBeneficesParProduit(tenant);
 
         // 2. Grouper les achats par nom de produit et calculer les totaux
         Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
@@ -76,7 +116,9 @@ public class StockService {
             List<AchatEntity> achatsProduitsListe = entry.getValue();
             List<VenteEntity> ventesProduitsListe = ventesParProduit.getOrDefault(nomProduit, new ArrayList<>());
 
-            stocks.add(calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe));
+            StockDto stock = calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe);
+            enrichirAvecBenefice(stock, beneficesParProduit);
+            stocks.add(stock);
         }
 
         // 6. Filtrer les produits archivés
@@ -103,6 +145,7 @@ public class StockService {
 
         List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
         List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+        Map<String, BigDecimal[]> beneficesParProduit = chargerBeneficesParProduit(tenant);
 
         Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
                 .collect(Collectors.groupingBy(a -> a.getNomProduit().toLowerCase().trim()));
@@ -114,7 +157,9 @@ public class StockService {
             List<AchatEntity> achatsP = achatsParProduit.getOrDefault(nomArchive, new ArrayList<>());
             List<VenteEntity> ventesP = ventesParProduit.getOrDefault(nomArchive, new ArrayList<>());
             if (!achatsP.isEmpty()) {
-                stocksArchives.add(calculerStock(nomArchive, achatsP, ventesP));
+                StockDto stock = calculerStock(nomArchive, achatsP, ventesP);
+                enrichirAvecBenefice(stock, beneficesParProduit);
+                stocksArchives.add(stock);
             }
         }
 
@@ -129,6 +174,7 @@ public class StockService {
     public List<StockDto> obtenirTousLesStocksParTenant(TenantEntity tenant) {
         List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
         List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+        Map<String, BigDecimal[]> beneficesParProduit = chargerBeneficesParProduit(tenant);
 
         Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
                 .collect(Collectors.groupingBy(a -> a.getNomProduit().toLowerCase().trim()));
@@ -137,8 +183,10 @@ public class StockService {
 
         List<StockDto> stocks = new ArrayList<>();
         for (Map.Entry<String, List<AchatEntity>> entry : achatsParProduit.entrySet()) {
-            stocks.add(calculerStock(entry.getKey(), entry.getValue(),
-                    ventesParProduit.getOrDefault(entry.getKey(), new ArrayList<>())));
+            StockDto stock = calculerStock(entry.getKey(), entry.getValue(),
+                    ventesParProduit.getOrDefault(entry.getKey(), new ArrayList<>()));
+            enrichirAvecBenefice(stock, beneficesParProduit);
+            stocks.add(stock);
         }
         return stocks;
     }
@@ -172,7 +220,9 @@ public class StockService {
             throw new RuntimeException("Produit non trouvé : " + nomProduit);
         }
 
-        return calculerStock(nomProduit, achats, ventes);
+        StockDto stock = calculerStock(nomProduit, achats, ventes);
+        enrichirAvecBenefice(stock, chargerBeneficesParProduit(tenant));
+        return stock;
     }
 
     /**

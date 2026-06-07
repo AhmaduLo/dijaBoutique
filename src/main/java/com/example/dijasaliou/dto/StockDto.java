@@ -77,6 +77,19 @@ public class StockDto {
     private BigDecimal margeUnitaire;
 
     /**
+     * Bénéfice net total réalisé sur ce produit (FIFO).
+     * Somme des benefice_total_ligne des lignes vente_lot_consommation.
+     * Inclut UNIQUEMENT les ventes qui ont eu un calcul FIFO valide.
+     */
+    private BigDecimal beneficeTotal;
+
+    /**
+     * Quantité vendue avec un bénéfice calculé (peut être < quantiteVendue
+     * si certaines ventes n'ont pas trouvé de lot d'achat).
+     */
+    private Double quantiteVendueAvecBenefice;
+
+    /**
      * Statut du stock
      */
     private StatutStock statut;

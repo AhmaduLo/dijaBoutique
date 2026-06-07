@@ -1,5 +1,6 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.BeneficeStatistiquesDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.AchatEntity;
@@ -230,5 +231,23 @@ public class VenteController {
         stats.put("ventes", ventesDto);
 
         return ResponseEntity.ok(stats);
+    }
+
+    /**
+     * GET /api/ventes/benefice?debut=2026-06-01&fin=2026-06-07
+     *
+     * Statistiques de bénéfice net FIFO sur une période :
+     *   - chiffreAffaires, totalCoutAchat, beneficeNet, margePourcentage
+     *   - nbVentes, nbVentesAvecBenefice, nbVentesSansBenefice
+     *
+     * Utilisé par la carte "Bénéfice du jour / mois" dans l'UI Ventes.
+     */
+    @GetMapping("/benefice")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    public ResponseEntity<BeneficeStatistiquesDto> obtenirBenefice(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+
+        return ResponseEntity.ok(venteService.calculerStatistiquesBenefice(debut, fin));
     }
 }
