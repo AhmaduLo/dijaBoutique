@@ -1,6 +1,7 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.StockDto;
+import com.example.dijasaliou.dto.StockExportDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
@@ -15,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -62,6 +66,82 @@ public class StockService {
             });
         }
         return resultat;
+    }
+
+    /**
+     * Export enrichi : pour chaque produit, retourne son stock actuel + l'activité
+     * (achats / ventes) sur la période choisie.
+     *
+     * Filtrage :
+     *   - Si une période est précisée (debut/fin non nulles), seuls les produits
+     *     ayant eu de l'activité (achat OU vente) sur la période sont retournés.
+     *   - Si pas de période → tous les produits, avec activité = 0.
+     */
+    @Transactional(readOnly = true)
+    public List<StockExportDto> obtenirStocksPourExport(LocalDate debut, LocalDate fin) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        List<StockDto> stocks = obtenirTousLesStocks();
+
+        // Si pas de période → on retourne tous les stocks sans activité
+        if (debut == null && fin == null) {
+            return stocks.stream()
+                    .map(s -> toExportDto(s, 0.0, 0.0))
+                    .collect(Collectors.toList());
+        }
+
+        LocalDateTime debutDt = (debut != null ? debut.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0));
+        LocalDateTime finDt   = (fin   != null ? fin.atTime(LocalTime.MAX) : LocalDateTime.of(2099, 12, 31, 23, 59));
+
+        // Charger les achats et ventes de la période, grouper par nom_produit (lowercase trim)
+        List<AchatEntity> achatsPeriode = achatRepository.findByDateAchatBetween(debutDt, finDt)
+                .stream()
+                .filter(a -> a.getTenant() != null && a.getTenant().getId().equals(tenant.getId()))
+                .collect(Collectors.toList());
+        List<VenteEntity> ventesPeriode = venteRepository.findByDateVenteBetween(debutDt, finDt)
+                .stream()
+                .filter(v -> v.getTenant() != null && v.getTenant().getId().equals(tenant.getId()))
+                .collect(Collectors.toList());
+
+        Map<String, Double> qteAcheteeParProduit = achatsPeriode.stream()
+                .collect(Collectors.groupingBy(
+                        a -> a.getNomProduit().toLowerCase().trim(),
+                        Collectors.summingDouble(AchatEntity::getQuantite)));
+
+        Map<String, Double> qteVendueParProduit = ventesPeriode.stream()
+                .collect(Collectors.groupingBy(
+                        v -> v.getNomProduit().toLowerCase().trim(),
+                        Collectors.summingDouble(VenteEntity::getQuantite)));
+
+        // Inclure seulement les produits avec activité sur la période
+        return stocks.stream()
+                .map(s -> {
+                    String key = s.getNomProduit().toLowerCase().trim();
+                    Double acheteePeriode = qteAcheteeParProduit.getOrDefault(key, 0.0);
+                    Double venduePeriode  = qteVendueParProduit.getOrDefault(key, 0.0);
+                    return new Object[]{s, acheteePeriode, venduePeriode};
+                })
+                .filter(t -> ((Double) t[1]) > 0 || ((Double) t[2]) > 0)
+                .map(t -> toExportDto((StockDto) t[0], (Double) t[1], (Double) t[2]))
+                .collect(Collectors.toList());
+    }
+
+    private StockExportDto toExportDto(StockDto s, Double acheteePeriode, Double venduePeriode) {
+        return StockExportDto.builder()
+                .nomProduit(s.getNomProduit())
+                .codeBarre(s.getCodeBarre())
+                .unite(s.getUnite())
+                .quantiteAchetee(s.getQuantiteAchetee())
+                .quantiteVendue(s.getQuantiteVendue())
+                .stockDisponible(s.getStockDisponible())
+                .prixMoyenAchat(s.getPrixMoyenAchat())
+                .prixMoyenVente(s.getPrixMoyenVente())
+                .valeurStock(s.getValeurStock())
+                .margeUnitaire(s.getMargeUnitaire())
+                .beneficeTotal(s.getBeneficeTotal())
+                .statut(s.getStatut())
+                .quantiteAcheteePeriode(acheteePeriode)
+                .quantiteVenduePeriode(venduePeriode)
+                .build();
     }
 
     /**
