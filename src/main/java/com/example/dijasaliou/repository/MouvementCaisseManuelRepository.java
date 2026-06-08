@@ -25,6 +25,16 @@ public interface MouvementCaisseManuelRepository extends JpaRepository<Mouvement
     List<MouvementCaisseManuelEntity> findByTenantSince(@Param("tenant") TenantEntity tenant,
                                                        @Param("debut") LocalDateTime debut);
 
+    /** Historique : tous les mouvements manuels d'un tenant depuis une date, triés DESC. */
+    @Query("""
+            SELECT m FROM MouvementCaisseManuelEntity m
+            JOIN FETCH m.tenant
+            WHERE m.tenant = :tenant AND m.dateMouvement >= :debut
+            ORDER BY m.dateMouvement DESC, m.id DESC
+            """)
+    List<MouvementCaisseManuelEntity> findHistoriqueByTenant(@Param("tenant") TenantEntity tenant,
+                                                             @Param("debut") LocalDateTime debut);
+
     /** Somme des mouvements d'un type et d'un compte depuis une date. */
     @Query("""
             SELECT COALESCE(SUM(m.montant), 0) FROM MouvementCaisseManuelEntity m

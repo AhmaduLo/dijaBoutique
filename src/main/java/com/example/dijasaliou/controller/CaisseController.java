@@ -4,6 +4,7 @@ import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.dto.ActiverCaisseRequest;
 import com.example.dijasaliou.dto.CaisseSoldeDto;
 import com.example.dijasaliou.dto.MouvementCaisseRequest;
+import com.example.dijasaliou.dto.MouvementHistoriqueDto;
 import com.example.dijasaliou.dto.TransfertCaisseRequest;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
@@ -15,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * Endpoints du module Caisse multi-comptes.
@@ -43,6 +46,22 @@ public class CaisseController {
     )
     public ResponseEntity<CaisseSoldeDto> getSolde() {
         return ResponseEntity.ok(caisseService.getSoldeActuel());
+    }
+
+    /**
+     * GET /api/caisse/historique
+     *
+     * Liste des mouvements manuels (ENTREE / SORTIE) et transferts depuis
+     * l'activation de la caisse, triés par date décroissante.
+     */
+    @GetMapping("/historique")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    @RequiresPlan(
+            plans = {TenantEntity.Plan.BUSINESS},
+            message = "Le module Caisse est réservé au plan BUSINESS"
+    )
+    public ResponseEntity<List<MouvementHistoriqueDto>> getHistorique() {
+        return ResponseEntity.ok(caisseService.getHistorique());
     }
 
     @PostMapping("/activer")

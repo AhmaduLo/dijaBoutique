@@ -3,6 +3,8 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.ActiverCaisseRequest;
 import com.example.dijasaliou.dto.CaisseSoldeDto;
 import com.example.dijasaliou.dto.MouvementCaisseRequest;
+import com.example.dijasaliou.dto.MouvementHistoriqueDto;
+import com.example.dijasaliou.dto.MouvementHistoriqueDto.TypeHistorique;
 import com.example.dijasaliou.dto.TransfertCaisseRequest;
 import com.example.dijasaliou.entity.*;
 import com.example.dijasaliou.entity.MouvementCaisseManuelEntity.TypeMouvement;
@@ -14,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Service du module Caisse multi-comptes (BUSINESS).
@@ -201,6 +206,63 @@ public class CaisseService {
                 request.getMontant(), tenant.getTenantUuid());
 
         return getSoldeActuel();
+    }
+
+    // ── HISTORIQUE ────────────────────────────────────────────────────────────
+
+    /**
+     * Retourne l'historique des mouvements manuels et des transferts depuis
+     * l'activation de la caisse, triés par date décroissante (plus récent en haut).
+     *
+     * N'inclut PAS les achats / ventes / dépenses — ils sont consultables sur
+     * leurs pages respectives.
+     */
+    @Transactional(readOnly = true)
+    public List<MouvementHistoriqueDto> getHistorique() {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+
+        // Si la caisse n'est pas activée, retourner une liste vide
+        var configOpt = caisseConfigRepository.findByTenant(tenant);
+        if (configOpt.isEmpty()) {
+            return List.of();
+        }
+        LocalDateTime debut = configOpt.get().getDateActivation();
+
+        List<MouvementHistoriqueDto> historique = new ArrayList<>();
+
+        // Mouvements manuels (ENTREE / SORTIE)
+        mouvementManuelRepository.findByTenantSince(tenant, debut).forEach(m -> {
+            historique.add(MouvementHistoriqueDto.builder()
+                    .id(m.getId())
+                    .type(m.getTypeMouvement() == TypeMouvement.ENTREE
+                            ? TypeHistorique.ENTREE
+                            : TypeHistorique.SORTIE)
+                    .compte(m.getCompte())
+                    .montant(m.getMontant())
+                    .motif(m.getMotif())
+                    .date(m.getDateMouvement())
+                    .faitPar(m.getFaitPar())
+                    .build());
+        });
+
+        // Transferts
+        transfertRepository.findByTenantSince(tenant, debut).forEach(t -> {
+            historique.add(MouvementHistoriqueDto.builder()
+                    .id(t.getId())
+                    .type(TypeHistorique.TRANSFERT)
+                    .compteSource(t.getCompteSource())
+                    .compteDestination(t.getCompteDestination())
+                    .montant(t.getMontant())
+                    .motif(t.getMotif())
+                    .date(t.getDateTransfert())
+                    .faitPar(t.getFaitPar())
+                    .build());
+        });
+
+        // Tri par date DESC (plus récent en haut)
+        historique.sort(Comparator.comparing(MouvementHistoriqueDto::getDate).reversed());
+
+        return historique;
     }
 
     // ── UTILITAIRES ──────────────────────────────────────────────────────────
