@@ -188,7 +188,8 @@ public class AuthController {
      */
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
-        log.info("=== verify-email appelé avec token: {}", token);
+        log.info("=== verify-email appelé (token prefix: {}...)",
+                token != null && token.length() >= 8 ? token.substring(0, 8) : "n/a");
         String redirectUrl;
         try {
             authService.verifyEmail(token);
