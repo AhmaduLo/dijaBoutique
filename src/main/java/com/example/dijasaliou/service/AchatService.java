@@ -9,6 +9,7 @@ import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.exception.ConflictException;
 import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -28,6 +29,7 @@ import java.util.List;
  * Spring va créer automatiquement une instance (injection de dépendances)
  */
 @Service
+@Slf4j
 public class AchatService {
 
     // Le repository pour accéder à la base
@@ -223,6 +225,10 @@ public class AchatService {
         achatExistant.setUnite(achatModifie.getUnite());
         if (achatModifie.getDateAchat() != null) {
             achatExistant.setDateAchat(achatModifie.getDateAchat());
+        }
+        // Caisse multi-comptes : permettre la modification du mode de paiement
+        if (achatModifie.getModePaiement() != null) {
+            achatExistant.setModePaiement(achatModifie.getModePaiement());
         }
 
         // NOTE : On ne modifie PAS le tenant pour des raisons de sécurité

@@ -118,6 +118,14 @@ public class AchatEntity extends BaseEntity{
     @Builder.Default
     private String unite = "pièce";
 
+    /**
+     * Mode de paiement utilisé pour cet achat (caisse multi-comptes BUSINESS).
+     * NULL pour les anciens achats (avant activation caisse) — ils ne sont pas pris en compte.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_paiement", length = 20)
+    private ModePaiementCaisse modePaiement;
+
 
     /**
      * Relation Many-to-One avec Utilisateur

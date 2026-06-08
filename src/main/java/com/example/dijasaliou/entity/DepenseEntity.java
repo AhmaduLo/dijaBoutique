@@ -64,6 +64,26 @@ public class DepenseEntity  extends BaseEntity{
     @Builder.Default
     private Boolean estRecurrente = false;
 
+    /**
+     * Champs devise — existent en BDD (NOT NULL) mais étaient absents de l'entité.
+     * Valeurs par défaut pour ne pas casser les insertions.
+     */
+    @Column(name = "devise_code", length = 10, nullable = false)
+    @Builder.Default
+    private String deviseCode = "XOF";
+
+    @Column(name = "taux_change_applique", nullable = false)
+    @Builder.Default
+    private Double tauxChangeApplique = 1.0;
+
+    /**
+     * Mode de paiement utilisé pour cette dépense (caisse multi-comptes BUSINESS).
+     * NULL pour les anciennes dépenses (avant activation caisse) — ignorées.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_paiement", length = 20)
+    private ModePaiementCaisse modePaiement;
+
 
     /**
      * Relation avec Utilisateur
@@ -183,6 +203,14 @@ public class DepenseEntity  extends BaseEntity{
         // Définir récurrence selon la catégorie
         if (this.estRecurrente == null && this.categorie != null) {
             this.estRecurrente = this.categorie.isRecurrenteParDefaut();
+        }
+
+        // Devise par défaut (filet de sécurité au cas où Jackson aurait mis null)
+        if (this.deviseCode == null || this.deviseCode.isBlank()) {
+            this.deviseCode = "XOF";
+        }
+        if (this.tauxChangeApplique == null) {
+            this.tauxChangeApplique = 1.0;
         }
     }
 

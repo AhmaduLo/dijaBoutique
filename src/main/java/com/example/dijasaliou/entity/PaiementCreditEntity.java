@@ -28,7 +28,8 @@ public class PaiementCreditEntity {
     public enum ModePaiement {
         ESPECES,
         WAVE,
-        ORANGE_MONEY;
+        ORANGE_MONEY,
+        VIREMENT;
 
         @com.fasterxml.jackson.annotation.JsonCreator
         public static ModePaiement fromString(String value) {
@@ -71,4 +72,22 @@ public class PaiementCreditEntity {
     @CreationTimestamp
     @Column(name = "created_date", nullable = false, updatable = false)
     private LocalDateTime createdDate;
+
+    @Column(name = "devise_code", length = 10, nullable = false)
+    @Builder.Default
+    private String deviseCode = "XOF";
+
+    @Column(name = "taux_change_applique", nullable = false)
+    @Builder.Default
+    private Double tauxChangeApplique = 1.0;
+
+    @PrePersist
+    void onCreate() {
+        if (this.deviseCode == null || this.deviseCode.isBlank()) {
+            this.deviseCode = "XOF";
+        }
+        if (this.tauxChangeApplique == null) {
+            this.tauxChangeApplique = 1.0;
+        }
+    }
 }

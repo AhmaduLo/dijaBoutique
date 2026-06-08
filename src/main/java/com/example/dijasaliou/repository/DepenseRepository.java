@@ -68,4 +68,23 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
                                           @Param("search") String search,
                                           @Param("categorie") DepenseEntity.CategorieDepense categorie,
                                           Pageable pageable);
+
+    /**
+     * Somme des dépenses pour un mode de paiement, entre deux dates.
+     * Utilisé par le module Caisse pour calculer les sorties par compte
+     * (avec borne supérieure pour les snapshots).
+     */
+    @Query("""
+            SELECT COALESCE(SUM(d.montant), 0)
+            FROM DepenseEntity d
+            WHERE d.tenant = :tenant
+              AND d.modePaiement = :modePaiement
+              AND d.dateDepense >= :debut
+              AND d.dateDepense <= :fin
+            """)
+    BigDecimal sumByModePaiementBetween(
+            @Param("tenant") TenantEntity tenant,
+            @Param("modePaiement") com.example.dijasaliou.entity.ModePaiementCaisse modePaiement,
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
 }

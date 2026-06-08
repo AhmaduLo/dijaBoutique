@@ -154,7 +154,7 @@ public class VenteEntity  extends BaseEntity{
     private LocalDate dateEcheance;  // reste LocalDate : l'échéance est une date, pas un instant
 
     public enum ModePaiementVente {
-        ESPECES, WAVE, ORANGE_MONEY, CREDIT;
+        ESPECES, WAVE, ORANGE_MONEY, VIREMENT, CREDIT;
 
         @com.fasterxml.jackson.annotation.JsonCreator
         public static ModePaiementVente fromString(String value) {

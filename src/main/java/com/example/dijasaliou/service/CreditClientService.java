@@ -121,6 +121,14 @@ public class CreditClientService {
     public CreditClientDto enregistrerPaiement(String creditId, BigDecimal montant,
                                                 PaiementCreditEntity.ModePaiement modePaiement,
                                                 String note, UserEntity employe) {
+        return enregistrerPaiement(creditId, montant, modePaiement, note, null, employe);
+    }
+
+    /** Variante avec date de paiement explicite (permet l'antédatage). */
+    @Transactional
+    public CreditClientDto enregistrerPaiement(String creditId, BigDecimal montant,
+                                                PaiementCreditEntity.ModePaiement modePaiement,
+                                                String note, LocalDate datePaiement, UserEntity employe) {
         // 1. Récupérer le crédit avec verrou pessimiste (empêche les paiements simultanés)
         CreditClientEntity credit = creditClientRepository.findByIdForUpdate(creditId)
                 .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
@@ -145,12 +153,13 @@ public class CreditClientService {
                     "Le montant (" + montant + ") dépasse le restant dû (" + credit.getMontantRestant() + ")");
         }
 
-        // 5. Créer le paiement
+        // 5. Créer le paiement (date du payload ou today par défaut)
+        LocalDate dateEffective = datePaiement != null ? datePaiement : LocalDate.now();
         PaiementCreditEntity paiement = PaiementCreditEntity.builder()
                 .credit(credit)
                 .montantPaye(montant)
                 .modePaiement(modePaiement)
-                .datePaiement(LocalDate.now())
+                .datePaiement(dateEffective)
                 .employe(employe)
                 .employeNom(employe != null ? employe.getPrenom() + " " + employe.getNom() : "Inconnu")
                 .note(note)
@@ -171,17 +180,14 @@ public class CreditClientService {
             credit.setStatut(StatutCredit.SOLDE);
             BigDecimal nouvelleDette = client.getDetteTotale().subtract(montant);
             client.setDetteTotale(nouvelleDette.max(BigDecimal.ZERO));
-            // Marquer la vente comme soldée et mettre à jour le mode de paiement
+            // Marquer la vente comme soldée — on GARDE modePaiement=CREDIT pour éviter
+            // un double comptage dans la caisse (vente CREDIT + paiements crédit additionnés).
+            // La vente reste historiquement une vente "à crédit", soldée par les paiements
+            // enregistrés dans paiements_credit.
             if (credit.getVente() != null) {
                 VenteEntity vente = credit.getVente();
                 vente.setEstSoldee(true);
-                // Mettre à jour le modePaiement de la vente avec celui du dernier paiement
-                VenteEntity.ModePaiementVente modePaiementVente =
-                        VenteEntity.ModePaiementVente.valueOf(modePaiement.name());
-                vente.setModePaiement(modePaiementVente);
                 venteRepository.save(vente);
-                log.info("Vente #{} : modePaiement mis à jour → {} (crédit soldé)",
-                        vente.getId(), modePaiementVente);
             }
             log.info("Crédit #{} soldé pour {} (tenant: {})",
                     creditId, client.getNom(), currentTenant.getTenantUuid());
@@ -259,6 +265,18 @@ public class CreditClientService {
         return paiementCreditRepository.findByCreditOrderByCreatedDateDesc(credit).stream()
                 .map(PaiementCreditDto::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /** Détail d'un crédit (par id), filtré par tenant. */
+    @Transactional(readOnly = true)
+    public CreditClientDto obtenirCredit(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findById(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(currentTenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+        return CreditClientDto.fromEntity(credit);
     }
 
     @Transactional(readOnly = true)

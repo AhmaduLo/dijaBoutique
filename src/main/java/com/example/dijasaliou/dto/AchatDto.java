@@ -1,6 +1,7 @@
 package com.example.dijasaliou.dto;
 
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.ModePaiementCaisse;
 import com.example.dijasaliou.entity.TenantEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -35,6 +36,9 @@ public class AchatDto {
     private String photoUrl;
     private String codeBarre;
     private String unite;
+
+    /** Mode de paiement utilisé (caisse multi-comptes BUSINESS). Peut être null pour les anciens achats. */
+    private ModePaiementCaisse modePaiement;
 
     // Informations sur l'utilisateur qui a créé l'achat
     private UserDto utilisateur;
@@ -71,6 +75,7 @@ public class AchatDto {
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .codeBarre(achat.getCodeBarre())
                 .unite(achat.getUnite())
+                .modePaiement(achat.getModePaiement())
                 .utilisateur(UserDto.fromEntityMinimal(achat.getUtilisateur()))
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
@@ -105,6 +110,7 @@ public class AchatDto {
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .codeBarre(achat.getCodeBarre())
                 .unite(achat.getUnite())
+                .modePaiement(achat.getModePaiement())
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
                 .annee(achat.getAnnee())

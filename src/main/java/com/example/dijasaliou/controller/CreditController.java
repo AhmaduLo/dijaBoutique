@@ -94,6 +94,7 @@ public class CreditController {
                 request.getMontant(),
                 request.getModePaiement(),
                 request.getNote(),
+                request.getDatePaiement(),
                 employe);
         return ResponseEntity.ok(result);
     }
@@ -103,6 +104,14 @@ public class CreditController {
     @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
     public ResponseEntity<List<PaiementCreditDto>> obtenirPaiements(@PathVariable String id) {
         return ResponseEntity.ok(creditClientService.obtenirPaiements(id));
+    }
+
+    /** GET /api/credits/{id} — détail d'un crédit (utilisé par certains refresh frontend). */
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<CreditClientDto> obtenirCredit(@PathVariable String id) {
+        return ResponseEntity.ok(creditClientService.obtenirCredit(id));
     }
 
     @GetMapping("/stats")

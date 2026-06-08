@@ -1,6 +1,7 @@
 package com.example.dijasaliou.dto;
 
 import com.example.dijasaliou.entity.DepenseEntity;
+import com.example.dijasaliou.entity.ModePaiementCaisse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,6 +32,9 @@ public class DepenseDto {
     private String notes;
     private Boolean estRecurrente;
 
+    /** Mode de paiement utilisé (caisse multi-comptes BUSINESS). Peut être null pour les anciennes dépenses. */
+    private ModePaiementCaisse modePaiement;
+
     // Informations sur l'utilisateur qui a créé la dépense
     private UserDto utilisateur;
 
@@ -57,6 +61,7 @@ public class DepenseDto {
                 .categorie(depense.getCategorie())
                 .notes(depense.getNotes())
                 .estRecurrente(depense.getEstRecurrente())
+                .modePaiement(depense.getModePaiement())
                 .utilisateur(UserDto.fromEntityMinimal(depense.getUtilisateur()))
                 .estRecente(depense.estRecente())
                 .mois(depense.getMois())
@@ -82,6 +87,7 @@ public class DepenseDto {
                 .categorie(depense.getCategorie())
                 .notes(depense.getNotes())
                 .estRecurrente(depense.getEstRecurrente())
+                .modePaiement(depense.getModePaiement())
                 .estRecente(depense.estRecente())
                 .mois(depense.getMois())
                 .annee(depense.getAnnee())
