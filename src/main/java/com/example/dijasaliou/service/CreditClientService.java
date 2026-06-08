@@ -261,6 +261,18 @@ public class CreditClientService {
                 .collect(Collectors.toList());
     }
 
+    /** Détail d'un crédit (par id), filtré par tenant. */
+    @Transactional(readOnly = true)
+    public CreditClientDto obtenirCredit(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findById(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(currentTenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+        return CreditClientDto.fromEntity(credit);
+    }
+
     @Transactional(readOnly = true)
     public List<CreditClientDto> obtenirHistoriqueClient(String clientId) {
         ClientEntity client = clientRepository.findById(clientId)

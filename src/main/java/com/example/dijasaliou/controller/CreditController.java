@@ -105,6 +105,14 @@ public class CreditController {
         return ResponseEntity.ok(creditClientService.obtenirPaiements(id));
     }
 
+    /** GET /api/credits/{id} — détail d'un crédit (utilisé par certains refresh frontend). */
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<CreditClientDto> obtenirCredit(@PathVariable String id) {
+        return ResponseEntity.ok(creditClientService.obtenirCredit(id));
+    }
+
     @GetMapping("/stats")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
     @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
