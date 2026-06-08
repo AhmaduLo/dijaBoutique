@@ -52,4 +52,10 @@ public interface TransfertCaisseRepository extends JpaRepository<TransfertCaisse
                                          @Param("compte") CompteCaisse compte,
                                          @Param("debut") LocalDateTime debut,
                                          @Param("fin") LocalDateTime fin);
+
+    /** Supprime tous les transferts d'un tenant. Utilisé par DELETE /api/caisse. */
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM TransfertCaisseEntity t WHERE t.tenant = :tenant")
+    int deleteAllByTenant(@Param("tenant") TenantEntity tenant);
 }

@@ -116,4 +116,23 @@ public class CaisseController {
         String userUuid = user != null ? String.valueOf(user.getId()) : null;
         return ResponseEntity.ok(caisseService.creerMouvementManuel(request, userUuid));
     }
+
+    /**
+     * DELETE /api/caisse — Supprime intégralement la caisse du tenant.
+     *
+     * Action IRRÉVERSIBLE : efface config + transferts + mouvements manuels.
+     * Les ventes/achats/dépenses/paiements crédit ne sont PAS touchés.
+     *
+     * Réservé au rôle ADMIN (le GERANT ne peut PAS supprimer).
+     */
+    @DeleteMapping
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @RequiresPlan(
+            plans = {TenantEntity.Plan.BUSINESS},
+            message = "Le module Caisse est réservé au plan BUSINESS"
+    )
+    public ResponseEntity<Void> supprimerCaisse() {
+        caisseService.supprimerCaisse();
+        return ResponseEntity.noContent().build();
+    }
 }

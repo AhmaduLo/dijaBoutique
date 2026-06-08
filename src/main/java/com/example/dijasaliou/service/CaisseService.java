@@ -60,6 +60,28 @@ public class CaisseService {
     private final TenantService                       tenantService;
     private final UserRepository                      userRepository;
 
+    // ── SUPPRESSION COMPLÈTE ─────────────────────────────────────────────────
+
+    /**
+     * Supprime intégralement la caisse du tenant courant : config + tous les
+     * transferts + tous les mouvements manuels. Action IRRÉVERSIBLE.
+     *
+     * Les ventes / achats / dépenses / paiements crédit ne sont PAS touchés
+     * (ils restent dans leurs tables). Après suppression, l'utilisateur revient
+     * sur l'écran "Activer la caisse".
+     *
+     * Réservé au rôle ADMIN (filtré côté controller).
+     */
+    @Transactional
+    public void supprimerCaisse() {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        int mouvements = mouvementManuelRepository.deleteAllByTenant(tenant);
+        int transferts = transfertRepository.deleteAllByTenant(tenant);
+        int config     = caisseConfigRepository.deleteAllByTenant(tenant);
+        log.warn("Caisse supprimée pour tenant={} : config={}, transferts={}, mouvements={}",
+                tenant.getTenantUuid(), config, transferts, mouvements);
+    }
+
     // ── ACTIVATION ───────────────────────────────────────────────────────────
 
     /**

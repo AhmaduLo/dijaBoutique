@@ -42,4 +42,10 @@ public interface MouvementCaisseManuelRepository extends JpaRepository<Mouvement
                                          @Param("type") TypeMouvement type,
                                          @Param("debut") LocalDateTime debut,
                                          @Param("fin") LocalDateTime fin);
+
+    /** Supprime tous les mouvements manuels d'un tenant. Utilisé par DELETE /api/caisse. */
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM MouvementCaisseManuelEntity m WHERE m.tenant = :tenant")
+    int deleteAllByTenant(@Param("tenant") TenantEntity tenant);
 }
