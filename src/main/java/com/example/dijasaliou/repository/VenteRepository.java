@@ -82,6 +82,22 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     List<VenteEntity> findAllByTenantOrderByDateAsc(@Param("tenant") TenantEntity tenant);
 
     /**
+     * Somme des ventes d'un tenant pour un mode de paiement, depuis une date.
+     * Utilisé par le module Caisse pour calculer les entrées par compte.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(v.prixTotal), 0)
+            FROM VenteEntity v
+            WHERE v.tenant = :tenant
+              AND v.modePaiement = :modePaiement
+              AND v.dateVente >= :debut
+            """)
+    BigDecimal sumByModePaiementSince(
+            @Param("tenant") TenantEntity tenant,
+            @Param("modePaiement") VenteEntity.ModePaiementVente modePaiement,
+            @Param("debut") LocalDateTime debut);
+
+    /**
      * Calcule le chiffre d'affaires d'une période directement en SQL (évite le chargement en mémoire)
      */
     @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +

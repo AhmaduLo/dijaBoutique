@@ -64,6 +64,14 @@ public class DepenseEntity  extends BaseEntity{
     @Builder.Default
     private Boolean estRecurrente = false;
 
+    /**
+     * Mode de paiement utilisé pour cette dépense (caisse multi-comptes BUSINESS).
+     * NULL pour les anciennes dépenses (avant activation caisse) — ignorées.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_paiement", length = 20)
+    private ModePaiementCaisse modePaiement;
+
 
     /**
      * Relation avec Utilisateur
