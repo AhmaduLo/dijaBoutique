@@ -184,7 +184,9 @@ public class CaisseService {
         BigDecimal entreesVentes      = venteRepository.sumByModePaiementBetween(tenant, modeVente, debut, fin);
         BigDecimal sortiesAchats      = achatRepository.sumByModePaiementBetween(tenant, modePaiement, debut, fin);
         BigDecimal sortiesDepenses    = depenseRepository.sumByModePaiementBetween(tenant, modePaiement, debut, fin);
-        BigDecimal entreesCredits     = paiementCreditRepository.sumByModeBetween(tenant, modeCredit, debut, fin);
+        // paiements crédit filtrés sur datePaiement (date métier, pas createdDate technique)
+        BigDecimal entreesCredits     = paiementCreditRepository.sumByModeBetween(
+                tenant, modeCredit, debut.toLocalDate(), fin.toLocalDate());
         BigDecimal transfertsEntrants = transfertRepository.sumEntreesByCompteBetween(tenant, compte, debut, fin);
         BigDecimal transfertsSortants = transfertRepository.sumSortiesByCompteBetween(tenant, compte, debut, fin);
         BigDecimal entreesManuelles   = mouvementManuelRepository.sumByCompteAndTypeBetween(

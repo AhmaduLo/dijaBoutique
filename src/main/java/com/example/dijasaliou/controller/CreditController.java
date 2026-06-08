@@ -94,6 +94,7 @@ public class CreditController {
                 request.getMontant(),
                 request.getModePaiement(),
                 request.getNote(),
+                request.getDatePaiement(),
                 employe);
         return ResponseEntity.ok(result);
     }

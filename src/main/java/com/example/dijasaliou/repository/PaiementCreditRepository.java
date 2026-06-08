@@ -12,7 +12,6 @@ import com.example.dijasaliou.entity.TenantEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -35,7 +34,8 @@ public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEn
 
     /**
      * Somme des remboursements de crédits pour un mode de paiement donné,
-     * entre deux dates (au sens createdDate — instant précis du paiement).
+     * entre deux dates au sens {@code datePaiement} (date métier saisie par
+     * l'utilisateur, peut être antédatée).
      * Utilisé par le module Caisse pour intégrer les remboursements aux soldes.
      */
     @Query("""
@@ -43,11 +43,11 @@ public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEn
             FROM PaiementCreditEntity p
             WHERE p.credit.tenant = :tenant
               AND p.modePaiement = :mode
-              AND p.createdDate >= :debut
-              AND p.createdDate <= :fin
+              AND p.datePaiement >= :debut
+              AND p.datePaiement <= :fin
             """)
     BigDecimal sumByModeBetween(@Param("tenant") TenantEntity tenant,
                                 @Param("mode") ModePaiement mode,
-                                @Param("debut") LocalDateTime debut,
-                                @Param("fin") LocalDateTime fin);
+                                @Param("debut") LocalDate debut,
+                                @Param("fin") LocalDate fin);
 }
