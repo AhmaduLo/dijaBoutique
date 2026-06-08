@@ -115,6 +115,10 @@ public class DepenseService {
         if (depenseModifiee.getDateDepense() != null) {
             depenseExistante.setDateDepense(depenseModifiee.getDateDepense());
         }
+        // Caisse multi-comptes : permettre la modification du mode de paiement
+        if (depenseModifiee.getModePaiement() != null) {
+            depenseExistante.setModePaiement(depenseModifiee.getModePaiement());
+        }
 
         return depenseRepository.save(depenseExistante);
     }
