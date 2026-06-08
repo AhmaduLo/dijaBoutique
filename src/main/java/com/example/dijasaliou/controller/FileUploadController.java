@@ -72,8 +72,6 @@ public class FileUploadController {
             response.put("photoUrl", photoUrl);
             response.put("message", "Photo uploadée avec succès");
 
-            log.info("Photo uploadée : {} (Tenant: {}, Type: {})", photoUrl, tenant.getTenantUuid(), type);
-
             return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {

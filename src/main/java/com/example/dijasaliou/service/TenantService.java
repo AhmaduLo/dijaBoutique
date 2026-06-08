@@ -100,18 +100,15 @@ public class TenantService {
             if (!nouveauNomEntreprise.equals(tenant.getNomEntreprise())) {
                 nomEntrepriseChange = true;
                 tenant.setNomEntreprise(nouveauNomEntreprise);
-                log.info("Mise à jour nom entreprise: {} -> {}", tenantActuel.getNomEntreprise(), nouveauNomEntreprise);
             }
         }
 
         if (request.getNumeroTelephone() != null && !request.getNumeroTelephone().trim().isEmpty()) {
             tenant.setNumeroTelephone(request.getNumeroTelephone().trim());
-            log.info("Mise à jour numéro téléphone: {} -> {}", tenantActuel.getNumeroTelephone(), request.getNumeroTelephone());
         }
 
         if (request.getAdresse() != null) {
             tenant.setAdresse(request.getAdresse().trim().isEmpty() ? null : request.getAdresse().trim());
-            log.info("Mise à jour adresse: {} -> {}", tenantActuel.getAdresse(), request.getAdresse());
         }
 
         if (request.getVille() != null) {
@@ -126,7 +123,6 @@ public class TenantService {
         if (request.getNineaSiret() != null) {
             String nineaSiret = request.getNineaSiret().trim().isEmpty() ? null : request.getNineaSiret().trim();
             tenant.setNineaSiret(nineaSiret);
-            log.info("Mise à jour NINEA/SIRET: {} -> {}", tenantActuel.getNineaSiret(), nineaSiret);
         }
 
         // Mise à jour de l'URL du logo (optionnel)
@@ -136,23 +132,15 @@ public class TenantService {
 
         // Forcer la sauvegarde du tenant
         TenantEntity tenantSauvegarde = tenantRepository.saveAndFlush(tenant);
-        log.info("Tenant mis à jour avec succès : {} - {} - {} - {}",
-                tenantSauvegarde.getNomEntreprise(),
-                tenantSauvegarde.getNumeroTelephone(),
-                tenantSauvegarde.getAdresse(),
-                tenantSauvegarde.getTenantUuid());
+        log.info("Tenant mis à jour : {} (uuid={})", tenantSauvegarde.getNomEntreprise(), tenantSauvegarde.getTenantUuid());
 
         // Si le nom de l'entreprise a changé, mettre à jour tous les utilisateurs de ce tenant
         if (nomEntrepriseChange) {
             List<UserEntity> utilisateurs = tenant.getUtilisateurs();
-            log.info("Mise à jour du nom d'entreprise pour {} utilisateurs", utilisateurs.size());
-
             for (UserEntity user : utilisateurs) {
                 user.setNomEntreprise(nouveauNomEntreprise);
             }
-
             userRepository.saveAllAndFlush(utilisateurs);
-            log.info("Tous les utilisateurs ont été mis à jour avec le nouveau nom d'entreprise: {}", nouveauNomEntreprise);
         }
 
         return tenantSauvegarde;

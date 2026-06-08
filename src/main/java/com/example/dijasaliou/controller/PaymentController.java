@@ -69,7 +69,6 @@ public class PaymentController {
     @GetMapping("/subscription")
     public ResponseEntity<SubscriptionStatusResponse> getSubscriptionStatus(Authentication authentication) {
         String email = authentication.getName();
-        log.info("Utilisateur {} consulte son abonnement", email);
 
         // SUPER_ADMIN n'a pas de tenant - retourner un statut actif permanent
         boolean isSuperAdmin = authentication.getAuthorities().stream()

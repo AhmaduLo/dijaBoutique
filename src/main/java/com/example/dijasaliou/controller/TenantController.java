@@ -41,9 +41,6 @@ public class TenantController {
      */
     @GetMapping("/tenant/info")
     public ResponseEntity<TenantResponse> getEntrepriseInfo(Authentication authentication) {
-        String email = authentication.getName();
-        log.info("Utilisateur {} récupère les informations de l'entreprise", email);
-
         TenantEntity tenant = tenantService.getCurrentTenant();
         UserEntity admin = tenantService.getAdminProprietaire(tenant);
 
@@ -74,9 +71,6 @@ public class TenantController {
      */
     @GetMapping("/admin/entreprise")
     public ResponseEntity<TenantResponse> getEntreprise(Authentication authentication) {
-        String emailAdmin = authentication.getName();
-        log.info("Admin {} récupère les informations de son entreprise", emailAdmin);
-
         TenantEntity tenant = tenantService.getCurrentTenant();
         UserEntity admin = tenantService.getAdminProprietaire(tenant);
 

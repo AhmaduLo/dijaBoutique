@@ -57,7 +57,6 @@ public class SuperAdminController {
      */
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStats(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les stats globales", auth.getName());
         return ResponseEntity.ok(superAdminService.getGlobalStats());
     }
 
@@ -67,7 +66,6 @@ public class SuperAdminController {
      */
     @GetMapping("/stats/monitoring")
     public ResponseEntity<Map<String, Object>> getMonitoring(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte le monitoring", auth.getName());
         return ResponseEntity.ok(superAdminService.getMonitoringStats());
     }
 
@@ -81,7 +79,6 @@ public class SuperAdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search) {
-        log.info("[SUPER_ADMIN] {} consulte tous les tenants (search={})", auth.getName(), search);
         if (size > 100) size = 100;
         return ResponseEntity.ok(superAdminService.getAllTenants(page, size, search));
     }
@@ -92,7 +89,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/supprimes")
     public ResponseEntity<List<TenantAdminDto>> getTenantsSupprimés(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les tenants supprimés", auth.getName());
         return ResponseEntity.ok(superAdminService.getSupprimesTenants());
     }
 
@@ -102,7 +98,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}")
     public ResponseEntity<TenantAdminDto> getTenant(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte le tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getTenantById(id));
     }
 
@@ -192,7 +187,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}/utilisateurs")
     public ResponseEntity<List<UtilisateurTenantDto>> getUtilisateurs(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les utilisateurs du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getUtilisateursByTenant(id));
     }
 
@@ -217,7 +211,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}/notes")
     public ResponseEntity<List<NoteInterne>> getNotes(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les notes du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getNotesByTenant(id));
     }
 
@@ -271,7 +264,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}/audit")
     public ResponseEntity<List<AuditLogDto>> getAuditLogs(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte l'audit du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getAuditLogs(id));
     }
 
@@ -281,7 +273,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}/factures")
     public ResponseEntity<List<FactureDto>> getFactures(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les factures du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getFacturesByTenant(id));
     }
 
@@ -321,7 +312,6 @@ public class SuperAdminController {
     @GetMapping("/tenants/{id}/paiements")
     public ResponseEntity<List<PaiementSuperAdminDto>> getPaiements(
             @PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les paiements du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getPaiementsByTenant(id));
     }
 
@@ -360,7 +350,6 @@ public class SuperAdminController {
      */
     @GetMapping("/stats/revenus-mensuels")
     public ResponseEntity<List<Map<String, Object>>> getRevenusMenuels(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les revenus mensuels", auth.getName());
         return ResponseEntity.ok(superAdminService.getRevenusMenuels());
     }
 
@@ -368,7 +357,6 @@ public class SuperAdminController {
 
     @GetMapping("/config")
     public ResponseEntity<List<PlatformConfigEntity>> getConfigs(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte la configuration plateforme", auth.getName());
         return ResponseEntity.ok(platformConfigService.obtenirToutes());
     }
 
