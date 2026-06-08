@@ -61,9 +61,10 @@ public class CaisseController {
     /**
      * GET /api/caisse/historique
      *
-     * Liste des mouvements manuels (ENTREE / SORTIE) et transferts depuis
-     * l'activation de la caisse, triés par date décroissante. Le paramètre
-     * optionnel {@code asOfDate} borne l'historique à la fin de la journée donnée.
+     * Liste des mouvements manuels (ENTREE / SORTIE) et transferts. Les paramètres
+     * optionnels {@code fromDate} et {@code asOfDate} bornent l'historique à un
+     * intervalle [fromDate, asOfDate] aligné sur le filtre du dashboard.
+     * Sans paramètres : historique complet depuis l'activation.
      */
     @GetMapping("/historique")
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
@@ -72,8 +73,9 @@ public class CaisseController {
             message = "Le module Caisse est réservé au plan BUSINESS"
     )
     public ResponseEntity<List<MouvementHistoriqueDto>> getHistorique(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
-        return ResponseEntity.ok(caisseService.getHistoriqueAt(asOfDate));
+        return ResponseEntity.ok(caisseService.getHistoriqueBetween(fromDate, asOfDate));
     }
 
     @PostMapping("/activer")

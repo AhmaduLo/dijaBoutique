@@ -56,6 +56,7 @@ public class CaisseService {
     private final AchatRepository                     achatRepository;
     private final VenteRepository                     venteRepository;
     private final DepenseRepository                   depenseRepository;
+    private final PaiementCreditRepository            paiementCreditRepository;
     private final TenantService                       tenantService;
     private final UserRepository                      userRepository;
 
@@ -178,10 +179,12 @@ public class CaisseService {
                                             BigDecimal soldeInitial) {
         ModePaiementCaisse modePaiement = compteToModePaiement(compte);
         VenteEntity.ModePaiementVente modeVente = compteToModeVente(compte);
+        PaiementCreditEntity.ModePaiement modeCredit = compteToModeCredit(compte);
 
         BigDecimal entreesVentes      = venteRepository.sumByModePaiementBetween(tenant, modeVente, debut, fin);
         BigDecimal sortiesAchats      = achatRepository.sumByModePaiementBetween(tenant, modePaiement, debut, fin);
         BigDecimal sortiesDepenses    = depenseRepository.sumByModePaiementBetween(tenant, modePaiement, debut, fin);
+        BigDecimal entreesCredits     = paiementCreditRepository.sumByModeBetween(tenant, modeCredit, debut, fin);
         BigDecimal transfertsEntrants = transfertRepository.sumEntreesByCompteBetween(tenant, compte, debut, fin);
         BigDecimal transfertsSortants = transfertRepository.sumSortiesByCompteBetween(tenant, compte, debut, fin);
         BigDecimal entreesManuelles   = mouvementManuelRepository.sumByCompteAndTypeBetween(
@@ -191,6 +194,7 @@ public class CaisseService {
 
         return nz(soldeInitial)
                 .add(nz(entreesVentes))
+                .add(nz(entreesCredits))
                 .subtract(nz(sortiesAchats))
                 .subtract(nz(sortiesDepenses))
                 .add(nz(transfertsEntrants))
@@ -205,6 +209,10 @@ public class CaisseService {
             return LocalDateTime.now();
         }
         return asOfDate.atTime(23, 59, 59);
+    }
+
+    private static LocalDateTime maxDateTime(LocalDateTime a, LocalDateTime b) {
+        return a.isAfter(b) ? a : b;
     }
 
     // ── TRANSFERTS ───────────────────────────────────────────────────────────
@@ -279,23 +287,34 @@ public class CaisseService {
      */
     @Transactional(readOnly = true)
     public List<MouvementHistoriqueDto> getHistorique() {
-        return getHistoriqueAt(null);
+        return getHistoriqueBetween(null, null);
     }
 
     /**
-     * Historique borné à une date (fin de journée). Si {@code asOfDate} est null,
-     * l'historique va jusqu'à maintenant (équivalent de {@link #getHistorique()}).
+     * Historique borné à un intervalle [fromDate, toDate] (inclusif).
+     * {@code fromDate} = null → on part de la date d'activation.
+     * {@code toDate}   = null → on va jusqu'à maintenant.
+     * Sinon, l'intervalle est restreint à la fenêtre demandée (mais jamais avant
+     * l'activation, qui reste la borne inférieure absolue).
      */
     @Transactional(readOnly = true)
-    public List<MouvementHistoriqueDto> getHistoriqueAt(LocalDate asOfDate) {
+    public List<MouvementHistoriqueDto> getHistoriqueBetween(LocalDate fromDate, LocalDate toDate) {
         TenantEntity tenant = tenantService.getCurrentTenant();
 
         var configOpt = caisseConfigRepository.findByTenant(tenant);
         if (configOpt.isEmpty()) {
             return List.of();
         }
-        LocalDateTime debut = configOpt.get().getDateActivation();
-        LocalDateTime fin = toFinJournee(asOfDate);
+        LocalDateTime dateActivation = configOpt.get().getDateActivation();
+        LocalDateTime debut = fromDate != null
+                ? maxDateTime(dateActivation, fromDate.atStartOfDay())
+                : dateActivation;
+        LocalDateTime fin = toFinJournee(toDate);
+
+        // Période entièrement avant l'activation → rien à afficher
+        if (fin.isBefore(dateActivation)) {
+            return List.of();
+        }
 
         List<MouvementHistoriqueDto> historique = new ArrayList<>();
 
@@ -440,6 +459,16 @@ public class CaisseService {
             case WAVE         -> VenteEntity.ModePaiementVente.WAVE;
             case ORANGE_MONEY -> VenteEntity.ModePaiementVente.ORANGE_MONEY;
             case VIREMENT     -> VenteEntity.ModePaiementVente.VIREMENT;
+        };
+    }
+
+    /** Convertit un CompteCaisse en PaiementCredit.ModePaiement (remboursements crédits). */
+    private static PaiementCreditEntity.ModePaiement compteToModeCredit(CompteCaisse compte) {
+        return switch (compte) {
+            case ESPECES      -> PaiementCreditEntity.ModePaiement.ESPECES;
+            case WAVE         -> PaiementCreditEntity.ModePaiement.WAVE;
+            case ORANGE_MONEY -> PaiementCreditEntity.ModePaiement.ORANGE_MONEY;
+            case VIREMENT     -> PaiementCreditEntity.ModePaiement.VIREMENT;
         };
     }
 }
