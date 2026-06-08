@@ -44,5 +44,10 @@ public class MouvementHistoriqueDto {
     private BigDecimal      montant;
     private String          motif;
     private LocalDateTime   date;
+
+    /** ID de l'utilisateur ayant effectué l'opération. */
     private String          faitPar;
+
+    /** Nom affichable (Prénom Nom) — résolu par le service à partir de faitPar. */
+    private String          faitParNom;
 }

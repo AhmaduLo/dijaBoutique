@@ -37,9 +37,11 @@ public class CaisseSoldeDto {
     private BigDecimal    soldeEspeces;
     private BigDecimal    soldeWave;
     private BigDecimal    soldeOm;
+    private BigDecimal    soldeVirement;
     private BigDecimal    soldeTotal;
 
     private BigDecimal    soldeInitialEspeces;
     private BigDecimal    soldeInitialWave;
     private BigDecimal    soldeInitialOm;
+    private BigDecimal    soldeInitialVirement;
 }

@@ -127,8 +127,9 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     List<AchatEntity> findAllByTenantOrderByDateAsc(@Param("tenant") TenantEntity tenant);
 
     /**
-     * Somme des achats d'un tenant pour un mode de paiement, depuis une date.
-     * Utilisé par le module Caisse pour calculer les sorties par compte.
+     * Somme des achats d'un tenant pour un mode de paiement, entre deux dates.
+     * Utilisé par le module Caisse pour calculer les sorties par compte
+     * (avec borne supérieure pour les snapshots).
      */
     @Query("""
             SELECT COALESCE(SUM(a.prixTotal), 0)
@@ -136,9 +137,11 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
             WHERE a.tenant = :tenant
               AND a.modePaiement = :modePaiement
               AND a.dateAchat >= :debut
+              AND a.dateAchat <= :fin
             """)
-    java.math.BigDecimal sumByModePaiementSince(
+    java.math.BigDecimal sumByModePaiementBetween(
             @Param("tenant") TenantEntity tenant,
             @Param("modePaiement") com.example.dijasaliou.entity.ModePaiementCaisse modePaiement,
-            @Param("debut") LocalDateTime debut);
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
 }

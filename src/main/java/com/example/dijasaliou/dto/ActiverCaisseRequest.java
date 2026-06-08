@@ -26,4 +26,8 @@ public class ActiverCaisseRequest {
     @NotNull
     @PositiveOrZero
     private BigDecimal soldeInitialOm;
+
+    @NotNull
+    @PositiveOrZero
+    private BigDecimal soldeInitialVirement;
 }

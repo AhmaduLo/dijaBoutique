@@ -64,6 +64,12 @@ public class CaisseConfigEntity extends BaseEntity {
     private BigDecimal soldeInitialOm = BigDecimal.ZERO;
 
     @NotNull
+    @PositiveOrZero
+    @Column(name = "solde_initial_virement", nullable = false, precision = 15, scale = 2)
+    @Builder.Default
+    private BigDecimal soldeInitialVirement = BigDecimal.ZERO;
+
+    @NotNull
     @Column(name = "date_activation", nullable = false)
     private LocalDateTime dateActivation;
 

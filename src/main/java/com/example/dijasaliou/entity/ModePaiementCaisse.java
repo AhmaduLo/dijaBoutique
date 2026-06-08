@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
  *   ESPECES        : sort de la caisse Espèces
  *   WAVE           : sort du compte Wave
  *   ORANGE_MONEY   : sort du compte Orange Money
- *   VIREMENT       : virement bancaire — N'IMPACTE PAS la caisse (l'argent est sur un compte bancaire)
+ *   VIREMENT       : sort du compte bancaire (compte caisse VIREMENT)
  *
  * Pour les ventes, on utilise ModePaiementVente (existant) avec en plus CREDIT.
  */
@@ -24,16 +24,13 @@ public enum ModePaiementCaisse {
         return ModePaiementCaisse.valueOf(value.toUpperCase());
     }
 
-    /**
-     * Retourne le compte de caisse correspondant, ou null si VIREMENT
-     * (pas de compte caisse pour le virement).
-     */
+    /** Retourne le compte de caisse correspondant. */
     public CompteCaisse toCompteCaisse() {
         return switch (this) {
             case ESPECES      -> CompteCaisse.ESPECES;
             case WAVE         -> CompteCaisse.WAVE;
             case ORANGE_MONEY -> CompteCaisse.ORANGE_MONEY;
-            case VIREMENT     -> null;
+            case VIREMENT     -> CompteCaisse.VIREMENT;
         };
     }
 }

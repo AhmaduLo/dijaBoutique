@@ -958,6 +958,7 @@ public class ImportService {
             case "ESPECES", "CASH", "LIQUIDE", "ESPECE" -> VenteEntity.ModePaiementVente.ESPECES;
             case "WAVE"                                  -> VenteEntity.ModePaiementVente.WAVE;
             case "ORANGE", "ORANGE_MONEY", "OM"          -> VenteEntity.ModePaiementVente.ORANGE_MONEY;
+            case "VIREMENT", "BANQUE"                    -> VenteEntity.ModePaiementVente.VIREMENT;
             case "CREDIT", "CRÉDIT"                      -> VenteEntity.ModePaiementVente.CREDIT;
             default                                      -> VenteEntity.ModePaiementVente.ESPECES;
         };

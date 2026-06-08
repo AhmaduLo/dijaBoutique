@@ -15,34 +15,41 @@ import java.util.List;
 @Repository
 public interface TransfertCaisseRepository extends JpaRepository<TransfertCaisseEntity, String> {
 
-    /** Tous les transferts d'un tenant à partir d'une date, triés par date DESC. */
+    /** Tous les transferts d'un tenant entre deux dates, triés par date DESC. */
     @Query("""
             SELECT t FROM TransfertCaisseEntity t
-            WHERE t.tenant = :tenant AND t.dateTransfert >= :debut
+            WHERE t.tenant = :tenant
+              AND t.dateTransfert >= :debut
+              AND t.dateTransfert <= :fin
             ORDER BY t.dateTransfert DESC, t.id DESC
             """)
-    List<TransfertCaisseEntity> findByTenantSince(@Param("tenant") TenantEntity tenant,
-                                                  @Param("debut") LocalDateTime debut);
+    List<TransfertCaisseEntity> findByTenantBetween(@Param("tenant") TenantEntity tenant,
+                                                    @Param("debut") LocalDateTime debut,
+                                                    @Param("fin") LocalDateTime fin);
 
-    /** Somme des transferts SORTANT d'un compte depuis une date. */
+    /** Somme des transferts SORTANT d'un compte entre deux dates. */
     @Query("""
             SELECT COALESCE(SUM(t.montant), 0) FROM TransfertCaisseEntity t
             WHERE t.tenant = :tenant
               AND t.compteSource = :compte
               AND t.dateTransfert >= :debut
+              AND t.dateTransfert <= :fin
             """)
-    BigDecimal sumSortiesByCompteSince(@Param("tenant") TenantEntity tenant,
-                                       @Param("compte") CompteCaisse compte,
-                                       @Param("debut") LocalDateTime debut);
+    BigDecimal sumSortiesByCompteBetween(@Param("tenant") TenantEntity tenant,
+                                         @Param("compte") CompteCaisse compte,
+                                         @Param("debut") LocalDateTime debut,
+                                         @Param("fin") LocalDateTime fin);
 
-    /** Somme des transferts ARRIVANT sur un compte depuis une date. */
+    /** Somme des transferts ARRIVANT sur un compte entre deux dates. */
     @Query("""
             SELECT COALESCE(SUM(t.montant), 0) FROM TransfertCaisseEntity t
             WHERE t.tenant = :tenant
               AND t.compteDestination = :compte
               AND t.dateTransfert >= :debut
+              AND t.dateTransfert <= :fin
             """)
-    BigDecimal sumEntreesByCompteSince(@Param("tenant") TenantEntity tenant,
-                                       @Param("compte") CompteCaisse compte,
-                                       @Param("debut") LocalDateTime debut);
+    BigDecimal sumEntreesByCompteBetween(@Param("tenant") TenantEntity tenant,
+                                         @Param("compte") CompteCaisse compte,
+                                         @Param("debut") LocalDateTime debut,
+                                         @Param("fin") LocalDateTime fin);
 }

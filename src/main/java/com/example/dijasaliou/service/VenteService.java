@@ -465,7 +465,7 @@ public class VenteService {
 
         Map<String, java.math.BigDecimal> totaux = new java.util.LinkedHashMap<>();
         Map<String, Long> nombres = new java.util.LinkedHashMap<>();
-        for (String mode : List.of("ESPECES", "WAVE", "ORANGE_MONEY", "CREDIT")) {
+        for (String mode : List.of("ESPECES", "WAVE", "ORANGE_MONEY", "VIREMENT", "CREDIT")) {
             totaux.put(mode, java.math.BigDecimal.ZERO);
             nombres.put(mode, 0L);
         }

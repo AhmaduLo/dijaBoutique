@@ -12,11 +12,13 @@ import com.example.dijasaliou.service.CaisseService;
 import com.example.dijasaliou.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -38,21 +40,30 @@ public class CaisseController {
     private final CaisseService caisseService;
     private final UserService   userService;
 
+    /**
+     * GET /api/caisse
+     *
+     * Solde actuel par compte. Le paramètre optionnel {@code asOfDate} permet
+     * de récupérer un "snapshot" virtuel à la fin de la journée donnée (utilisé
+     * pour consulter le solde d'un mois passé sur le dashboard).
+     */
     @GetMapping
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     @RequiresPlan(
             plans = {TenantEntity.Plan.BUSINESS},
             message = "Le module Caisse est réservé au plan BUSINESS"
     )
-    public ResponseEntity<CaisseSoldeDto> getSolde() {
-        return ResponseEntity.ok(caisseService.getSoldeActuel());
+    public ResponseEntity<CaisseSoldeDto> getSolde(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
+        return ResponseEntity.ok(caisseService.getSoldeAt(asOfDate));
     }
 
     /**
      * GET /api/caisse/historique
      *
      * Liste des mouvements manuels (ENTREE / SORTIE) et transferts depuis
-     * l'activation de la caisse, triés par date décroissante.
+     * l'activation de la caisse, triés par date décroissante. Le paramètre
+     * optionnel {@code asOfDate} borne l'historique à la fin de la journée donnée.
      */
     @GetMapping("/historique")
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
@@ -60,8 +71,9 @@ public class CaisseController {
             plans = {TenantEntity.Plan.BUSINESS},
             message = "Le module Caisse est réservé au plan BUSINESS"
     )
-    public ResponseEntity<List<MouvementHistoriqueDto>> getHistorique() {
-        return ResponseEntity.ok(caisseService.getHistorique());
+    public ResponseEntity<List<MouvementHistoriqueDto>> getHistorique(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
+        return ResponseEntity.ok(caisseService.getHistoriqueAt(asOfDate));
     }
 
     @PostMapping("/activer")
