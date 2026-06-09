@@ -60,4 +60,14 @@ public class SubscriptionStatusResponse {
      * Message pour l'utilisateur
      */
     private String message;
+
+    /**
+     * Date d'inscription (création du tenant)
+     */
+    private LocalDateTime dateCreation;
+
+    /**
+     * Date de début de l'essai gratuit
+     */
+    private LocalDateTime dateDebutEssai;
 }
