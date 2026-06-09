@@ -101,6 +101,23 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
             @Param("fin") LocalDateTime fin);
 
     /**
+     * Optimisation caisse : retourne le total des ventes GROUPÉ par mode
+     * en une seule query. Résultat : List<[ModePaiementVente, BigDecimal]>.
+     */
+    @Query("""
+            SELECT v.modePaiement, COALESCE(SUM(v.prixTotal), 0)
+            FROM VenteEntity v
+            WHERE v.tenant = :tenant
+              AND v.dateVente >= :debut
+              AND v.dateVente <= :fin
+            GROUP BY v.modePaiement
+            """)
+    java.util.List<Object[]> sumByModePaiementGrouped(
+            @Param("tenant") TenantEntity tenant,
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
+
+    /**
      * Calcule le chiffre d'affaires d'une période directement en SQL (évite le chargement en mémoire)
      */
     @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +

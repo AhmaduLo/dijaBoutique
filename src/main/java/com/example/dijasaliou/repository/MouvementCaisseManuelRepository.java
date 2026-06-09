@@ -43,6 +43,19 @@ public interface MouvementCaisseManuelRepository extends JpaRepository<Mouvement
                                          @Param("debut") LocalDateTime debut,
                                          @Param("fin") LocalDateTime fin);
 
+    /** Optimisation caisse : mouvements GROUPÉS par (compte, type) en une seule query. */
+    @Query("""
+            SELECT m.compte, m.typeMouvement, COALESCE(SUM(m.montant), 0)
+            FROM MouvementCaisseManuelEntity m
+            WHERE m.tenant = :tenant
+              AND m.dateMouvement >= :debut
+              AND m.dateMouvement <= :fin
+            GROUP BY m.compte, m.typeMouvement
+            """)
+    java.util.List<Object[]> sumByCompteAndTypeGrouped(@Param("tenant") TenantEntity tenant,
+                                                       @Param("debut") LocalDateTime debut,
+                                                       @Param("fin") LocalDateTime fin);
+
     /** Supprime tous les mouvements manuels d'un tenant. Utilisé par DELETE /api/caisse. */
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Modifying

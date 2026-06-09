@@ -87,4 +87,19 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
             @Param("modePaiement") com.example.dijasaliou.entity.ModePaiementCaisse modePaiement,
             @Param("debut") LocalDateTime debut,
             @Param("fin") LocalDateTime fin);
+
+    /** Optimisation caisse : total dépenses GROUPÉ par mode en une seule query. */
+    @Query("""
+            SELECT d.modePaiement, COALESCE(SUM(d.montant), 0)
+            FROM DepenseEntity d
+            WHERE d.tenant = :tenant
+              AND d.dateDepense >= :debut
+              AND d.dateDepense <= :fin
+              AND d.modePaiement IS NOT NULL
+            GROUP BY d.modePaiement
+            """)
+    java.util.List<Object[]> sumByModePaiementGrouped(
+            @Param("tenant") TenantEntity tenant,
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
 }

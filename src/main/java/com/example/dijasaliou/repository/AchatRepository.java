@@ -144,4 +144,19 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
             @Param("modePaiement") com.example.dijasaliou.entity.ModePaiementCaisse modePaiement,
             @Param("debut") LocalDateTime debut,
             @Param("fin") LocalDateTime fin);
+
+    /** Optimisation caisse : total achats GROUPÉ par mode en une seule query. */
+    @Query("""
+            SELECT a.modePaiement, COALESCE(SUM(a.prixTotal), 0)
+            FROM AchatEntity a
+            WHERE a.tenant = :tenant
+              AND a.dateAchat >= :debut
+              AND a.dateAchat <= :fin
+              AND a.modePaiement IS NOT NULL
+            GROUP BY a.modePaiement
+            """)
+    java.util.List<Object[]> sumByModePaiementGrouped(
+            @Param("tenant") TenantEntity tenant,
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
 }

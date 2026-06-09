@@ -53,6 +53,32 @@ public interface TransfertCaisseRepository extends JpaRepository<TransfertCaisse
                                          @Param("debut") LocalDateTime debut,
                                          @Param("fin") LocalDateTime fin);
 
+    /** Optimisation caisse : transferts SORTANTS GROUPÉS par compte source. */
+    @Query("""
+            SELECT t.compteSource, COALESCE(SUM(t.montant), 0)
+            FROM TransfertCaisseEntity t
+            WHERE t.tenant = :tenant
+              AND t.dateTransfert >= :debut
+              AND t.dateTransfert <= :fin
+            GROUP BY t.compteSource
+            """)
+    java.util.List<Object[]> sumSortiesGrouped(@Param("tenant") TenantEntity tenant,
+                                                @Param("debut") LocalDateTime debut,
+                                                @Param("fin") LocalDateTime fin);
+
+    /** Optimisation caisse : transferts ENTRANTS GROUPÉS par compte destination. */
+    @Query("""
+            SELECT t.compteDestination, COALESCE(SUM(t.montant), 0)
+            FROM TransfertCaisseEntity t
+            WHERE t.tenant = :tenant
+              AND t.dateTransfert >= :debut
+              AND t.dateTransfert <= :fin
+            GROUP BY t.compteDestination
+            """)
+    java.util.List<Object[]> sumEntreesGrouped(@Param("tenant") TenantEntity tenant,
+                                                @Param("debut") LocalDateTime debut,
+                                                @Param("fin") LocalDateTime fin);
+
     /** Supprime tous les transferts d'un tenant. Utilisé par DELETE /api/caisse. */
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Modifying

@@ -9,6 +9,7 @@ import com.example.dijasaliou.dto.TransfertCaisseRequest;
 import com.example.dijasaliou.entity.*;
 import com.example.dijasaliou.entity.MouvementCaisseManuelEntity.TypeMouvement;
 import com.example.dijasaliou.repository.*;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -59,6 +60,15 @@ public class CaisseService {
     private final PaiementCreditRepository            paiementCreditRepository;
     private final TenantService                       tenantService;
     private final UserRepository                      userRepository;
+
+    /**
+     * Borne supérieure utilisée pour la vue "temps réel" (asOfDate non fourni).
+     * Suffisamment loin dans le futur pour inclure toutes les transactions
+     * quelle que soit la TZ du client, sans risquer un overflow LocalDateTime
+     * (qui supporte jusqu'à l'an +999 999 999).
+     */
+    private static final LocalDateTime FUTUR_LOINTAIN =
+            LocalDateTime.of(9999, 12, 31, 23, 59, 59);
 
     // ── SUPPRESSION COMPLÈTE ─────────────────────────────────────────────────
 
@@ -115,7 +125,7 @@ public class CaisseService {
                 request.getSoldeInitialVirement());
 
         // Futur lointain pour fin : inclut tous les flux (évite tout problème de TZ)
-        return calculerSolde(tenant, config, LocalDateTime.now().plusYears(100));
+        return calculerSolde(tenant, config, FUTUR_LOINTAIN);
     }
 
     // ── CALCUL DU SOLDE ──────────────────────────────────────────────────────
@@ -171,14 +181,14 @@ public class CaisseService {
                     .build();
         }
 
-        BigDecimal soldeEspeces  = calculerSoldeCompte(tenant, CompteCaisse.ESPECES, debut, fin,
-                config.getSoldeInitialEspeces());
-        BigDecimal soldeWave     = calculerSoldeCompte(tenant, CompteCaisse.WAVE, debut, fin,
-                config.getSoldeInitialWave());
-        BigDecimal soldeOm       = calculerSoldeCompte(tenant, CompteCaisse.ORANGE_MONEY, debut, fin,
-                config.getSoldeInitialOm());
-        BigDecimal soldeVirement = calculerSoldeCompte(tenant, CompteCaisse.VIREMENT, debut, fin,
-                nz(config.getSoldeInitialVirement()));
+        // OPTIMISATION : 7 queries groupées au lieu de 28 (7 × 4 comptes avant)
+        // Chaque query GROUP BY compte/mode retourne tous les comptes d'un coup.
+        SoldesAgreges agg = chargerAgregats(tenant, debut, fin);
+
+        BigDecimal soldeEspeces  = soldeFromAgg(CompteCaisse.ESPECES,      config.getSoldeInitialEspeces(),  agg);
+        BigDecimal soldeWave     = soldeFromAgg(CompteCaisse.WAVE,         config.getSoldeInitialWave(),     agg);
+        BigDecimal soldeOm       = soldeFromAgg(CompteCaisse.ORANGE_MONEY, config.getSoldeInitialOm(),       agg);
+        BigDecimal soldeVirement = soldeFromAgg(CompteCaisse.VIREMENT,     nz(config.getSoldeInitialVirement()), agg);
 
         BigDecimal soldeTotal = soldeEspeces.add(soldeWave).add(soldeOm).add(soldeVirement);
 
@@ -198,8 +208,120 @@ public class CaisseService {
     }
 
     /**
-     * Calcule le solde d'un compte précis entre la date d'activation et {@code fin}.
+     * Agrégats SUM groupés par compte, chargés en 7 queries (1 par source de flux)
+     * au lieu de 7 × 4 = 28 queries avant l'optimisation.
      */
+    private static class SoldesAgreges {
+        final Map<CompteCaisse, BigDecimal> entreesVentes      = new EnumMap<>(CompteCaisse.class);
+        final Map<CompteCaisse, BigDecimal> sortiesAchats      = new EnumMap<>(CompteCaisse.class);
+        final Map<CompteCaisse, BigDecimal> sortiesDepenses    = new EnumMap<>(CompteCaisse.class);
+        final Map<CompteCaisse, BigDecimal> entreesCredits     = new EnumMap<>(CompteCaisse.class);
+        final Map<CompteCaisse, BigDecimal> transfertsEntrants = new EnumMap<>(CompteCaisse.class);
+        final Map<CompteCaisse, BigDecimal> transfertsSortants = new EnumMap<>(CompteCaisse.class);
+        final Map<CompteCaisse, BigDecimal> entreesManuelles   = new EnumMap<>(CompteCaisse.class);
+        final Map<CompteCaisse, BigDecimal> sortiesManuelles   = new EnumMap<>(CompteCaisse.class);
+    }
+
+    /** Charge tous les agrégats nécessaires au calcul du solde en 7 queries. */
+    private SoldesAgreges chargerAgregats(TenantEntity tenant, LocalDateTime debut, LocalDateTime fin) {
+        SoldesAgreges agg = new SoldesAgreges();
+
+        // 1. Ventes par mode → entrées par compte (CREDIT exclu, n'impacte pas la caisse)
+        for (Object[] row : venteRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
+            VenteEntity.ModePaiementVente mode = (VenteEntity.ModePaiementVente) row[0];
+            BigDecimal sum = (BigDecimal) row[1];
+            CompteCaisse compte = modeVenteToCompte(mode);
+            if (compte != null) agg.entreesVentes.merge(compte, sum, BigDecimal::add);
+        }
+
+        // 2. Achats par mode → sorties par compte
+        for (Object[] row : achatRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
+            ModePaiementCaisse mode = (ModePaiementCaisse) row[0];
+            BigDecimal sum = (BigDecimal) row[1];
+            agg.sortiesAchats.merge(mode.toCompteCaisse(), sum, BigDecimal::add);
+        }
+
+        // 3. Dépenses par mode → sorties par compte
+        for (Object[] row : depenseRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
+            ModePaiementCaisse mode = (ModePaiementCaisse) row[0];
+            BigDecimal sum = (BigDecimal) row[1];
+            agg.sortiesDepenses.merge(mode.toCompteCaisse(), sum, BigDecimal::add);
+        }
+
+        // 4. Paiements crédit par mode → entrées par compte
+        for (Object[] row : paiementCreditRepository.sumByModeGrouped(tenant, debut.toLocalDate(), fin.toLocalDate())) {
+            PaiementCreditEntity.ModePaiement mode = (PaiementCreditEntity.ModePaiement) row[0];
+            BigDecimal sum = (BigDecimal) row[1];
+            agg.entreesCredits.merge(modeCreditToCompte(mode), sum, BigDecimal::add);
+        }
+
+        // 5. Transferts sortants (compte_source)
+        for (Object[] row : transfertRepository.sumSortiesGrouped(tenant, debut, fin)) {
+            CompteCaisse compte = (CompteCaisse) row[0];
+            BigDecimal sum = (BigDecimal) row[1];
+            agg.transfertsSortants.put(compte, sum);
+        }
+
+        // 6. Transferts entrants (compte_destination)
+        for (Object[] row : transfertRepository.sumEntreesGrouped(tenant, debut, fin)) {
+            CompteCaisse compte = (CompteCaisse) row[0];
+            BigDecimal sum = (BigDecimal) row[1];
+            agg.transfertsEntrants.put(compte, sum);
+        }
+
+        // 7. Mouvements manuels par (compte, type)
+        for (Object[] row : mouvementManuelRepository.sumByCompteAndTypeGrouped(tenant, debut, fin)) {
+            CompteCaisse compte = (CompteCaisse) row[0];
+            TypeMouvement type  = (TypeMouvement) row[1];
+            BigDecimal sum      = (BigDecimal) row[2];
+            (type == TypeMouvement.ENTREE ? agg.entreesManuelles : agg.sortiesManuelles)
+                    .put(compte, sum);
+        }
+
+        return agg;
+    }
+
+    /** Assemble le solde d'un compte à partir des agrégats déjà chargés. */
+    private BigDecimal soldeFromAgg(CompteCaisse compte, BigDecimal soldeInitial, SoldesAgreges agg) {
+        return nz(soldeInitial)
+                .add(nz(agg.entreesVentes.get(compte)))
+                .add(nz(agg.entreesCredits.get(compte)))
+                .subtract(nz(agg.sortiesAchats.get(compte)))
+                .subtract(nz(agg.sortiesDepenses.get(compte)))
+                .add(nz(agg.transfertsEntrants.get(compte)))
+                .subtract(nz(agg.transfertsSortants.get(compte)))
+                .add(nz(agg.entreesManuelles.get(compte)))
+                .subtract(nz(agg.sortiesManuelles.get(compte)));
+    }
+
+    /** Convertit un mode vente vers son compte caisse, null si CREDIT (n'impacte pas la caisse). */
+    private static CompteCaisse modeVenteToCompte(VenteEntity.ModePaiementVente mode) {
+        return switch (mode) {
+            case ESPECES      -> CompteCaisse.ESPECES;
+            case WAVE         -> CompteCaisse.WAVE;
+            case ORANGE_MONEY -> CompteCaisse.ORANGE_MONEY;
+            case VIREMENT     -> CompteCaisse.VIREMENT;
+            case CREDIT       -> null;
+        };
+    }
+
+    /** Convertit un mode paiement crédit vers son compte caisse. */
+    private static CompteCaisse modeCreditToCompte(PaiementCreditEntity.ModePaiement mode) {
+        return switch (mode) {
+            case ESPECES      -> CompteCaisse.ESPECES;
+            case WAVE         -> CompteCaisse.WAVE;
+            case ORANGE_MONEY -> CompteCaisse.ORANGE_MONEY;
+            case VIREMENT     -> CompteCaisse.VIREMENT;
+        };
+    }
+
+    /**
+     * Calcule le solde d'un compte précis entre la date d'activation et {@code fin}.
+     * @deprecated remplacé par {@link #chargerAgregats} + {@link #soldeFromAgg} qui font
+     *             le même calcul en 7 queries au lieu de 7 par compte.
+     *             Conservé pour {@link #soldeCompte} (verification solde, 1 compte à la fois).
+     */
+    @Deprecated
     private BigDecimal calculerSoldeCompte(TenantEntity tenant, CompteCaisse compte,
                                             LocalDateTime debut, LocalDateTime fin,
                                             BigDecimal soldeInitial) {
@@ -242,7 +364,7 @@ public class CaisseService {
      */
     private LocalDateTime toFinJournee(LocalDate asOfDate) {
         if (asOfDate == null) {
-            return LocalDateTime.now().plusYears(100);
+            return FUTUR_LOINTAIN;
         }
         return asOfDate.atTime(23, 59, 59);
     }
@@ -256,7 +378,13 @@ public class CaisseService {
     @Transactional
     public CaisseSoldeDto creerTransfert(TransfertCaisseRequest request, String userUuid) {
         TenantEntity tenant = tenantService.getCurrentTenant();
-        verifierCaisseActive(tenant);
+
+        // Verrou pessimiste sur la config caisse : sérialise les opérations
+        // parallèles sur le même tenant (double-clic, multi-onglet, 2 appareils).
+        // Empêche le scénario "2 transferts simultanés rendent le solde négatif".
+        caisseConfigRepository.findByTenantForUpdate(tenant)
+                .orElseThrow(() -> new IllegalStateException(
+                        "La caisse n'est pas activée. Activez-la d'abord."));
 
         if (request.getCompteSource().equals(request.getCompteDestination())) {
             throw new IllegalArgumentException("Le compte source et destination doivent être différents");
@@ -289,11 +417,15 @@ public class CaisseService {
     @Transactional
     public CaisseSoldeDto creerMouvementManuel(MouvementCaisseRequest request, String userUuid) {
         TenantEntity tenant = tenantService.getCurrentTenant();
-        verifierCaisseActive(tenant);
 
-        // Une sortie ne peut pas rendre le compte négatif
+        // Verrou pessimiste pour les sorties (même raison que pour les transferts)
         if (request.getTypeMouvement() == TypeMouvement.SORTIE) {
+            caisseConfigRepository.findByTenantForUpdate(tenant)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "La caisse n'est pas activée. Activez-la d'abord."));
             verifierSoldeSuffisant(tenant, request.getCompte(), request.getMontant());
+        } else {
+            verifierCaisseActive(tenant);
         }
 
         MouvementCaisseManuelEntity mouvement = MouvementCaisseManuelEntity.builder()
@@ -468,7 +600,7 @@ public class CaisseService {
         };
         // Futur lointain : inclut tous les flux quel que soit la TZ (cf. toFinJournee)
         return calculerSoldeCompte(tenant, compte, config.getDateActivation(),
-                LocalDateTime.now().plusYears(100), soldeInitial);
+                FUTUR_LOINTAIN, soldeInitial);
     }
 
     private static String libelleCompte(CompteCaisse compte) {

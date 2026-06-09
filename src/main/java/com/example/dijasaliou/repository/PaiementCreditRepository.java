@@ -50,4 +50,17 @@ public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEn
                                 @Param("mode") ModePaiement mode,
                                 @Param("debut") LocalDate debut,
                                 @Param("fin") LocalDate fin);
+
+    /** Optimisation caisse : total paiements crédit GROUPÉ par mode en une query. */
+    @Query("""
+            SELECT p.modePaiement, COALESCE(SUM(p.montantPaye), 0)
+            FROM PaiementCreditEntity p
+            WHERE p.credit.tenant = :tenant
+              AND p.datePaiement >= :debut
+              AND p.datePaiement <= :fin
+            GROUP BY p.modePaiement
+            """)
+    java.util.List<Object[]> sumByModeGrouped(@Param("tenant") TenantEntity tenant,
+                                              @Param("debut") LocalDate debut,
+                                              @Param("fin") LocalDate fin);
 }
