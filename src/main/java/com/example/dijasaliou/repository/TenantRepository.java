@@ -98,4 +98,15 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
      */
     @Query("SELECT t FROM TenantEntity t WHERE t.plan = :plan AND t.essaiUtilise = false AND t.deleted = false AND t.dateDebutEssai < :cutoff")
     List<TenantEntity> findExpiredTrials(@Param("plan") TenantEntity.Plan plan, @Param("cutoff") LocalDateTime cutoff);
+
+    /**
+     * Tenants actifs (non supprimés, non suspendus) dont l'abonnement expire
+     * dans une fenêtre de temps donnée. Utilisé pour notifier le super admin
+     * X jours avant l'expiration.
+     */
+    @Query("SELECT t FROM TenantEntity t WHERE t.deleted = false AND t.actif = true " +
+           "AND t.dateExpiration IS NOT NULL " +
+           "AND t.dateExpiration BETWEEN :debut AND :fin")
+    List<TenantEntity> findExpiringBetween(@Param("debut") LocalDateTime debut,
+                                            @Param("fin") LocalDateTime fin);
 }

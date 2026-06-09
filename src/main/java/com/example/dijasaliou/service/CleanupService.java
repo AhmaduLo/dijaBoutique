@@ -26,6 +26,7 @@ public class CleanupService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final TenantRepository tenantRepository;
     private final TenantCacheService tenantCacheService;
+    private final PushNotificationService pushService;
 
     /**
      * Supprime les tokens de reset expirés — s'exécute toutes les nuits à 2h00.
@@ -58,6 +59,31 @@ public class CleanupService {
 
         if (!expiredTrials.isEmpty()) {
             log.info("[CLEANUP] {} essai(s) BUSINESS rétrogradé(s) vers GRATUIT", expiredTrials.size());
+        }
+    }
+
+    /**
+     * Alerte le super admin via push notification pour les abonnements qui
+     * expirent dans 3 jours (fenêtre 72h-96h).
+     * Tourne chaque jour à 9h du matin (heure raisonnable pour recevoir une notif).
+     */
+    @Scheduled(cron = "0 0 9 * * *")
+    public void notifierAbonnementsExpirantBientot() {
+        LocalDateTime debut = LocalDateTime.now().plusHours(72);
+        LocalDateTime fin = LocalDateTime.now().plusHours(96);
+        List<TenantEntity> expirantBientot = tenantRepository.findExpiringBetween(debut, fin);
+
+        for (TenantEntity tenant : expirantBientot) {
+            pushService.notifyAllSuperAdmins(
+                    "⚠️ Abonnement bientôt expiré",
+                    tenant.getNomEntreprise() + " — plan " + tenant.getPlan() + " expire dans 3 jours",
+                    "/superadmin/tenants/" + tenant.getId()
+            );
+        }
+
+        if (!expirantBientot.isEmpty()) {
+            log.info("[CLEANUP] {} alerte(s) push envoyée(s) pour abonnements expirant dans 3 jours",
+                    expirantBientot.size());
         }
     }
 }

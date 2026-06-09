@@ -36,19 +36,22 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+    private final PushNotificationService pushService;
 
     public AuthService(UserRepository userRepository,
                        TenantRepository tenantRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        PasswordResetTokenRepository passwordResetTokenRepository,
-                       EmailService emailService) {
+                       EmailService emailService,
+                       PushNotificationService pushService) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.emailService = emailService;
+        this.pushService = pushService;
     }
 
     /**
@@ -160,7 +163,16 @@ public class AuthService {
         passwordResetTokenRepository.save(verificationToken);
         emailService.sendVerificationEmail(savedUser.getEmail(), verificationToken.getToken(), savedUser.getPrenom());
 
-        // 8. Retourner la réponse - L'utilisateur a 14 jours d'essai gratuit
+        // 8. Notifier les super admins (push) — fire & forget
+        String villePays = (savedTenant.getVille() != null ? savedTenant.getVille() : "")
+                + (savedTenant.getPays() != null ? " " + savedTenant.getPays() : "");
+        pushService.notifyAllSuperAdmins(
+                "🆕 Nouveau client EasyStock",
+                savedTenant.getNomEntreprise() + (villePays.isBlank() ? "" : " — " + villePays.trim()),
+                "/superadmin/tenants/" + savedTenant.getId()
+        );
+
+        // 9. Retourner la réponse - L'utilisateur a 14 jours d'essai gratuit
         return AuthResponse.builder()
                 .token(token)
                 .user(savedUser)
