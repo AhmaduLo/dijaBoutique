@@ -114,7 +114,8 @@ public class CaisseService {
                 request.getSoldeInitialOm(),
                 request.getSoldeInitialVirement());
 
-        return calculerSolde(tenant, config, tenantService.nowInTenantTz());
+        // Futur lointain pour fin : inclut tous les flux (évite tout problème de TZ)
+        return calculerSolde(tenant, config, LocalDateTime.now().plusYears(100));
     }
 
     // ── CALCUL DU SOLDE ──────────────────────────────────────────────────────
@@ -230,10 +231,18 @@ public class CaisseService {
                 .subtract(nz(sortiesManuelles));
     }
 
-    /** Borne supérieure : fin de la journée d'asOfDate, ou maintenant (TZ tenant) si null. */
+    /**
+     * Borne supérieure :
+     *  - asOfDate fourni → fin de cette journée (snapshot)
+     *  - asOfDate null   → futur lointain (pas de borne, vue temps réel)
+     *
+     * Le "futur lointain" évite tout problème de timezone entre le serveur
+     * (Railway Amsterdam) et le navigateur de l'utilisateur (n'importe quel
+     * pays). Toutes les transactions sont alors incluses, peu importe la TZ.
+     */
     private LocalDateTime toFinJournee(LocalDate asOfDate) {
         if (asOfDate == null) {
-            return tenantService.nowInTenantTz();
+            return LocalDateTime.now().plusYears(100);
         }
         return asOfDate.atTime(23, 59, 59);
     }
@@ -457,8 +466,9 @@ public class CaisseService {
             case ORANGE_MONEY -> config.getSoldeInitialOm();
             case VIREMENT     -> nz(config.getSoldeInitialVirement());
         };
+        // Futur lointain : inclut tous les flux quel que soit la TZ (cf. toFinJournee)
         return calculerSoldeCompte(tenant, compte, config.getDateActivation(),
-                tenantService.nowInTenantTz(), soldeInitial);
+                LocalDateTime.now().plusYears(100), soldeInitial);
     }
 
     private static String libelleCompte(CompteCaisse compte) {
