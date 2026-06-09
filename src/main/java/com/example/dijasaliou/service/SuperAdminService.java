@@ -580,9 +580,14 @@ public class SuperAdminService {
         TenantEntity.Plan plan = TenantEntity.Plan.valueOf(req.plan());
         TenantEntity.Plan ancienPlan = tenant.getPlan();
 
+        // Période : MENSUEL (défaut) → +30j, ANNUEL → +365j
+        String periode = (req.periode() != null && req.periode().equalsIgnoreCase("ANNUEL"))
+                ? "ANNUEL" : "MENSUEL";
+        int joursAjoutes = "ANNUEL".equals(periode) ? 365 : 30;
+
         // Mettre à jour le tenant
         tenant.setPlan(plan);
-        tenant.setDateExpiration(LocalDateTime.now().plusDays(30));
+        tenant.setDateExpiration(LocalDateTime.now().plusDays(joursAjoutes));
         tenant.setActif(true);
         tenant.setEssaiUtilise(true);
         tenantRepository.save(tenant);
@@ -601,15 +606,16 @@ public class SuperAdminService {
                 .datePaiement(LocalDateTime.now())
                 .moisDebut(req.moisDebut())
                 .modePaiement(req.modePaiement())
+                .periode(periode)
                 .note(req.note())
                 .validePar(superAdminId)
                 .build();
         paiementSuperAdminRepository.save(paiement);
 
-        log.info("[SUPER_ADMIN] {} valide paiement pour tenant {} : {} → {} ({}F, {})",
-                auteurEmail, tenant.getTenantUuid(), ancienPlan, plan, req.montant(), req.modePaiement());
+        log.info("[SUPER_ADMIN] {} valide paiement pour tenant {} : {} → {} ({}F, {}, {})",
+                auteurEmail, tenant.getTenantUuid(), ancienPlan, plan, req.montant(), req.modePaiement(), periode);
         saveLog("VALIDER_PAIEMENT",
-                ancienPlan + " → " + plan + " | " + req.montant() + " F | " + req.modePaiement(),
+                ancienPlan + " → " + plan + " | " + req.montant() + " F | " + req.modePaiement() + " | " + periode,
                 tenant);
 
         return PaiementSuperAdminDto.fromEntity(paiement);

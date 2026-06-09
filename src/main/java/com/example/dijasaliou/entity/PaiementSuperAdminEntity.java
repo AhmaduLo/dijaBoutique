@@ -51,6 +51,11 @@ public class PaiementSuperAdminEntity {
     @Column(name = "mode_paiement", length = 50)
     private String modePaiement;
 
+    /** MENSUEL ou ANNUEL (annuel = -15% appliqué côté frontend) */
+    @Column(name = "periode", nullable = false, length = 10)
+    @Builder.Default
+    private String periode = "MENSUEL";
+
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
