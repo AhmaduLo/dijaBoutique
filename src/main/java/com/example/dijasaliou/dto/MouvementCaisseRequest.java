@@ -26,4 +26,7 @@ public class MouvementCaisseRequest {
     @NotBlank(message = "Le motif est obligatoire")
     @Size(max = 255)
     private String motif;
+
+    /** Date du mouvement (optionnelle) — heure locale du navigateur. */
+    private java.time.LocalDateTime dateMouvement;
 }

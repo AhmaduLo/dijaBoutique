@@ -23,4 +23,7 @@ public class TransfertCaisseRequest {
 
     @Size(max = 255)
     private String motif;
+
+    /** Date du transfert (optionnelle) — heure locale du navigateur. */
+    private java.time.LocalDateTime dateTransfert;
 }

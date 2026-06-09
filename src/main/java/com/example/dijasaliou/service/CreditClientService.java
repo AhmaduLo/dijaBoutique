@@ -153,8 +153,8 @@ public class CreditClientService {
                     "Le montant (" + montant + ") dépasse le restant dû (" + credit.getMontantRestant() + ")");
         }
 
-        // 5. Créer le paiement (date du payload ou today par défaut)
-        LocalDate dateEffective = datePaiement != null ? datePaiement : LocalDate.now();
+        // 5. Créer le paiement (date du payload ou today dans la TZ du tenant)
+        LocalDate dateEffective = datePaiement != null ? datePaiement : tenantService.todayInTenantTz();
         PaiementCreditEntity paiement = PaiementCreditEntity.builder()
                 .credit(credit)
                 .montantPaye(montant)
@@ -410,7 +410,7 @@ public class CreditClientService {
         stats.put("montantTotalDu", montantTotalDu);
         stats.put("nombreCreditsActifs", creditClientRepository.countCreditsActifs(StatutCredit.SOLDE, tenantUuid));
         stats.put("nombreClientsCrediteurs", creditClientRepository.countClientsCrediteurs(StatutCredit.SOLDE, tenantUuid));
-        stats.put("creditsEnRetard", creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, LocalDate.now(), tenantUuid));
+        stats.put("creditsEnRetard", creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, tenantService.todayInTenantTz(), tenantUuid));
         stats.put("tauxRecouvrement", tauxRecouvrement);
         return stats;
     }

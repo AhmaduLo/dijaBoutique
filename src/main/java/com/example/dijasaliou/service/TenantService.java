@@ -10,6 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -51,6 +54,55 @@ public class TenantService {
                 .orElseThrow(() -> new IllegalStateException(
                     "Tenant introuvable pour l'UUID: " + tenantId
                 ));
+    }
+
+    /**
+     * Retourne l'heure courante dans le fuseau horaire du tenant.
+     *
+     * À utiliser à la place de {@link LocalDateTime#now()} pour toutes les
+     * dates métier (activation caisse, transferts, mouvements, etc.) afin que
+     * l'heure stockée corresponde à celle vue par l'utilisateur côté frontend,
+     * indépendamment du fuseau horaire du serveur Railway/AWS.
+     */
+    public LocalDateTime nowInTenantTz() {
+        TenantEntity tenant = getCurrentTenant();
+        String tz = tenant.getTimezone();
+        if (tz == null || tz.isBlank()) tz = "Africa/Dakar";
+        try {
+            return LocalDateTime.now(ZoneId.of(tz));
+        } catch (Exception e) {
+            log.warn("Fuseau invalide '{}' sur tenant {}, fallback Africa/Dakar",
+                    tz, tenant.getTenantUuid());
+            return LocalDateTime.now(ZoneId.of("Africa/Dakar"));
+        }
+    }
+
+    /** Variante {@link LocalDate} pour les champs jour-seul (datePaiement). */
+    public LocalDate todayInTenantTz() {
+        return nowInTenantTz().toLocalDate();
+    }
+
+    /**
+     * Met à jour le fuseau horaire du tenant courant (paramétrage utilisateur).
+     * Vérifie que le fuseau est un identifiant IANA valide.
+     */
+    @Transactional
+    public TenantEntity updateTimezone(String newTimezone) {
+        if (newTimezone == null || newTimezone.isBlank()) {
+            throw new IllegalArgumentException("Le fuseau horaire est obligatoire");
+        }
+        try {
+            ZoneId.of(newTimezone);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                "Fuseau horaire invalide : " + newTimezone + " (ex: Africa/Dakar)");
+        }
+        TenantEntity tenant = getCurrentTenant();
+        tenant.setTimezone(newTimezone);
+        TenantEntity saved = tenantRepository.save(tenant);
+        log.info("Fuseau horaire mis à jour pour tenant {} : {}",
+                tenant.getTenantUuid(), newTimezone);
+        return saved;
     }
 
     /**

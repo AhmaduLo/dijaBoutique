@@ -55,7 +55,8 @@ public class TenantController {
                 tenant.getLogoUrl(),
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
-                admin != null ? admin.getEmail() : null
+                admin != null ? admin.getEmail() : null,
+                tenant.getTimezone()
         );
 
         return ResponseEntity.ok(response);
@@ -85,7 +86,8 @@ public class TenantController {
                 tenant.getLogoUrl(),
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
-                admin != null ? admin.getEmail() : null
+                admin != null ? admin.getEmail() : null,
+                tenant.getTimezone()
         );
 
         return ResponseEntity.ok(response);
@@ -128,11 +130,35 @@ public class TenantController {
                 tenantMisAJour.getLogoUrl(),
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
-                admin != null ? admin.getEmail() : null
+                admin != null ? admin.getEmail() : null,
+                tenantMisAJour.getTimezone()
         );
 
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Met à jour le fuseau horaire du tenant (multi-pays).
+     *
+     * PUT /api/admin/entreprise/timezone
+     * Body : { "timezone": "Africa/Dakar" }
+     *
+     * Le fuseau (format IANA) est utilisé pour toutes les dates métier
+     * server-side : activation caisse, transferts, mouvements, paiements crédit.
+     */
+    @PutMapping("/admin/entreprise/timezone")
+    public ResponseEntity<TenantTimezoneResponse> updateTimezone(
+            @RequestBody UpdateTimezoneRequest request,
+            Authentication authentication
+    ) {
+        log.info("Admin {} modifie le fuseau horaire → {}",
+                authentication.getName(), request.timezone());
+        TenantEntity updated = tenantService.updateTimezone(request.timezone());
+        return ResponseEntity.ok(new TenantTimezoneResponse(updated.getTimezone()));
+    }
+
+    public record UpdateTimezoneRequest(String timezone) {}
+    public record TenantTimezoneResponse(String timezone) {}
 
     /**
      * DTO pour les réponses contenant les informations du tenant et du propriétaire
@@ -148,6 +174,7 @@ public class TenantController {
             String logoUrl,
             String nomProprietaire,
             String prenomProprietaire,
-            String emailProprietaire
+            String emailProprietaire,
+            String timezone
     ) {}
 }

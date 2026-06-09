@@ -30,4 +30,11 @@ public class ActiverCaisseRequest {
     @NotNull
     @PositiveOrZero
     private BigDecimal soldeInitialVirement;
+
+    /**
+     * Date d'activation (optionnelle). Si fournie, c'est l'heure locale du
+     * navigateur — évite tout problème de fuseau quand le serveur est dans
+     * un autre pays. Si null, le backend utilise son heure locale.
+     */
+    private java.time.LocalDateTime dateActivation;
 }

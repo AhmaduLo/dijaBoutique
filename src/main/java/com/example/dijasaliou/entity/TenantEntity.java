@@ -89,6 +89,17 @@ public class TenantEntity {
     private String devisePreferee = "XOF";
 
     /**
+     * Fuseau horaire IANA du tenant (ex: "Africa/Dakar", "Europe/Paris").
+     * Utilisé pour toutes les dates métier server-side : activation caisse,
+     * transferts, mouvements manuels, paiements crédit.
+     *
+     * Défaut : "Africa/Dakar" (Sénégal UTC+0, couvre toute l'Afrique de l'Ouest).
+     */
+    @Column(name = "timezone", nullable = false, length = 64)
+    @Builder.Default
+    private String timezone = "Africa/Dakar";
+
+    /**
      * Permet de désactiver un tenant temporairement (suspension réversible)
      * Si actif = false, l'entreprise ne peut plus se connecter
      */

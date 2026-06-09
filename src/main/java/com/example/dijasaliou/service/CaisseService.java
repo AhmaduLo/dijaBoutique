@@ -100,7 +100,10 @@ public class CaisseService {
         config.setSoldeInitialWave(request.getSoldeInitialWave());
         config.setSoldeInitialOm(request.getSoldeInitialOm());
         config.setSoldeInitialVirement(request.getSoldeInitialVirement());
-        config.setDateActivation(LocalDateTime.now());
+        // Date d'activation : heure locale du navigateur si fournie, sinon serveur
+        config.setDateActivation(request.getDateActivation() != null
+                ? request.getDateActivation()
+                : tenantService.nowInTenantTz());
         config.setActivePar(userUuid);
 
         caisseConfigRepository.save(config);
@@ -111,7 +114,7 @@ public class CaisseService {
                 request.getSoldeInitialOm(),
                 request.getSoldeInitialVirement());
 
-        return calculerSolde(tenant, config, LocalDateTime.now());
+        return calculerSolde(tenant, config, tenantService.nowInTenantTz());
     }
 
     // ── CALCUL DU SOLDE ──────────────────────────────────────────────────────
@@ -227,10 +230,10 @@ public class CaisseService {
                 .subtract(nz(sortiesManuelles));
     }
 
-    /** Borne supérieure : fin de la journée d'asOfDate, ou maintenant si null. */
-    private static LocalDateTime toFinJournee(LocalDate asOfDate) {
+    /** Borne supérieure : fin de la journée d'asOfDate, ou maintenant (TZ tenant) si null. */
+    private LocalDateTime toFinJournee(LocalDate asOfDate) {
         if (asOfDate == null) {
-            return LocalDateTime.now();
+            return tenantService.nowInTenantTz();
         }
         return asOfDate.atTime(23, 59, 59);
     }
@@ -258,7 +261,9 @@ public class CaisseService {
                 .compteDestination(request.getCompteDestination())
                 .montant(request.getMontant())
                 .motif(request.getMotif())
-                .dateTransfert(LocalDateTime.now())
+                .dateTransfert(request.getDateTransfert() != null
+                        ? request.getDateTransfert()
+                        : tenantService.nowInTenantTz())
                 .faitPar(userUuid)
                 .build();
 
@@ -288,7 +293,9 @@ public class CaisseService {
                 .compte(request.getCompte())
                 .montant(request.getMontant())
                 .motif(request.getMotif())
-                .dateMouvement(LocalDateTime.now())
+                .dateMouvement(request.getDateMouvement() != null
+                        ? request.getDateMouvement()
+                        : tenantService.nowInTenantTz())
                 .faitPar(userUuid)
                 .build();
 
@@ -450,7 +457,8 @@ public class CaisseService {
             case ORANGE_MONEY -> config.getSoldeInitialOm();
             case VIREMENT     -> nz(config.getSoldeInitialVirement());
         };
-        return calculerSoldeCompte(tenant, compte, config.getDateActivation(), LocalDateTime.now(), soldeInitial);
+        return calculerSoldeCompte(tenant, compte, config.getDateActivation(),
+                tenantService.nowInTenantTz(), soldeInitial);
     }
 
     private static String libelleCompte(CompteCaisse compte) {
