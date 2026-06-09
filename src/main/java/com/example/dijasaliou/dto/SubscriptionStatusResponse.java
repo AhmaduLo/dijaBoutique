@@ -70,4 +70,11 @@ public class SubscriptionStatusResponse {
      * Date de début de l'essai gratuit
      */
     private LocalDateTime dateDebutEssai;
+
+    /**
+     * Date de début de l'abonnement actuel :
+     *  - essai en cours → dateDebutEssai
+     *  - abonnement payant → date du dernier paiement validé par le super admin
+     */
+    private LocalDateTime dateDebutAbonnement;
 }

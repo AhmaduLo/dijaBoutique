@@ -172,8 +172,10 @@ public class SuperAdminService {
 
         TenantEntity.Plan ancienPlan = tenant.getPlan();
         LocalDateTime ancienPlanExpiration = tenant.getDateExpiration();
+        LocalDateTime now = LocalDateTime.now();
         tenant.setPlan(plan);
-        tenant.setDateExpiration(LocalDateTime.now().plusDays(jours));
+        tenant.setDateDebutEssai(now); // Sert aussi de "date de début d'abonnement" (affichée à l'admin tenant)
+        tenant.setDateExpiration(now.plusDays(jours));
         tenant.setActif(true);
 
         if (!Boolean.TRUE.equals(tenant.getEssaiUtilise())) {
@@ -589,8 +591,10 @@ public class SuperAdminService {
         int joursAjoutes = "ANNUEL".equals(periode) ? 365 : 30;
 
         // Mettre à jour le tenant
+        LocalDateTime now = LocalDateTime.now();
         tenant.setPlan(plan);
-        tenant.setDateExpiration(LocalDateTime.now().plusDays(joursAjoutes));
+        tenant.setDateDebutEssai(now); // Sert aussi de "date de début d'abonnement" (affichée à l'admin tenant)
+        tenant.setDateExpiration(now.plusDays(joursAjoutes));
         tenant.setActif(true);
         tenant.setEssaiUtilise(true);
         tenantRepository.save(tenant);

@@ -117,6 +117,8 @@ public class PaymentController {
             message = String.format("Abonnement %s actif - %d jours restants", tenant.getPlan().getLibelle(), joursRestants);
         }
 
+        // Date de début de l'abonnement = dateDebutEssai (mis à jour par SuperAdminService
+        // à chaque activation via changerPlan ou validerPaiement)
         SubscriptionStatusResponse response = SubscriptionStatusResponse.builder()
                 .plan(tenant.getPlan().name())
                 .actif(tenant.getActif())
@@ -127,6 +129,7 @@ public class PaymentController {
                 .message(message)
                 .dateCreation(tenant.getDateCreation())
                 .dateDebutEssai(tenant.getDateDebutEssai())
+                .dateDebutAbonnement(tenant.getDateDebutEssai())
                 .build();
 
         return ResponseEntity.ok(response);
