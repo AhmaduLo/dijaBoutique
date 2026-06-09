@@ -108,7 +108,7 @@ public class AuthService {
             }
         }
 
-        // 3. Créer le TENANT (entreprise) - ESSAI GRATUIT DE 14 JOURS
+        // 3. Créer le TENANT (entreprise) - ESSAI GRATUIT (durée = TenantEntity.DUREE_ESSAI_JOURS)
         if (request.getNomEntreprise() == null || request.getNomEntreprise().isBlank()) {
             throw new RuntimeException("Nom de l'entreprise obligatoire");
         }
@@ -123,10 +123,10 @@ public class AuthService {
                 .pays(request.getPays())
                 .nineaSiret(request.getNineaSiret()) // OPTIONNEL - peut être null
                 .actif(true)
-                .plan(TenantEntity.Plan.BUSINESS) // Essai BUSINESS complet pendant 14 jours
+                .plan(TenantEntity.Plan.BUSINESS) // Essai BUSINESS complet
                 .dateDebutEssai(now) // Début de l'essai
                 .essaiUtilise(false) // L'essai n'a pas encore été utilisé
-                .dateExpiration(now.plusDays(14)) // Expire dans 14 jours → rétrograde vers GRATUIT
+                .dateExpiration(now.plusDays(TenantEntity.DUREE_ESSAI_JOURS)) // Rétrograde vers GRATUIT à l'expiration
                 .build();
 
         TenantEntity savedTenant = tenantRepository.save(tenant);
@@ -166,13 +166,14 @@ public class AuthService {
         // 8. Notifier les super admins (push) — fire & forget
         String villePays = (savedTenant.getVille() != null ? savedTenant.getVille() : "")
                 + (savedTenant.getPays() != null ? " " + savedTenant.getPays() : "");
-        pushService.notifyAllSuperAdmins(
+        pushService.notify(
+                com.example.dijasaliou.entity.NotificationType.NOUVEAU_CLIENT,
                 "🆕 Nouveau client EasyStock",
                 savedTenant.getNomEntreprise() + (villePays.isBlank() ? "" : " — " + villePays.trim()),
                 "/superadmin/tenants/" + savedTenant.getId()
         );
 
-        // 9. Retourner la réponse - L'utilisateur a 14 jours d'essai gratuit
+        // 9. Retourner la réponse - L'utilisateur a TenantEntity.DUREE_ESSAI_JOURS jours d'essai gratuit
         return AuthResponse.builder()
                 .token(token)
                 .user(savedUser)

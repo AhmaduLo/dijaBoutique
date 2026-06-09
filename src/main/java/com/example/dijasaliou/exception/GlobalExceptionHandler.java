@@ -1,7 +1,9 @@
 package com.example.dijasaliou.exception;
 
 import com.example.dijasaliou.aspect.PlanRestrictionAspect;
+import com.example.dijasaliou.service.SystemNotificationsService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,10 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    /** Injection facultative : ne casse pas le démarrage si le service n'est pas dispo. */
+    @Autowired(required = false)
+    private SystemNotificationsService systemNotificationsService;
 
     /**
      * Gestion des restrictions de plan d'abonnement (@RequiresPlan)
@@ -201,6 +207,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {
         // Logger l'exception complète côté serveur (visible seulement dans les logs)
         log.error("Exception non gérée: {}", ex.getMessage(), ex);
+
+        if (systemNotificationsService != null) {
+            systemNotificationsService.recordError();
+        }
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());

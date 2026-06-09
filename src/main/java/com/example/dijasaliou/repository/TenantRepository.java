@@ -92,7 +92,7 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
     long countByEssaiUtiliseTrueAndPlanNot(TenantEntity.Plan plan);
 
     /**
-     * Trouve les tenants dont l'essai BUSINESS est expiré (> 14 jours)
+     * Trouve les tenants dont l'essai BUSINESS est expiré (> DUREE_ESSAI_JOURS)
      * et qui n'ont pas encore payé (essaiUtilise=false, pas supprimés)
      * Utilisé par CleanupService pour rétrograder vers GRATUIT chaque nuit.
      */

@@ -66,6 +66,7 @@ public class SuperAdminService {
     private final TenantCacheService tenantCacheService;
     private final PaiementSuperAdminRepository paiementSuperAdminRepository;
     private final AuthService authService;
+    private final PushNotificationService pushService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -79,7 +80,8 @@ public class SuperAdminService {
                              FactureRepository factureRepository,
                              TenantCacheService tenantCacheService,
                              PaiementSuperAdminRepository paiementSuperAdminRepository,
-                             @Lazy AuthService authService) {
+                             @Lazy AuthService authService,
+                             PushNotificationService pushService) {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.venteRepository = venteRepository;
@@ -90,6 +92,7 @@ public class SuperAdminService {
         this.tenantCacheService = tenantCacheService;
         this.paiementSuperAdminRepository = paiementSuperAdminRepository;
         this.authService = authService;
+        this.pushService = pushService;
     }
 
     /**
@@ -618,7 +621,81 @@ public class SuperAdminService {
                 ancienPlan + " → " + plan + " | " + req.montant() + " F | " + req.modePaiement() + " | " + periode,
                 tenant);
 
+        // ─── Notifications push contextuelles ────────────────────────────────
+        envoyerNotificationsPaiement(tenant, ancienPlan, plan, req.montant(), periode);
+
         return PaiementSuperAdminDto.fromEntity(paiement);
+    }
+
+    /**
+     * Détermine quelles notifications envoyer en fonction du changement de plan.
+     * Plusieurs notifications peuvent être envoyées pour un même paiement.
+     */
+    private void envoyerNotificationsPaiement(TenantEntity tenant,
+                                              TenantEntity.Plan ancienPlan,
+                                              TenantEntity.Plan nouveauPlan,
+                                              java.math.BigDecimal montant,
+                                              String periode) {
+        String urlDetail = "/superadmin/tenants/" + tenant.getId();
+        String nom = tenant.getNomEntreprise();
+        String montantFormate = montant != null ? montant.toPlainString() + " CFA" : "";
+
+        // 1. Paiement reçu — toujours envoyé
+        pushService.notify(
+                com.example.dijasaliou.entity.NotificationType.PAIEMENT_RECU,
+                "💰 Paiement reçu",
+                nom + " — " + nouveauPlan + " " + periode.toLowerCase() + " (" + montantFormate + ")",
+                urlDetail
+        );
+
+        // 2. Paiement annuel — gros revenu
+        if ("ANNUEL".equals(periode)) {
+            pushService.notify(
+                    com.example.dijasaliou.entity.NotificationType.PAIEMENT_ANNUEL,
+                    "💎 Paiement annuel reçu",
+                    nom + " — Plan " + nouveauPlan + " pour 1 an (" + montantFormate + ")",
+                    urlDetail
+            );
+        }
+
+        // 3. Conversion essai → payant
+        boolean estPayant = nouveauPlan != TenantEntity.Plan.GRATUIT;
+        boolean etaitEnEssaiOuGratuit = ancienPlan == TenantEntity.Plan.GRATUIT
+                || ancienPlan == TenantEntity.Plan.BUSINESS && tenant.essaiGratuitValide();
+        if (estPayant && etaitEnEssaiOuGratuit && ancienPlan != nouveauPlan) {
+            pushService.notify(
+                    com.example.dijasaliou.entity.NotificationType.CONVERSION_ESSAI,
+                    "⭐ Conversion essai → payant",
+                    nom + " est passé au plan " + nouveauPlan + " (" + montantFormate + ")",
+                    urlDetail
+            );
+        }
+
+        // 4. Upgrade de plan (STARTER < PRO < BUSINESS)
+        if (estUpgrade(ancienPlan, nouveauPlan)) {
+            pushService.notify(
+                    com.example.dijasaliou.entity.NotificationType.UPGRADE_PLAN,
+                    "⬆️ Upgrade de plan",
+                    nom + " : " + ancienPlan + " → " + nouveauPlan,
+                    urlDetail
+            );
+        }
+    }
+
+    private boolean estUpgrade(TenantEntity.Plan ancien, TenantEntity.Plan nouveau) {
+        int rangAncien = rangPlan(ancien);
+        int rangNouveau = rangPlan(nouveau);
+        return rangNouveau > rangAncien && rangAncien >= 0;
+    }
+
+    private int rangPlan(TenantEntity.Plan p) {
+        if (p == null) return -1;
+        return switch (p) {
+            case GRATUIT -> 0;
+            case STARTER -> 1;
+            case PRO -> 2;
+            case BUSINESS -> 3;
+        };
     }
 
     /**
