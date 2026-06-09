@@ -1,5 +1,6 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.entity.NotificationType;
 import com.example.dijasaliou.entity.SuperAdminPushSubscription;
 import com.example.dijasaliou.repository.SuperAdminPushSubscriptionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +32,7 @@ import java.util.Map;
 public class PushNotificationService {
 
     private final SuperAdminPushSubscriptionRepository repository;
+    private final NotificationPreferenceService preferenceService;
     private final ObjectMapper objectMapper;
     private final String publicKey;
     private final String privateKey;
@@ -41,11 +43,13 @@ public class PushNotificationService {
 
     public PushNotificationService(
             SuperAdminPushSubscriptionRepository repository,
+            NotificationPreferenceService preferenceService,
             ObjectMapper objectMapper,
             @Value("${vapid.public.key:}") String publicKey,
             @Value("${vapid.private.key:}") String privateKey,
             @Value("${vapid.subject:mailto:contact@heasystock.com}") String subject) {
         this.repository = repository;
+        this.preferenceService = preferenceService;
         this.objectMapper = objectMapper;
         this.publicKey = publicKey;
         this.privateKey = privateKey;
@@ -82,16 +86,37 @@ public class PushNotificationService {
     }
 
     /**
-     * Envoie une notification à TOUS les super admins abonnés.
-     * Non bloquant : exécuté en async, ne ralentit pas la requête appelante.
+     * Envoie une notification typée à tous les super admins abonnés
+     * qui ont activé ce type dans leurs préférences.
+     * Non bloquant : @Async ne ralentit pas la requête appelante.
      */
     @Async
-    public void notifyAllSuperAdmins(String title, String body, String url) {
+    public void notify(NotificationType type, String title, String body, String url) {
         if (!enabled) return;
+        if (!preferenceService.isAnyoneSubscribedTo(type)) {
+            log.debug("[PUSH] Type {} désactivé pour tous les super admins, skip", type);
+            return;
+        }
 
         List<SuperAdminPushSubscription> subs = repository.findAll();
         if (subs.isEmpty()) return;
 
+        String payload = buildPayload(title, body, url);
+        for (SuperAdminPushSubscription sub : subs) {
+            sendOne(sub, payload);
+        }
+    }
+
+    /**
+     * @deprecated utiliser {@link #notify(NotificationType, String, String, String)}.
+     * Conservée pour le test endpoint et pour ne pas casser d'éventuels appels existants.
+     */
+    @Deprecated
+    @Async
+    public void notifyAllSuperAdmins(String title, String body, String url) {
+        if (!enabled) return;
+        List<SuperAdminPushSubscription> subs = repository.findAll();
+        if (subs.isEmpty()) return;
         String payload = buildPayload(title, body, url);
         for (SuperAdminPushSubscription sub : subs) {
             sendOne(sub, payload);

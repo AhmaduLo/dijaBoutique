@@ -40,13 +40,13 @@ public class CleanupService {
     }
 
     /**
-     * Rétrograde les essais BUSINESS expirés (> 14 jours) vers GRATUIT.
+     * Rétrograde les essais BUSINESS expirés (durée = TenantEntity.DUREE_ESSAI_JOURS) vers GRATUIT.
      * S'exécute toutes les nuits à 3h00.
      */
     @Scheduled(cron = "0 0 3 * * *")
     @Transactional
     public void retrograderEssaisExpires() {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(14);
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(com.example.dijasaliou.entity.TenantEntity.DUREE_ESSAI_JOURS);
         List<TenantEntity> expiredTrials = tenantRepository.findExpiredTrials(
                 TenantEntity.Plan.BUSINESS, cutoff);
 
@@ -74,7 +74,8 @@ public class CleanupService {
         List<TenantEntity> expirantBientot = tenantRepository.findExpiringBetween(debut, fin);
 
         for (TenantEntity tenant : expirantBientot) {
-            pushService.notifyAllSuperAdmins(
+            pushService.notify(
+                    com.example.dijasaliou.entity.NotificationType.ABONNEMENT_EXPIRE_3J,
                     "⚠️ Abonnement bientôt expiré",
                     tenant.getNomEntreprise() + " — plan " + tenant.getPlan() + " expire dans 3 jours",
                     "/superadmin/tenants/" + tenant.getId()

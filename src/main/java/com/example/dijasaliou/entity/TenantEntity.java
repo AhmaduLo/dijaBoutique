@@ -39,6 +39,14 @@ import java.util.UUID;
 @EqualsAndHashCode(exclude = {"utilisateurs", "notes"})
 public class TenantEntity {
 
+    /**
+     * Durée de l'essai gratuit BUSINESS offert à l'inscription, en jours.
+     * Source unique de vérité — utilisée par essaiGratuitValide(), par
+     * AuthService (set dateExpiration), par CleanupService (rétrogradation),
+     * et par PaymentController (affichage des jours restants).
+     */
+    public static final int DUREE_ESSAI_JOURS = 30;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -123,7 +131,7 @@ public class TenantEntity {
     private LocalDateTime dateCreation;
 
     /**
-     * ESSAI GRATUIT : Date de début de l'essai gratuit de 14 jours
+     * ESSAI GRATUIT : Date de début de l'essai gratuit (durée = DUREE_ESSAI_JOURS)
      * Automatiquement définie lors de l'inscription
      */
     @Column(name = "date_debut_essai")
@@ -263,7 +271,7 @@ public class TenantEntity {
     }
 
     /**
-     * Vérifie si l'essai gratuit de 14 jours est encore valide
+     * Vérifie si l'essai gratuit (durée = {@link #DUREE_ESSAI_JOURS}) est encore valide
      *
      * @return true si l'essai est encore valide, false sinon
      */
@@ -278,8 +286,8 @@ public class TenantEntity {
             return false;
         }
 
-        // Calculer la date de fin de l'essai (14 jours après le début)
-        LocalDateTime dateFinEssai = dateDebutEssai.plusDays(14);
+        // Date de fin = début + DUREE_ESSAI_JOURS
+        LocalDateTime dateFinEssai = dateDebutEssai.plusDays(DUREE_ESSAI_JOURS);
 
         // Vérifier si on est encore dans la période d'essai
         return LocalDateTime.now().isBefore(dateFinEssai);

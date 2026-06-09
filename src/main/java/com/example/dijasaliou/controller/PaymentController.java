@@ -91,7 +91,7 @@ public class PaymentController {
         Boolean essaiGratuit = tenant.essaiGratuitValide();
 
         if (essaiGratuit) {
-            dateExpirationAffichee = tenant.getDateDebutEssai().plusDays(14);
+            dateExpirationAffichee = tenant.getDateDebutEssai().plusDays(TenantEntity.DUREE_ESSAI_JOURS);
             LocalDateTime now = LocalDateTime.now();
             Duration duration = Duration.between(now, dateExpirationAffichee);
             joursRestants = duration.toDays();
