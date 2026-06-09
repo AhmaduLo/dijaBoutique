@@ -6,6 +6,7 @@ import com.example.dijasaliou.entity.TenantEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.crypto.Mac;
@@ -20,10 +21,12 @@ import static org.assertj.core.api.Assertions.*;
 class WaveServiceTest {
 
     private WaveService waveService;
+    private PushNotificationService pushService;
 
     @BeforeEach
     void setUp() {
-        waveService = new WaveService();
+        pushService = Mockito.mock(PushNotificationService.class);
+        waveService = new WaveService(pushService);
         // Par défaut : mode développement (clés vides)
         ReflectionTestUtils.setField(waveService, "waveApiKey", "");
         ReflectionTestUtils.setField(waveService, "waveApiSecret", "");
