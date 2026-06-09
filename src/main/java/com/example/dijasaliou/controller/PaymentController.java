@@ -125,6 +125,8 @@ public class PaymentController {
                 .essaiGratuit(essaiGratuit)
                 .estExpire(estExpire)
                 .message(message)
+                .dateCreation(tenant.getDateCreation())
+                .dateDebutEssai(tenant.getDateDebutEssai())
                 .build();
 
         return ResponseEntity.ok(response);
