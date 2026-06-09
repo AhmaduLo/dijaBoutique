@@ -390,6 +390,9 @@ public class SuperAdminService {
                     entry.put("email", u.getEmail());
                     entry.put("role", u.getRole().name());
                     entry.put("boutique", u.getTenant() != null ? u.getTenant().getNomEntreprise() : "Super Admin");
+                    // tenantId : nécessaire pour le bouton "Détail" du frontend (sinon lookup
+                    // local côté Angular limité à la page courante de getAllTenants).
+                    entry.put("tenantId", u.getTenant() != null ? u.getTenant().getId() : null);
                     entry.put("derniereConnexion", u.getDerniereConnexion());
                     entry.put("enLigne", u.getDerniereConnexion().isAfter(il5min));
                     return entry;
