@@ -62,26 +62,38 @@ jobs:
           python-version: '3.11'
       - run: pip install --quiet google-api-python-client google-auth
 
+      - name: Écrire la clé service account dans un fichier
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          # Passage par fichier pour éviter les soucis d'échappement \n
+          # lorsque le JSON est transmis via env var.
+          printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" > gdrive-creds.json
+          # Sanity check : doit commencer par {
+          head -c 1 gdrive-creds.json | grep -q '{' || {
+            echo "::error::GDRIVE_SERVICE_ACCOUNT_JSON ne contient pas un JSON valide (premier caractère != '{')."
+            exit 1
+          }
+          echo "✅ Fichier de credentials créé ($(wc -c < gdrive-creds.json) octets)"
+
       - name: Uploader sur Google Drive + rotation
         env:
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
-          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
           BACKUP_FILE: ${{ env.BACKUP_FILE }}
         run: |
           python <<'PYTHON'
-          import json, os, sys
+          import os
           from google.oauth2 import service_account
           from googleapiclient.discovery import build
           from googleapiclient.http import MediaFileUpload
 
           MAX_BACKUPS = 30  # rotation : garde les 30 plus récents
 
-          creds_json = os.environ['GDRIVE_SERVICE_ACCOUNT_JSON']
-          folder_id  = os.environ['GDRIVE_FOLDER_ID']
-          filename   = os.environ['BACKUP_FILE']
+          folder_id = os.environ['GDRIVE_FOLDER_ID']
+          filename  = os.environ['BACKUP_FILE']
 
-          creds = service_account.Credentials.from_service_account_info(
-              json.loads(creds_json),
+          creds = service_account.Credentials.from_service_account_file(
+              'gdrive-creds.json',
               scopes=['https://www.googleapis.com/auth/drive']
           )
           drive = build('drive', 'v3', credentials=creds, cache_discovery=False)
@@ -123,6 +135,12 @@ jobs:
           else:
               print(f"ℹ️  Rotation non nécessaire (< {MAX_BACKUPS} backups)")
           PYTHON
+
+      - name: Nettoyer les fichiers temporaires
+        if: always()
+        run: |
+          rm -f gdrive-creds.json
+          rm -f easystock-backup-*.sql.gz
 
       - name: Résumé
         if: always()
