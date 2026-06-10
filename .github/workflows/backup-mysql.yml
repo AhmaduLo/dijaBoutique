@@ -1,0 +1,134 @@
+name: Backup MySQL → Google Drive
+
+# Backup automatique de la BDD MySQL Railway vers Google Drive.
+#
+# Déclenchement :
+#   - Automatique : tous les jours à 03:00 UTC (04:00 ou 05:00 heure Sénégal selon DST)
+#   - Manuel : onglet "Actions" du repo → "Backup MySQL → Google Drive" → "Run workflow"
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+#   GDRIVE_FOLDER_ID                 → ID du dossier Drive partagé avec le service account
+#   GDRIVE_SERVICE_ACCOUNT_JSON      → contenu complet du fichier JSON de clé service account
+#
+# Rétention : 30 backups les plus récents (les plus anciens sont supprimés du Drive).
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # tous les jours à 3h UTC
+  workflow_dispatch:       # bouton manuel "Run workflow"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer le client MySQL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y mysql-client gzip
+
+      - name: Dumper la BDD
+        env:
+          MYSQL_PWD: ${{ secrets.MYSQL_PASSWORD }}
+        run: |
+          TIMESTAMP=$(date -u +'%Y-%m-%d_%Hh%Mm')
+          FILENAME="easystock-backup-${TIMESTAMP}.sql.gz"
+          echo "BACKUP_FILE=${FILENAME}" >> $GITHUB_ENV
+
+          mysqldump \
+            --host="${{ secrets.MYSQL_HOST }}" \
+            --port="${{ secrets.MYSQL_PORT }}" \
+            --user="${{ secrets.MYSQL_USER }}" \
+            --single-transaction \
+            --quick \
+            --routines \
+            --triggers \
+            --no-tablespaces \
+            --set-gtid-purged=OFF \
+            "${{ secrets.MYSQL_DATABASE }}" \
+            | gzip -9 > "${FILENAME}"
+
+          SIZE=$(ls -lh "${FILENAME}" | awk '{print $5}')
+          echo "✅ Dump créé : ${FILENAME} (${SIZE})"
+
+      - name: Installer Python + libs Google Drive
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install --quiet google-api-python-client google-auth
+
+      - name: Uploader sur Google Drive + rotation
+        env:
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          BACKUP_FILE: ${{ env.BACKUP_FILE }}
+        run: |
+          python <<'PYTHON'
+          import json, os, sys
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          MAX_BACKUPS = 30  # rotation : garde les 30 plus récents
+
+          creds_json = os.environ['GDRIVE_SERVICE_ACCOUNT_JSON']
+          folder_id  = os.environ['GDRIVE_FOLDER_ID']
+          filename   = os.environ['BACKUP_FILE']
+
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(creds_json),
+              scopes=['https://www.googleapis.com/auth/drive']
+          )
+          drive = build('drive', 'v3', credentials=creds, cache_discovery=False)
+
+          # 1) Upload
+          file_metadata = {'name': filename, 'parents': [folder_id]}
+          media = MediaFileUpload(filename, mimetype='application/gzip', resumable=True)
+          uploaded = drive.files().create(
+              body=file_metadata,
+              media_body=media,
+              fields='id, name, size',
+              supportsAllDrives=True
+          ).execute()
+          size_mb = int(uploaded.get('size', 0)) / (1024 * 1024)
+          print(f"✅ Upload OK : {uploaded['name']} ({size_mb:.2f} MB) — id {uploaded['id']}")
+
+          # 2) Rotation : lister tous les backups du dossier, garder les MAX_BACKUPS plus récents
+          query = (
+              f"'{folder_id}' in parents and trashed = false "
+              f"and name contains 'easystock-backup-'"
+          )
+          results = drive.files().list(
+              q=query,
+              fields='files(id, name, createdTime)',
+              orderBy='createdTime desc',
+              pageSize=200,
+              supportsAllDrives=True,
+              includeItemsFromAllDrives=True
+          ).execute()
+          backups = results.get('files', [])
+          print(f"📦 {len(backups)} backup(s) dans le dossier Drive")
+
+          if len(backups) > MAX_BACKUPS:
+              to_delete = backups[MAX_BACKUPS:]
+              for b in to_delete:
+                  drive.files().delete(fileId=b['id'], supportsAllDrives=True).execute()
+                  print(f"🗑️  Supprimé : {b['name']}")
+              print(f"✅ Rotation : {len(to_delete)} ancien(s) backup(s) supprimé(s)")
+          else:
+              print(f"ℹ️  Rotation non nécessaire (< {MAX_BACKUPS} backups)")
+          PYTHON
+
+      - name: Résumé
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "::notice::✅ Backup MySQL réussi : ${{ env.BACKUP_FILE }}"
+          else
+            echo "::error::❌ Backup MySQL ÉCHOUÉ. Vérifier les logs ci-dessus."
+          fi
