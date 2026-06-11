@@ -8,8 +8,13 @@ name: Backup MySQL → Google Drive
 #
 # Secrets requis (Settings → Secrets and variables → Actions) :
 #   MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
-#   GDRIVE_FOLDER_ID                 → ID du dossier Drive partagé avec le service account
-#   GDRIVE_SERVICE_ACCOUNT_JSON      → contenu complet du fichier JSON de clé service account
+#   GDRIVE_FOLDER_ID       → ID du dossier Drive (sur le compte easystock@gmail.com)
+#   GDRIVE_CLIENT_ID       → OAuth Client ID (depuis Google Cloud Console)
+#   GDRIVE_CLIENT_SECRET   → OAuth Client Secret
+#   GDRIVE_REFRESH_TOKEN   → Refresh token obtenu via oauth-setup/get_refresh_token.py
+#
+# L'upload se fait au nom du compte propriétaire (easystock@gmail.com) — utilise
+# son quota Drive (100 Go Google One), pas celui d'un Service Account.
 #
 # Rétention : 30 backups les plus récents (les plus anciens sont supprimés du Drive).
 
@@ -62,28 +67,17 @@ jobs:
           python-version: '3.11'
       - run: pip install --quiet google-api-python-client google-auth
 
-      - name: Écrire la clé service account dans un fichier
+      - name: Uploader sur Google Drive + rotation (OAuth)
         env:
-          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
-        run: |
-          # Passage par fichier pour éviter les soucis d'échappement \n
-          # lorsque le JSON est transmis via env var.
-          printf '%s' "$GDRIVE_SERVICE_ACCOUNT_JSON" > gdrive-creds.json
-          # Sanity check : doit commencer par {
-          head -c 1 gdrive-creds.json | grep -q '{' || {
-            echo "::error::GDRIVE_SERVICE_ACCOUNT_JSON ne contient pas un JSON valide (premier caractère != '{')."
-            exit 1
-          }
-          echo "✅ Fichier de credentials créé ($(wc -c < gdrive-creds.json) octets)"
-
-      - name: Uploader sur Google Drive + rotation
-        env:
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
-          BACKUP_FILE: ${{ env.BACKUP_FILE }}
+          GDRIVE_FOLDER_ID:      ${{ secrets.GDRIVE_FOLDER_ID }}
+          GDRIVE_CLIENT_ID:      ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET:  ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN:  ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+          BACKUP_FILE:           ${{ env.BACKUP_FILE }}
         run: |
           python <<'PYTHON'
           import os
-          from google.oauth2 import service_account
+          from google.oauth2.credentials import Credentials
           from googleapiclient.discovery import build
           from googleapiclient.http import MediaFileUpload
 
@@ -92,8 +86,13 @@ jobs:
           folder_id = os.environ['GDRIVE_FOLDER_ID']
           filename  = os.environ['BACKUP_FILE']
 
-          creds = service_account.Credentials.from_service_account_file(
-              'gdrive-creds.json',
+          # Credentials OAuth utilisateur (utilise le quota Drive du compte easystock@gmail.com)
+          creds = Credentials(
+              token=None,
+              refresh_token=os.environ['GDRIVE_REFRESH_TOKEN'],
+              token_uri='https://oauth2.googleapis.com/token',
+              client_id=os.environ['GDRIVE_CLIENT_ID'],
+              client_secret=os.environ['GDRIVE_CLIENT_SECRET'],
               scopes=['https://www.googleapis.com/auth/drive']
           )
           drive = build('drive', 'v3', credentials=creds, cache_discovery=False)
@@ -104,8 +103,7 @@ jobs:
           uploaded = drive.files().create(
               body=file_metadata,
               media_body=media,
-              fields='id, name, size',
-              supportsAllDrives=True
+              fields='id, name, size'
           ).execute()
           size_mb = int(uploaded.get('size', 0)) / (1024 * 1024)
           print(f"✅ Upload OK : {uploaded['name']} ({size_mb:.2f} MB) — id {uploaded['id']}")
@@ -119,9 +117,7 @@ jobs:
               q=query,
               fields='files(id, name, createdTime)',
               orderBy='createdTime desc',
-              pageSize=200,
-              supportsAllDrives=True,
-              includeItemsFromAllDrives=True
+              pageSize=200
           ).execute()
           backups = results.get('files', [])
           print(f"📦 {len(backups)} backup(s) dans le dossier Drive")
@@ -129,7 +125,7 @@ jobs:
           if len(backups) > MAX_BACKUPS:
               to_delete = backups[MAX_BACKUPS:]
               for b in to_delete:
-                  drive.files().delete(fileId=b['id'], supportsAllDrives=True).execute()
+                  drive.files().delete(fileId=b['id']).execute()
                   print(f"🗑️  Supprimé : {b['name']}")
               print(f"✅ Rotation : {len(to_delete)} ancien(s) backup(s) supprimé(s)")
           else:
@@ -139,7 +135,6 @@ jobs:
       - name: Nettoyer les fichiers temporaires
         if: always()
         run: |
-          rm -f gdrive-creds.json
           rm -f easystock-backup-*.sql.gz
 
       - name: Résumé
