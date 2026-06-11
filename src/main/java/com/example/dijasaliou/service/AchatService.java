@@ -223,6 +223,8 @@ public class AchatService {
         achatExistant.setUtilisateur(achatModifie.getUtilisateur());
         achatExistant.setPhotoUrl(achatModifie.getPhotoUrl());
         achatExistant.setUnite(achatModifie.getUnite());
+        achatExistant.setCategorie(achatModifie.getCategorie());
+        achatExistant.setDescription(achatModifie.getDescription());
         if (achatModifie.getDateAchat() != null) {
             achatExistant.setDateAchat(achatModifie.getDateAchat());
         }

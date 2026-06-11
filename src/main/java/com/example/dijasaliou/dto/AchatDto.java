@@ -36,6 +36,8 @@ public class AchatDto {
     private String photoUrl;
     private String codeBarre;
     private String unite;
+    private String categorie;
+    private String description;
 
     /** Mode de paiement utilisé (caisse multi-comptes BUSINESS). Peut être null pour les anciens achats. */
     private ModePaiementCaisse modePaiement;
@@ -75,6 +77,8 @@ public class AchatDto {
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .codeBarre(achat.getCodeBarre())
                 .unite(achat.getUnite())
+                .categorie(achat.getCategorie())
+                .description(achat.getDescription())
                 .modePaiement(achat.getModePaiement())
                 .utilisateur(UserDto.fromEntityMinimal(achat.getUtilisateur()))
                 .estRecent(achat.estRecent())
@@ -110,6 +114,8 @@ public class AchatDto {
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .codeBarre(achat.getCodeBarre())
                 .unite(achat.getUnite())
+                .categorie(achat.getCategorie())
+                .description(achat.getDescription())
                 .modePaiement(achat.getModePaiement())
                 .estRecent(achat.estRecent())
                 .mois(achat.getMois())
