@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -96,13 +97,79 @@ public class SuperAdminService {
     }
 
     /**
-     * Retourne tous les tenants avec leurs stats — paginé
+     * Retourne tous les tenants avec leurs stats — paginé.
+     * Le filtre {@code activite} permet de ne garder que les tenants matchant
+     * une fenêtre d'activité d'usage (par dernière connexion d'au moins un user) :
+     *   - "today"        : connecté aujourd'hui
+     *   - "week"         : connecté cette semaine
+     *   - "month"        : connecté ce mois
+     *   - "inactive_30d" : aucun user connecté depuis 30 jours (ou jamais)
+     *   - "ghost"        : créé > 5 mois sans qu'aucun user ne se soit jamais connecté
+     *   - null/vide      : tous les tenants
      */
-    public PagedResponse<TenantAdminDto> getAllTenants(int page, int size, String search) {
+    public PagedResponse<TenantAdminDto> getAllTenants(int page, int size, String search, String activite) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
-        Page<TenantEntity> tenantsPage = tenantRepository.findByDeletedFalseWithSearch(searchParam, pageable);
-        return PagedResponse.from(tenantsPage.map(this::toDto));
+
+        // Pas de filtre activité → comportement original (paginé direct par la query)
+        if (activite == null || activite.isBlank()) {
+            Page<TenantEntity> tenantsPage = tenantRepository.findByDeletedFalseWithSearch(searchParam, pageable);
+            return PagedResponse.from(tenantsPage.map(this::toDto));
+        }
+
+        // Avec filtre activité : on récupère tous les tenants matching search,
+        // on filtre en mémoire par activité, puis on pagine. Acceptable jusqu'à
+        // quelques centaines de tenants ; à optimiser avec une query SQL dédiée
+        // si tu dépasses 1000 tenants.
+        Set<Long> tenantIdsMatchingActivite = getTenantIdsForActivite(activite);
+
+        List<TenantEntity> tous = tenantRepository
+                .findByDeletedFalseWithSearch(searchParam, PageRequest.of(0, 5000, Sort.by(Sort.Direction.DESC, "id")))
+                .getContent();
+
+        List<TenantEntity> filtres = tous.stream()
+                .filter(t -> tenantIdsMatchingActivite.contains(t.getId()))
+                .toList();
+
+        // Pagination manuelle sur la liste filtrée
+        int total = filtres.size();
+        int from = Math.min(page * size, total);
+        int to = Math.min(from + size, total);
+        List<TenantAdminDto> contentDto = filtres.subList(from, to).stream().map(this::toDto).toList();
+
+        return PagedResponse.<TenantAdminDto>builder()
+                .content(contentDto)
+                .currentPage(page)
+                .pageSize(size)
+                .totalElements(total)
+                .totalPages((int) Math.ceil((double) total / size))
+                .first(page == 0)
+                .last(to >= total)
+                .build();
+    }
+
+    /** IDs des tenants matchant un filtre activité donné. */
+    private Set<Long> getTenantIdsForActivite(String activite) {
+        LocalDateTime now = LocalDateTime.now();
+        return switch (activite.toLowerCase()) {
+            case "today" ->
+                    tenantRepository.findActiveSince(now.toLocalDate().atStartOfDay())
+                            .stream().map(TenantEntity::getId).collect(Collectors.toSet());
+            case "week" ->
+                    tenantRepository.findActiveSince(now.minusDays(7))
+                            .stream().map(TenantEntity::getId).collect(Collectors.toSet());
+            case "month" ->
+                    tenantRepository.findActiveSince(now.minusDays(30))
+                            .stream().map(TenantEntity::getId).collect(Collectors.toSet());
+            case "inactive_30d" ->
+                    tenantRepository.findInactiveSince(now.minusDays(30))
+                            .stream().map(TenantEntity::getId).collect(Collectors.toSet());
+            case "ghost" ->
+                    tenantRepository.findFantomes(now.minusMonths(5))
+                            .stream().map(TenantEntity::getId).collect(Collectors.toSet());
+            default -> tenantRepository.findByDeletedFalse()
+                    .stream().map(TenantEntity::getId).collect(Collectors.toSet());
+        };
     }
 
     /**
@@ -766,6 +833,84 @@ public class SuperAdminService {
             saveLog("SUPPRIMER_PAIEMENT",
                     "Paiement #" + paiementId + " supprimé — " + restants + " paiement(s) actifs conservés", tenant);
         }
+    }
+
+    // ==================== ACTIVITÉ RÉELLE & FANTÔMES ====================
+
+    /**
+     * Stats d'activité d'usage (vs stats commerciales du dashboard).
+     * Compte les utilisateurs UNIQUES qui se sont connectés récemment + les
+     * boutiques actives + les comptes "fantômes" (créés > 5 mois, jamais connectés).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getActivityStats() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime debutJour = now.toLocalDate().atStartOfDay();
+        LocalDateTime debutSemaine = now.minusDays(7);
+        LocalDateTime debutMois = now.minusDays(30);
+        LocalDateTime seuilFantome = now.minusMonths(5);
+
+        List<UserEntity> tousUsers = userRepository.findByDeletedFalse();
+
+        long usersAujourdhui = tousUsers.stream()
+                .filter(u -> u.getDerniereConnexion() != null && u.getDerniereConnexion().isAfter(debutJour))
+                .count();
+        long usersSemaine = tousUsers.stream()
+                .filter(u -> u.getDerniereConnexion() != null && u.getDerniereConnexion().isAfter(debutSemaine))
+                .count();
+        long usersMois = tousUsers.stream()
+                .filter(u -> u.getDerniereConnexion() != null && u.getDerniereConnexion().isAfter(debutMois))
+                .count();
+
+        long boutiquesActivesAujourdhui = tenantRepository.findActiveSince(debutJour).size();
+        long boutiquesActivesSemaine = tenantRepository.findActiveSince(debutSemaine).size();
+        long boutiquesActivesMois = tenantRepository.findActiveSince(debutMois).size();
+        long boutiquesInactives30j = tenantRepository.findInactiveSince(now.minusDays(30)).size();
+        long fantomes = tenantRepository.findFantomes(seuilFantome).size();
+
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("usersUniquesAujourdhui", usersAujourdhui);
+        stats.put("usersUniquesSemaine", usersSemaine);
+        stats.put("usersUniquesMois", usersMois);
+        stats.put("boutiquesActivesAujourdhui", boutiquesActivesAujourdhui);
+        stats.put("boutiquesActivesSemaine", boutiquesActivesSemaine);
+        stats.put("boutiquesActivesMois", boutiquesActivesMois);
+        stats.put("boutiquesInactives30j", boutiquesInactives30j);
+        stats.put("comptesFantomes", fantomes);
+        stats.put("seuilFantomeMois", 5);
+        return stats;
+    }
+
+    /**
+     * Liste des comptes fantômes : créés il y a > 5 mois, aucun user jamais connecté.
+     * Candidats au nettoyage.
+     */
+    @Transactional(readOnly = true)
+    public List<TenantAdminDto> getFantomes() {
+        LocalDateTime seuil = LocalDateTime.now().minusMonths(5);
+        return tenantRepository.findFantomes(seuil).stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    /**
+     * Suppression en masse de tenants (soft-delete via supprimerTenant pour
+     * chaque ID). Renvoie le nombre de tenants effectivement supprimés.
+     */
+    @Transactional
+    public int supprimerTenantsBatch(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return 0;
+        int count = 0;
+        for (Long id : ids) {
+            try {
+                supprimerTenant(id);
+                count++;
+            } catch (Exception e) {
+                log.warn("[SUPER_ADMIN] Suppression batch : échec pour tenant {} : {}", id, e.getMessage());
+            }
+        }
+        log.info("[SUPER_ADMIN] Suppression batch : {}/{} tenants supprimés", count, ids.size());
+        return count;
     }
 
     /**

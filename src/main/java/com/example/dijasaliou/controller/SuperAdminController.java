@@ -78,9 +78,48 @@ public class SuperAdminController {
             Authentication auth,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String activite) {
         if (size > 100) size = 100;
-        return ResponseEntity.ok(superAdminService.getAllTenants(page, size, search));
+        return ResponseEntity.ok(superAdminService.getAllTenants(page, size, search, activite));
+    }
+
+    /**
+     * GET /superadmin/stats/activity
+     * Stats d'activité d'usage : combien d'utilisateurs uniques connectés
+     * aujourd'hui / semaine / mois, nombre de comptes fantômes, etc.
+     */
+    @GetMapping("/stats/activity")
+    public ResponseEntity<Map<String, Object>> getActivityStats() {
+        return ResponseEntity.ok(superAdminService.getActivityStats());
+    }
+
+    /**
+     * GET /superadmin/tenants/fantomes
+     * Liste des comptes "fantômes" : créés > 5 mois, jamais connectés.
+     */
+    @GetMapping("/tenants/fantomes")
+    public ResponseEntity<List<TenantAdminDto>> getFantomes() {
+        return ResponseEntity.ok(superAdminService.getFantomes());
+    }
+
+    /**
+     * POST /superadmin/tenants/batch-delete
+     * Suppression en masse de tenants (soft-delete).
+     * Body : { "ids": [1, 2, 3, ...] }
+     */
+    @PostMapping("/tenants/batch-delete")
+    public ResponseEntity<Map<String, Object>> batchDeleteTenants(
+            @RequestBody Map<String, List<Long>> body,
+            Authentication auth) {
+        List<Long> ids = body.get("ids");
+        log.info("[SUPER_ADMIN] {} supprime en masse {} tenant(s)", auth.getName(), ids != null ? ids.size() : 0);
+        int supprimes = superAdminService.supprimerTenantsBatch(ids);
+        return ResponseEntity.ok(Map.of(
+                "supprimes", supprimes,
+                "demandes", ids != null ? ids.size() : 0,
+                "message", supprimes + " tenant(s) supprimé(s) sur " + (ids != null ? ids.size() : 0)
+        ));
     }
 
     /**
