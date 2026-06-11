@@ -7,7 +7,9 @@ name: Backup MySQL → Google Drive
 #   - Manuel : onglet "Actions" du repo → "Backup MySQL → Google Drive" → "Run workflow"
 #
 # Secrets requis (Settings → Secrets and variables → Actions) :
-#   MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+#   MYSQL_PUBLIC_URL       → URL complète depuis Railway → MySQL → Variables
+#                            (format mysql://USER:PASS@HOST:PORT/DATABASE — la PUBLIQUE,
+#                            pas l'INTERNE qui n'est pas accessible depuis GitHub)
 #   GDRIVE_FOLDER_ID       → ID du dossier Drive (sur le compte easystock@gmail.com)
 #   GDRIVE_CLIENT_ID       → OAuth Client ID (depuis Google Cloud Console)
 #   GDRIVE_CLIENT_SECRET   → OAuth Client Secret
@@ -39,26 +41,46 @@ jobs:
 
       - name: Dumper la BDD
         env:
-          MYSQL_PWD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_PUBLIC_URL: ${{ secrets.MYSQL_PUBLIC_URL }}
         run: |
           # pipefail : si mysqldump plante, gzip ne masque plus l'erreur
           set -eo pipefail
+
+          # Parse mysql://USER:PASS@HOST:PORT/DATABASE en 5 variables
+          # Plus robuste qu'avoir 5 secrets séparés à copier-coller à la main.
+          if [ -z "$MYSQL_PUBLIC_URL" ]; then
+            echo "::error::Le secret MYSQL_PUBLIC_URL est vide. Copier la valeur de Railway → MySQL → Variables → MYSQL_PUBLIC_URL."
+            exit 1
+          fi
+
+          # Format attendu : mysql://user:password@host:port/database
+          NO_PROTOCOL="${MYSQL_PUBLIC_URL#mysql://}"
+          USER_PASS="${NO_PROTOCOL%@*}"
+          HOST_PORT_DB="${NO_PROTOCOL#*@}"
+          DB_USER="${USER_PASS%%:*}"
+          DB_PASS="${USER_PASS#*:}"
+          HOST_PORT="${HOST_PORT_DB%/*}"
+          DB_NAME="${HOST_PORT_DB#*/}"
+          DB_HOST="${HOST_PORT%:*}"
+          DB_PORT="${HOST_PORT#*:}"
+
+          echo "Connexion à ${DB_HOST}:${DB_PORT} / base ${DB_NAME} (user=${DB_USER})"
 
           TIMESTAMP=$(date -u +'%Y-%m-%d_%Hh%Mm')
           FILENAME="easystock-backup-${TIMESTAMP}.sql.gz"
           echo "BACKUP_FILE=${FILENAME}" >> $GITHUB_ENV
 
-          mysqldump \
-            --host="${{ secrets.MYSQL_HOST }}" \
-            --port="${{ secrets.MYSQL_PORT }}" \
-            --user="${{ secrets.MYSQL_USER }}" \
+          MYSQL_PWD="$DB_PASS" mysqldump \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USER" \
             --single-transaction \
             --quick \
             --routines \
             --triggers \
             --no-tablespaces \
             --set-gtid-purged=OFF \
-            "${{ secrets.MYSQL_DATABASE }}" \
+            "$DB_NAME" \
             | gzip -9 > "${FILENAME}"
 
           SIZE_BYTES=$(stat -c%s "${FILENAME}")
@@ -66,7 +88,7 @@ jobs:
 
           # Sanity check : un dump valide fait toujours >1 KB (rien que les CREATE TABLE)
           if [ "${SIZE_BYTES}" -lt 1024 ]; then
-            echo "::error::❌ Dump anormalement petit (${SIZE_BYTES} octets) — mysqldump a probablement échoué (mauvais credentials, mauvaise BDD, ou host inaccessible). Vérifier les secrets MYSQL_*."
+            echo "::error::❌ Dump anormalement petit (${SIZE_BYTES} octets) — mysqldump a échoué."
             exit 1
           fi
 
