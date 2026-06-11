@@ -41,6 +41,9 @@ jobs:
         env:
           MYSQL_PWD: ${{ secrets.MYSQL_PASSWORD }}
         run: |
+          # pipefail : si mysqldump plante, gzip ne masque plus l'erreur
+          set -eo pipefail
+
           TIMESTAMP=$(date -u +'%Y-%m-%d_%Hh%Mm')
           FILENAME="easystock-backup-${TIMESTAMP}.sql.gz"
           echo "BACKUP_FILE=${FILENAME}" >> $GITHUB_ENV
@@ -58,7 +61,15 @@ jobs:
             "${{ secrets.MYSQL_DATABASE }}" \
             | gzip -9 > "${FILENAME}"
 
+          SIZE_BYTES=$(stat -c%s "${FILENAME}")
           SIZE=$(ls -lh "${FILENAME}" | awk '{print $5}')
+
+          # Sanity check : un dump valide fait toujours >1 KB (rien que les CREATE TABLE)
+          if [ "${SIZE_BYTES}" -lt 1024 ]; then
+            echo "::error::❌ Dump anormalement petit (${SIZE_BYTES} octets) — mysqldump a probablement échoué (mauvais credentials, mauvaise BDD, ou host inaccessible). Vérifier les secrets MYSQL_*."
+            exit 1
+          fi
+
           echo "✅ Dump créé : ${FILENAME} (${SIZE})"
 
       - name: Installer Python + libs Google Drive
