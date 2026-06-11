@@ -99,11 +99,19 @@ public class AchatEntity extends BaseEntity{
     private String codeBarre;
 
     /**
-     * Catégorie du produit — champ transient pour la base partagée.
-     * Non sauvegardé dans la table achats, transmis à produit_reference.
+     * Catégorie du produit (Alimentaire, Boisson, etc. ou libre via "Autre").
+     * Stockée depuis V31 — aussi transmise à produit_reference pour la base partagée.
      */
-    @Transient
+    @Size(max = 100, message = "La catégorie ne peut dépasser 100 caractères")
+    @Column(name = "categorie", length = 100)
     private String categorie;
+
+    /**
+     * Description libre de l'achat (lot, conditions de livraison, etc.) — optionnelle.
+     */
+    @Size(max = 200, message = "La description ne peut dépasser 200 caractères")
+    @Column(name = "description", length = 200)
+    private String description;
 
     @Column(name = "devise_code", length = 10, nullable = false)
     @Builder.Default
