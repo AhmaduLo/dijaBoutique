@@ -109,4 +109,36 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
            "AND t.dateExpiration BETWEEN :debut AND :fin")
     List<TenantEntity> findExpiringBetween(@Param("debut") LocalDateTime debut,
                                             @Param("fin") LocalDateTime fin);
+
+    /**
+     * Tenants dont AU MOINS UN utilisateur s'est connecté après :seuil.
+     * Utilisé pour les filtres d'activité (aujourd'hui / semaine / mois).
+     */
+    @Query("SELECT DISTINCT t FROM TenantEntity t " +
+           "JOIN UserEntity u ON u.tenant = t AND u.deleted = false " +
+           "WHERE t.deleted = false AND u.derniereConnexion >= :seuil")
+    List<TenantEntity> findActiveSince(@Param("seuil") LocalDateTime seuil);
+
+    /**
+     * Tenants dont AUCUN utilisateur ne s'est connecté depuis :seuil
+     * (ou jamais connecté du tout). Filtre "inactifs depuis X jours".
+     */
+    @Query("SELECT t FROM TenantEntity t WHERE t.deleted = false AND t.id NOT IN (" +
+           "  SELECT DISTINCT t2.id FROM TenantEntity t2 " +
+           "  JOIN UserEntity u ON u.tenant = t2 AND u.deleted = false " +
+           "  WHERE u.derniereConnexion >= :seuil" +
+           ")")
+    List<TenantEntity> findInactiveSince(@Param("seuil") LocalDateTime seuil);
+
+    /**
+     * Comptes "fantômes" : créés AVANT :seuilCreation et dont AUCUN utilisateur
+     * ne s'est JAMAIS connecté (derniereConnexion = null pour tous les users).
+     */
+    @Query("SELECT t FROM TenantEntity t WHERE t.deleted = false " +
+           "AND t.dateCreation < :seuilCreation " +
+           "AND NOT EXISTS (" +
+           "  SELECT 1 FROM UserEntity u WHERE u.tenant = t AND u.deleted = false " +
+           "  AND u.derniereConnexion IS NOT NULL" +
+           ")")
+    List<TenantEntity> findFantomes(@Param("seuilCreation") LocalDateTime seuilCreation);
 }
