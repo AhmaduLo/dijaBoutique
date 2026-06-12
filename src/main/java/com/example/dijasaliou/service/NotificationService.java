@@ -163,10 +163,17 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public Page<NotificationEntity> getHistorique(int page, int size) {
         Page<NotificationEntity> notifs = notificationRepository.findAllByOrderByDateEnvoiDesc(PageRequest.of(page, size));
-        // Remplir tenantNom pour l'affichage JSON
+        // Remplir tenantNom pour l'affichage JSON.
+        // Tolérant : si le tenant a été supprimé après l'envoi de la notification,
+        // le proxy lazy lève EntityNotFoundException — on capte et on laisse tenantNom null.
         notifs.forEach(n -> {
-            if (n.getTenant() != null) {
-                n.setTenantNom(n.getTenant().getNomEntreprise());
+            try {
+                if (n.getTenant() != null) {
+                    n.setTenantNom(n.getTenant().getNomEntreprise());
+                }
+            } catch (jakarta.persistence.EntityNotFoundException ex) {
+                log.warn("Notification {} référence un tenant supprimé : {}", n.getId(), ex.getMessage());
+                n.setTenantNom("(boutique supprimée)");
             }
         });
         return notifs;
