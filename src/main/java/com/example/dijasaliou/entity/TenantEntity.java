@@ -186,8 +186,8 @@ public class TenantEntity {
     public enum Plan {
         GRATUIT("Plan Gratuit", "Paiement requis - Aucun accès aux fonctionnalités", 0, 0, 0, false),
         STARTER("Plan Starter", "Gestion complète boutique - 3 utilisateurs", 9.99, 5000, 3, true),
-        PRO("Plan Pro", "Pour moyennes entreprises", 29.99, 15000, 10, true),
-        BUSINESS("Plan Business", "Pour grandes entreprises", 99.99, 20000, 20, true);
+        PRO("Plan Pro", "Pour moyennes entreprises", 29.99, 10000, 10, true),
+        BUSINESS("Plan Business", "Pour grandes entreprises", 99.99, 15000, 20, true);
 
         private final String libelle;
         private final String description;
