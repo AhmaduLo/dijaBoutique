@@ -137,6 +137,25 @@ public class PushNotificationService {
         if (url != null) {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("url", url);
+            // onActionClick : indique explicitement au Service Worker Angular
+            // comment réagir au clic, MÊME quand la PWA est fermée.
+            //
+            // Sans ce bloc, ngsw-worker se contente d'ouvrir la PWA sur sa page
+            // de démarrage (/) → l'utilisateur doit cliquer "Connexion" puis
+            // naviguer manuellement vers la page de la notification.
+            //
+            // Avec navigateLastFocusedOrOpen :
+            //   - PWA ouverte (focus ou arrière-plan) → focus + naviguer à url
+            //   - PWA fermée → ouvrir nouvelle fenêtre directement sur url
+            //
+            // L'auth est conservée (cookies / localStorage du navigateur), donc
+            // les routes protégées par superAdminGuard s'ouvrent sans refaire login.
+            Map<String, Object> onActionClick = new LinkedHashMap<>();
+            Map<String, Object> defaultAction = new LinkedHashMap<>();
+            defaultAction.put("operation", "navigateLastFocusedOrOpen");
+            defaultAction.put("url", url);
+            onActionClick.put("default", defaultAction);
+            data.put("onActionClick", onActionClick);
             notification.put("data", data);
         }
 
