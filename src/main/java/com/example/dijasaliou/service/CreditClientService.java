@@ -267,8 +267,6 @@ public class CreditClientService {
                 .collect(Collectors.toList());
     }
 
-    /** Détail d'un crédit (par id), filtré par tenant. */
-    @Transactional(readOnly = true)
     /**
      * Passe un crédit en perte (le client ne paiera jamais).
      *
@@ -311,6 +309,8 @@ public class CreditClientService {
         return CreditClientDto.fromEntity(credit);
     }
 
+    /** Détail d'un crédit (par id), filtré par tenant. */
+    @Transactional(readOnly = true)
     public CreditClientDto obtenirCredit(String creditId) {
         CreditClientEntity credit = creditClientRepository.findById(creditId)
                 .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
