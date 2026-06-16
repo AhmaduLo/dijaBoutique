@@ -106,6 +106,21 @@ public class CreditController {
         return ResponseEntity.ok(creditClientService.obtenirPaiements(id));
     }
 
+    /**
+     * POST /api/credits/{id}/passer-en-perte
+     *
+     * Le commerçant indique qu'il abandonne ce crédit (le client ne paiera jamais).
+     * Le reste dû devient une perte FIFO de catégorie CREDIT_IMPAYE dans les stats,
+     * mais les paiements déjà reçus restent dans le CA / la caisse.
+     */
+    @PostMapping("/{id}/passer-en-perte")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<CreditClientDto> passerEnPerte(@PathVariable String id, Authentication auth) {
+        log.info("Crédit #{} passé en perte par {}", id, auth.getName());
+        return ResponseEntity.ok(creditClientService.passerEnPerte(id));
+    }
+
     /** GET /api/credits/{id} — détail d'un crédit (utilisé par certains refresh frontend). */
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")

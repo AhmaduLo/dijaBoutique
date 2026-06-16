@@ -524,7 +524,7 @@ public class VenteService {
         long nbVentesAvecBenefice = consommationRepository.countVentesAvecBeneficeBetween(tenant, debutDt, finDt);
         long nbVentesSansBenefice = Math.max(0L, nbVentes - nbVentesAvecBenefice);
 
-        // 5. Sorties hors vente (pertes, vols, dons, créances impayées) — comptabilisées séparément
+        // 5. Sorties hors vente (pertes, vols, dons) — comptabilisées séparément
         java.util.Map<String, BigDecimal> pertesParType = new java.util.LinkedHashMap<>();
         BigDecimal totalPertes = BigDecimal.ZERO;
         long nbSorties = 0L;
@@ -538,6 +538,37 @@ public class VenteService {
         // Compte les sorties via la query sumSortiesParTypeEtPeriode (compte les ventes, pas les lignes FIFO)
         for (Object[] row : venteRepository.sumSortiesParTypeEtPeriode(debutDt, finDt, tenantUuid)) {
             nbSorties += row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
+        }
+
+        // 5bis. Crédits impayés passés en perte sur la période
+        // Pour chaque crédit en perte : perte FIFO = coût total vente × (montant restant / prix total vente)
+        BigDecimal pertesCreditImpaye = BigDecimal.ZERO;
+        long nbCreditsEnPerte = 0L;
+        for (CreditClientEntity credit : creditClientRepository.findCreditsPassesEnPerteBetween(debut, fin, tenantUuid)) {
+            BigDecimal montantRestant = credit.getMontantRestant();
+            if (montantRestant == null || montantRestant.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            VenteEntity vente = credit.getVente();
+            if (vente == null || vente.getPrixTotal() == null
+                    || vente.getPrixTotal().compareTo(BigDecimal.ZERO) <= 0) {
+                // Sans vente associée, on prend la perte = montant restant (pas de coût FIFO calculable)
+                pertesCreditImpaye = pertesCreditImpaye.add(montantRestant);
+                nbCreditsEnPerte++;
+                continue;
+            }
+
+            // Prorata FIFO : part non payée × coût total de la vente
+            BigDecimal proratNonPaye = montantRestant.divide(vente.getPrixTotal(), 6, java.math.RoundingMode.HALF_UP);
+            BigDecimal coutVente = consommationRepository.sumCoutAchatByVenteId(vente.getId(), tenant);
+            if (coutVente == null) coutVente = BigDecimal.ZERO;
+            pertesCreditImpaye = pertesCreditImpaye.add(coutVente.multiply(proratNonPaye));
+            nbCreditsEnPerte++;
+        }
+        pertesCreditImpaye = pertesCreditImpaye.setScale(2, java.math.RoundingMode.HALF_UP);
+        if (pertesCreditImpaye.compareTo(BigDecimal.ZERO) > 0) {
+            pertesParType.merge("CREDIT_IMPAYE", pertesCreditImpaye, BigDecimal::add);
+            totalPertes = totalPertes.add(pertesCreditImpaye);
+            nbSorties += nbCreditsEnPerte;
         }
 
         BigDecimal marge = BigDecimal.ZERO;

@@ -269,6 +269,48 @@ public class CreditClientService {
 
     /** Détail d'un crédit (par id), filtré par tenant. */
     @Transactional(readOnly = true)
+    /**
+     * Passe un crédit en perte (le client ne paiera jamais).
+     *
+     * Effet :
+     *   - Le statut du crédit devient PERTE
+     *   - datePassageEnPerte = aujourd'hui (sert à attribuer la perte FIFO à la bonne période)
+     *   - Le montant restant est marqué comme perdu (resterDu × prorata FIFO côté stats)
+     *   - Les paiements déjà reçus restent dans le CA / caisse (intacts)
+     *   - Le crédit disparaît de la liste "actifs" (en_attente / partiel)
+     *   - Pas de mouvement de stock (la marchandise est déjà partie)
+     *
+     * Validation :
+     *   - Crédit doit être EN_ATTENTE ou PARTIEL (pas SOLDE ni déjà PERTE)
+     *   - Reste dû doit être > 0
+     */
+    @Transactional
+    public CreditClientDto passerEnPerte(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findByIdForUpdate(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(currentTenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+
+        if (credit.getStatut() == StatutCredit.SOLDE) {
+            throw new IllegalStateException("Ce crédit est déjà entièrement payé — on ne peut pas le passer en perte");
+        }
+        if (credit.getStatut() == StatutCredit.PERTE) {
+            throw new IllegalStateException("Ce crédit est déjà passé en perte");
+        }
+        if (credit.getMontantRestant() == null || credit.getMontantRestant().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Aucun reste dû sur ce crédit");
+        }
+
+        credit.setStatut(StatutCredit.PERTE);
+        credit.setDatePassageEnPerte(tenantService.todayInTenantTz());
+        creditClientRepository.save(credit);
+
+        return CreditClientDto.fromEntity(credit);
+    }
+
     public CreditClientDto obtenirCredit(String creditId) {
         CreditClientEntity credit = creditClientRepository.findById(creditId)
                 .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));

@@ -39,7 +39,13 @@ public class CreditClientEntity extends BaseEntity {
     public enum StatutCredit {
         EN_ATTENTE,
         PARTIEL,
-        SOLDE
+        SOLDE,
+        /**
+         * Crédit que le client ne paiera jamais — le reste dû devient une perte.
+         * Les paiements déjà reçus restent attribués au CA / bénéfice (cash basis).
+         * Le coût FIFO de la part non payée est comptabilisé comme perte CREDIT_IMPAYE.
+         */
+        PERTE
     }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -65,6 +71,14 @@ public class CreditClientEntity extends BaseEntity {
 
     @Column(name = "date_echeance")
     private LocalDate dateEcheance;
+
+    /**
+     * Date à laquelle le crédit est passé en perte (statut = PERTE).
+     * Sert à attribuer la perte FIFO à la bonne période dans les stats bénéfice
+     * (pas à la date de la vente originale).
+     */
+    @Column(name = "date_passage_en_perte")
+    private LocalDate datePassageEnPerte;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "employe_id", nullable = true, foreignKey = @ForeignKey(name = "fk_credit_employe"))
