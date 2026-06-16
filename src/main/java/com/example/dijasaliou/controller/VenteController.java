@@ -244,11 +244,7 @@ public class VenteController {
     public ResponseEntity<List<VenteDto>> obtenirSorties(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
-        List<VenteDto> sorties = venteService.obtenirSortiesPeriode(debut, fin)
-                .stream()
-                .map(VenteDto::fromEntity)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(sorties);
+        return ResponseEntity.ok(venteService.obtenirSortiesPeriode(debut, fin));
     }
 
     /**

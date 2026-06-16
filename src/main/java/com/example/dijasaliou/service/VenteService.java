@@ -91,6 +91,7 @@ public class VenteService {
         LocalDateTime finDt = dateFin != null ? dateFin.atTime(LocalTime.MAX) : null;
         Page<VenteEntity> ventesPage = venteRepository.findAllWithSearch(tenantUuid, searchParam, debutDt, finDt, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
+        enrichirCreditStatut(dtoPage.getContent(), tenantUuid);
         return PagedResponse.from(dtoPage);
     }
 
@@ -106,7 +107,33 @@ public class VenteService {
         LocalDateTime finDt2 = dateFin != null ? dateFin.atTime(LocalTime.MAX) : null;
         Page<VenteEntity> ventesPage = venteRepository.findByUtilisateurWithSearch(utilisateur, tenantUuid, searchParam, debutDt2, finDt2, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
+        enrichirCreditStatut(dtoPage.getContent(), tenantUuid);
         return PagedResponse.from(dtoPage);
+    }
+
+    /**
+     * Enrichit une liste de VenteDto avec le statut de leur crédit associé (s'il existe).
+     * Utilise une seule query bulk pour éviter le N+1 sur les ventes paginées.
+     */
+    private void enrichirCreditStatut(List<VenteDto> ventes, String tenantUuid) {
+        if (ventes == null || ventes.isEmpty()) return;
+        List<String> venteIds = ventes.stream()
+                .filter(v -> "CREDIT".equals(v.getModePaiement()))
+                .map(VenteDto::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        if (venteIds.isEmpty()) return;
+
+        Map<String, String> statutParVenteId = new java.util.HashMap<>();
+        for (Object[] row : creditClientRepository.findStatutByVenteIds(venteIds, tenantUuid)) {
+            String venteId = (String) row[0];
+            Object statut = row[1];
+            statutParVenteId.put(venteId, statut != null ? statut.toString() : null);
+        }
+        for (VenteDto dto : ventes) {
+            String s = statutParVenteId.get(dto.getId());
+            if (s != null) dto.setCreditStatut(s);
+        }
     }
 
     /**
@@ -435,14 +462,39 @@ public class VenteService {
     }
 
     /**
-     * Liste détaillée des sorties hors vente (perte, vol, casse, don, crédit impayé)
-     * sur une période. Utilisée par la modale "Pertes" du frontend.
+     * Liste détaillée des sorties hors vente (perte, vol, casse, don) ET des crédits
+     * passés en perte sur une période. Utilisée par la modale "Pertes" du frontend.
+     *
+     * Les crédits perdus sont convertis en VenteDto virtuels (typeSortie=CREDIT_IMPAYE)
+     * pour partager la même structure que les vraies sorties — le frontend les affiche
+     * de manière unifiée dans le tableau.
      */
     @Transactional(readOnly = true)
-    public List<VenteEntity> obtenirSortiesPeriode(LocalDate debut, LocalDate fin) {
+    public List<com.example.dijasaliou.dto.VenteDto> obtenirSortiesPeriode(LocalDate debut, LocalDate fin) {
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
-        return venteRepository.findSortiesBetween(
-                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), tenantUuid);
+        LocalDateTime debutDt = debut.atStartOfDay();
+        LocalDateTime finDt = fin.atTime(LocalTime.MAX);
+
+        List<com.example.dijasaliou.dto.VenteDto> resultat = new java.util.ArrayList<>(
+                venteRepository.findSortiesBetween(debutDt, finDt, tenantUuid).stream()
+                        .map(com.example.dijasaliou.dto.VenteDto::fromEntity)
+                        .toList()
+        );
+
+        // Crédits passés en perte sur la période — virtual sorties
+        for (com.example.dijasaliou.entity.CreditClientEntity credit :
+                creditClientRepository.findCreditsPassesEnPerteBetween(debut, fin, tenantUuid)) {
+            resultat.add(com.example.dijasaliou.dto.VenteDto.fromCreditPerdu(credit));
+        }
+
+        // Tri global par date desc
+        resultat.sort((a, b) -> {
+            if (a.getDateVente() == null) return 1;
+            if (b.getDateVente() == null) return -1;
+            return b.getDateVente().compareTo(a.getDateVente());
+        });
+
+        return resultat;
     }
 
     /**
