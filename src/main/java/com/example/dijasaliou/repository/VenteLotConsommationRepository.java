@@ -84,6 +84,63 @@ public interface VenteLotConsommationRepository
                                              @Param("debut") LocalDateTime debut,
                                              @Param("fin")   LocalDateTime fin);
 
+    /**
+     * Bénéfice sur les ventes NON-CRÉDIT d'une période (= ventes payées immédiatement).
+     * Sert à la comptabilité de caisse : exclut les ventes crédit, qui sont prises
+     * en compte au prorata via PaiementCreditEntity.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(v.beneficeTotalLigne), 0)
+            FROM VenteLotConsommationEntity v
+            WHERE v.tenant = :tenant
+              AND v.dateVenteSnapshot BETWEEN :debut AND :fin
+              AND v.vente.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT
+            """)
+    BigDecimal sumBeneficeNonCreditBetween(@Param("tenant") TenantEntity tenant,
+                                           @Param("debut") LocalDateTime debut,
+                                           @Param("fin")   LocalDateTime fin);
+
+    /**
+     * Coût FIFO sur les ventes NON-CRÉDIT d'une période.
+     * Pendant comptabilité de caisse de sumCoutAchatBetween.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee), 0)
+            FROM VenteLotConsommationEntity v
+            WHERE v.tenant = :tenant
+              AND v.dateVenteSnapshot BETWEEN :debut AND :fin
+              AND v.vente.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT
+            """)
+    BigDecimal sumCoutAchatNonCreditBetween(@Param("tenant") TenantEntity tenant,
+                                            @Param("debut") LocalDateTime debut,
+                                            @Param("fin")   LocalDateTime fin);
+
+    /**
+     * Coût FIFO total d'une vente précise (= somme des prix_achat × quantité de toutes ses lignes).
+     * Sert au calcul prorata du coût pour un paiement crédit partiel.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee), 0)
+            FROM VenteLotConsommationEntity v
+            WHERE v.vente.id = :venteId
+              AND v.tenant = :tenant
+            """)
+    BigDecimal sumCoutAchatByVenteId(@Param("venteId") String venteId,
+                                     @Param("tenant") TenantEntity tenant);
+
+    /**
+     * Bénéfice FIFO total d'une vente précise (= somme des benefice_total_ligne de toutes ses lignes).
+     * Permet de retrouver le bénéfice attendu d'une vente pour calcul prorata.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(v.beneficeTotalLigne), 0)
+            FROM VenteLotConsommationEntity v
+            WHERE v.vente.id = :venteId
+              AND v.tenant = :tenant
+            """)
+    BigDecimal sumBeneficeByVenteId(@Param("venteId") String venteId,
+                                    @Param("tenant") TenantEntity tenant);
+
     /** Supprime toutes les lignes liées à une vente (utilisé lors d'une suppression de vente). */
     void deleteByVenteId(String venteId);
 

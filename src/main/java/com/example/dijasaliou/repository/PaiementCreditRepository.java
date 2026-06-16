@@ -63,4 +63,51 @@ public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEn
     java.util.List<Object[]> sumByModeGrouped(@Param("tenant") TenantEntity tenant,
                                               @Param("debut") LocalDate debut,
                                               @Param("fin") LocalDate fin);
+
+    /**
+     * Total des paiements crédit reçus sur une période (tous modes confondus).
+     * Sert au CA en comptabilité de caisse : un paiement crédit est de l'argent vraiment encaissé.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(p.montantPaye), 0)
+            FROM PaiementCreditEntity p
+            WHERE p.credit.tenant.tenantUuid = :tenantUuid
+              AND p.datePaiement >= :debut
+              AND p.datePaiement <= :fin
+            """)
+    BigDecimal sumMontantPayeBetweenAndTenant(@Param("debut") LocalDate debut,
+                                              @Param("fin") LocalDate fin,
+                                              @Param("tenantUuid") String tenantUuid);
+
+    /**
+     * Compte le nombre de paiements crédit reçus sur une période.
+     * Sert à compter les "ventes encaissées via crédit" pour les stats.
+     */
+    @Query("""
+            SELECT COUNT(p)
+            FROM PaiementCreditEntity p
+            WHERE p.credit.tenant.tenantUuid = :tenantUuid
+              AND p.datePaiement >= :debut
+              AND p.datePaiement <= :fin
+            """)
+    long countByPeriodeAndTenant(@Param("debut") LocalDate debut,
+                                 @Param("fin") LocalDate fin,
+                                 @Param("tenantUuid") String tenantUuid);
+
+    /**
+     * Paiements crédit d'une période, avec la vente associée chargée (pour calcul du coût FIFO prorata).
+     * Retourne uniquement les paiements liés à une vente (credit.vente != null).
+     */
+    @Query("""
+            SELECT p
+            FROM PaiementCreditEntity p
+            JOIN FETCH p.credit c
+            JOIN FETCH c.vente v
+            WHERE c.tenant.tenantUuid = :tenantUuid
+              AND p.datePaiement >= :debut
+              AND p.datePaiement <= :fin
+            """)
+    List<PaiementCreditEntity> findPaiementsAvecVenteBetween(@Param("debut") LocalDate debut,
+                                                             @Param("fin") LocalDate fin,
+                                                             @Param("tenantUuid") String tenantUuid);
 }

@@ -127,6 +127,30 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
                                          @Param("fin") LocalDateTime fin,
                                          @Param("tenantUuid") String tenantUuid);
 
+    /**
+     * CA des ventes payées immédiatement (mode != CREDIT) sur une période.
+     * Sert la comptabilité de caisse : seules les ventes encaissées au moment de l'enregistrement
+     * comptent ; les ventes crédit sont prises en compte via la table paiements_credit.
+     */
+    @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT")
+    BigDecimal sumChiffreAffairesNonCreditPeriode(@Param("debut") LocalDateTime debut,
+                                                  @Param("fin") LocalDateTime fin,
+                                                  @Param("tenantUuid") String tenantUuid);
+
+    /**
+     * Nombre de ventes non-crédit sur une période (pour le décompte "ventes encaissées").
+     */
+    @Query("SELECT COUNT(v) FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT")
+    long countVentesNonCreditPeriode(@Param("debut") LocalDateTime debut,
+                                     @Param("fin") LocalDateTime fin,
+                                     @Param("tenantUuid") String tenantUuid);
+
     @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.tenantUuid = :tenantUuid")
     long countByTenantUuid(@Param("tenantUuid") String tenantUuid);
 

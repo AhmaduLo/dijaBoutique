@@ -395,44 +395,123 @@ public class VenteService {
     }
 
     /**
-     * Calculer le chiffre d'affaires d'une période
+     * Calculer le chiffre d'affaires d'une période — comptabilité de caisse.
+     *
+     * LOGIQUE CASH BASIS :
+     *   CA = (somme des ventes payées immédiatement, mode != CREDIT)
+     *      + (somme des paiements crédit reçus sur la période)
+     *
+     * Une vente crédit n'entre PAS dans le CA tant que le client ne paye pas.
+     * À chaque paiement reçu, le montant payé s'ajoute au CA de la période du paiement.
      */
     @Transactional(readOnly = true)
     public BigDecimal calculerChiffreAffaires(LocalDate debut, LocalDate fin) {
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+
+        BigDecimal caNonCredit = venteRepository.sumChiffreAffairesNonCreditPeriode(
+                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), tenantUuid);
+        if (caNonCredit == null) caNonCredit = BigDecimal.ZERO;
+
+        BigDecimal caPaiementsCredit = paiementCreditRepository.sumMontantPayeBetweenAndTenant(
+                debut, fin, tenantUuid);
+        if (caPaiementsCredit == null) caPaiementsCredit = BigDecimal.ZERO;
+
+        return caNonCredit.add(caPaiementsCredit);
+    }
+
+    /**
+     * Ancienne méthode : CA en comptabilité d'engagement (toutes ventes confondues, crédit inclus).
+     * Conservée pour usage interne uniquement (le rapport modes de paiement par exemple).
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal calculerChiffreAffairesAccrual(LocalDate debut, LocalDate fin) {
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
         return venteRepository.sumChiffreAffairesPeriode(
                 debut.atStartOfDay(), fin.atTime(LocalTime.MAX), tenantUuid);
     }
 
     /**
-     * Calculer les statistiques de bénéfice net (FIFO) sur une période.
+     * Calculer les statistiques de bénéfice net (FIFO) sur une période — comptabilité de caisse.
      *
-     * Le bénéfice est obtenu en sommant les benefice_total_ligne des lignes
-     * vente_lot_consommation pour la période. Les ventes sans ligne de consommation
-     * (produit jamais acheté) sont comptées séparément dans nbVentesSansBenefice.
+     * LOGIQUE CASH BASIS :
+     *   CA          = ventes non-crédit de la période + paiements crédit reçus dans la période
+     *   coût FIFO   = coût des ventes non-crédit + coût prorata des ventes crédit pour la part payée
+     *   bénéfice    = CA − coût FIFO
+     *
+     * EXEMPLE :
+     *   Vente crédit 100k (coût FIFO 60k). Mr Diop paye 50k en juin → on attribue :
+     *     • CA juin     += 50k
+     *     • Coût juin   += 60k × (50k / 100k) = 30k
+     *     • Bénéfice    += 20k
+     *
+     * Les ventes sans ligne de consommation (produit jamais acheté ⇒ coût FIFO inconnu)
+     * sont comptées dans nbVentesSansBenefice.
      */
     @Transactional(readOnly = true)
     public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin) {
         TenantEntity tenant = tenantService.getCurrentTenant();
         LocalDateTime debutDt = debut.atStartOfDay();
         LocalDateTime finDt   = fin.atTime(LocalTime.MAX);
+        String tenantUuid = tenant.getTenantUuid();
 
-        BigDecimal ca           = venteRepository.sumChiffreAffairesPeriode(debutDt, finDt, tenant.getTenantUuid());
-        if (ca == null) ca = BigDecimal.ZERO;
+        // 1. Partie NON-CRÉDIT : ventes payées immédiatement → on prend tout (CA + coût + bénéfice complets)
+        BigDecimal caNonCredit = venteRepository.sumChiffreAffairesNonCreditPeriode(debutDt, finDt, tenantUuid);
+        if (caNonCredit == null) caNonCredit = BigDecimal.ZERO;
 
-        BigDecimal coutAchat    = consommationRepository.sumCoutAchatBetween(tenant, debutDt, finDt);
+        BigDecimal coutAchat = consommationRepository.sumCoutAchatNonCreditBetween(tenant, debutDt, finDt);
         if (coutAchat == null) coutAchat = BigDecimal.ZERO;
 
-        BigDecimal benefice     = consommationRepository.sumBeneficeBetween(tenant, debutDt, finDt);
+        BigDecimal benefice  = consommationRepository.sumBeneficeNonCreditBetween(tenant, debutDt, finDt);
         if (benefice == null) benefice = BigDecimal.ZERO;
 
-        long nbVentes              = venteRepository.findByDateVenteBetween(debutDt, finDt).size();
-        long nbVentesAvecBenefice  = consommationRepository.countVentesAvecBeneficeBetween(tenant, debutDt, finDt);
-        long nbVentesSansBenefice  = Math.max(0L, nbVentes - nbVentesAvecBenefice);
+        // 2. Partie CRÉDIT : pour chaque paiement reçu dans la période, attribution prorata du coût/bénéfice
+        List<PaiementCreditEntity> paiements = paiementCreditRepository.findPaiementsAvecVenteBetween(
+                debut, fin, tenantUuid);
+
+        BigDecimal caPaiementsCredit  = BigDecimal.ZERO;
+        BigDecimal coutPaiementsCredit = BigDecimal.ZERO;
+        BigDecimal beneficePaiementsCredit = BigDecimal.ZERO;
+
+        for (PaiementCreditEntity p : paiements) {
+            BigDecimal montantPaye = p.getMontantPaye();
+            if (montantPaye == null || montantPaye.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            VenteEntity vente = (p.getCredit() != null) ? p.getCredit().getVente() : null;
+            if (vente == null || vente.getPrixTotal() == null
+                    || vente.getPrixTotal().compareTo(BigDecimal.ZERO) <= 0) {
+                // Paiement sans vente ou vente à prix 0 : on ajoute juste le CA, pas de coût attribuable
+                caPaiementsCredit = caPaiementsCredit.add(montantPaye);
+                continue;
+            }
+
+            // Prorata = montant payé / prix total de la vente
+            BigDecimal prorata = montantPaye.divide(vente.getPrixTotal(), 6, java.math.RoundingMode.HALF_UP);
+
+            BigDecimal coutVente     = consommationRepository.sumCoutAchatByVenteId(vente.getId(), tenant);
+            if (coutVente == null) coutVente = BigDecimal.ZERO;
+            BigDecimal beneficeVente = consommationRepository.sumBeneficeByVenteId(vente.getId(), tenant);
+            if (beneficeVente == null) beneficeVente = BigDecimal.ZERO;
+
+            caPaiementsCredit       = caPaiementsCredit.add(montantPaye);
+            coutPaiementsCredit     = coutPaiementsCredit.add(coutVente.multiply(prorata));
+            beneficePaiementsCredit = beneficePaiementsCredit.add(beneficeVente.multiply(prorata));
+        }
+
+        // 3. Agrégation finale
+        BigDecimal ca         = caNonCredit.add(caPaiementsCredit);
+        BigDecimal coutTotal  = coutAchat.add(coutPaiementsCredit).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal beneficeTotal = benefice.add(beneficePaiementsCredit).setScale(2, java.math.RoundingMode.HALF_UP);
+
+        // 4. Comptages
+        long nbVentesNonCredit  = venteRepository.countVentesNonCreditPeriode(debutDt, finDt, tenantUuid);
+        long nbPaiementsCredit  = paiementCreditRepository.countByPeriodeAndTenant(debut, fin, tenantUuid);
+        long nbVentes           = nbVentesNonCredit + nbPaiementsCredit;
+        long nbVentesAvecBenefice = consommationRepository.countVentesAvecBeneficeBetween(tenant, debutDt, finDt);
+        long nbVentesSansBenefice = Math.max(0L, nbVentes - nbVentesAvecBenefice);
 
         BigDecimal marge = BigDecimal.ZERO;
         if (ca.compareTo(BigDecimal.ZERO) > 0) {
-            marge = benefice
+            marge = beneficeTotal
                     .multiply(new BigDecimal("100"))
                     .divide(ca, 2, java.math.RoundingMode.HALF_UP);
         }
@@ -441,8 +520,8 @@ public class VenteService {
                 .dateDebut(debut)
                 .dateFin(fin)
                 .chiffreAffaires(ca)
-                .totalCoutAchat(coutAchat)
-                .beneficeNet(benefice)
+                .totalCoutAchat(coutTotal)
+                .beneficeNet(beneficeTotal)
                 .margePourcentage(marge)
                 .nbVentes(nbVentes)
                 .nbVentesAvecBenefice(nbVentesAvecBenefice)
