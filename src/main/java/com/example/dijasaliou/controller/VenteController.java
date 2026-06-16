@@ -234,6 +234,24 @@ public class VenteController {
     }
 
     /**
+     * GET /api/ventes/sorties?debut=2026-06-01&fin=2026-06-30
+     *
+     * Liste détaillée des sorties hors vente (perte, vol, casse, don, crédit impayé)
+     * sur une période. Utilisée par la modale "Pertes" du frontend.
+     */
+    @GetMapping("/sorties")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    public ResponseEntity<List<VenteDto>> obtenirSorties(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        List<VenteDto> sorties = venteService.obtenirSortiesPeriode(debut, fin)
+                .stream()
+                .map(VenteDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(sorties);
+    }
+
+    /**
      * GET /api/ventes/benefice?debut=2026-06-01&fin=2026-06-07
      *
      * Statistiques de bénéfice net FIFO sur une période :

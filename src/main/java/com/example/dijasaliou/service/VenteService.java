@@ -252,6 +252,10 @@ public class VenteService {
         if (venteModifiee.getModePaiement() != null) {
             venteExistante.setModePaiement(venteModifiee.getModePaiement());
         }
+        // Sortie hors vente (perte, vol, casse, don, crédit impayé) — toujours synchroniser,
+        // y compris quand on REMET à null (ex: passer d'une sortie à une vraie vente).
+        venteExistante.setTypeSortie(venteModifiee.getTypeSortie());
+        venteExistante.setMotifSortie(venteModifiee.getMotifSortie());
 
         // Photo
         if (produitChange) {
@@ -431,6 +435,17 @@ public class VenteService {
     }
 
     /**
+     * Liste détaillée des sorties hors vente (perte, vol, casse, don, crédit impayé)
+     * sur une période. Utilisée par la modale "Pertes" du frontend.
+     */
+    @Transactional(readOnly = true)
+    public List<VenteEntity> obtenirSortiesPeriode(LocalDate debut, LocalDate fin) {
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        return venteRepository.findSortiesBetween(
+                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), tenantUuid);
+    }
+
+    /**
      * Calculer les statistiques de bénéfice net (FIFO) sur une période — comptabilité de caisse.
      *
      * LOGIQUE CASH BASIS :
@@ -509,6 +524,22 @@ public class VenteService {
         long nbVentesAvecBenefice = consommationRepository.countVentesAvecBeneficeBetween(tenant, debutDt, finDt);
         long nbVentesSansBenefice = Math.max(0L, nbVentes - nbVentesAvecBenefice);
 
+        // 5. Sorties hors vente (pertes, vols, dons, créances impayées) — comptabilisées séparément
+        java.util.Map<String, BigDecimal> pertesParType = new java.util.LinkedHashMap<>();
+        BigDecimal totalPertes = BigDecimal.ZERO;
+        long nbSorties = 0L;
+        for (Object[] row : consommationRepository.sumPertesFifoParTypeBetween(tenant, debutDt, finDt)) {
+            String type = row[0] != null ? row[0].toString() : "AUTRE";
+            BigDecimal cout = row[1] instanceof BigDecimal ? (BigDecimal) row[1]
+                    : (row[1] instanceof Number ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO);
+            pertesParType.put(type, cout.setScale(2, java.math.RoundingMode.HALF_UP));
+            totalPertes = totalPertes.add(cout);
+        }
+        // Compte les sorties via la query sumSortiesParTypeEtPeriode (compte les ventes, pas les lignes FIFO)
+        for (Object[] row : venteRepository.sumSortiesParTypeEtPeriode(debutDt, finDt, tenantUuid)) {
+            nbSorties += row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
+        }
+
         BigDecimal marge = BigDecimal.ZERO;
         if (ca.compareTo(BigDecimal.ZERO) > 0) {
             marge = beneficeTotal
@@ -522,6 +553,9 @@ public class VenteService {
                 .chiffreAffaires(ca)
                 .totalCoutAchat(coutTotal)
                 .beneficeNet(beneficeTotal)
+                .totalPertes(totalPertes.setScale(2, java.math.RoundingMode.HALF_UP))
+                .pertesParType(pertesParType)
+                .nbSorties(nbSorties)
                 .margePourcentage(marge)
                 .nbVentes(nbVentes)
                 .nbVentesAvecBenefice(nbVentesAvecBenefice)
@@ -625,13 +659,31 @@ public class VenteService {
             throw new IllegalArgumentException("La quantité doit être supérieure à 0");
         }
 
-        if (vente.getPrixUnitaire() == null ||
-                vente.getPrixUnitaire().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Le prix unitaire doit être supérieur à 0");
-        }
-
         if (vente.getNomProduit() == null || vente.getNomProduit().trim().isEmpty()) {
             throw new IllegalArgumentException("Le nom du produit est obligatoire");
+        }
+
+        // Cas sortie hors vente (perte, vol, casse, don, crédit impayé) :
+        //   - prixUnitaire peut être 0 (la marchandise sort sans contrepartie financière)
+        //   - typeSortie obligatoire pour expliquer pourquoi
+        //   - le mode paiement CREDIT n'a pas de sens dans ce cas
+        if (vente.getTypeSortie() != null) {
+            if (vente.getPrixUnitaire() == null
+                    || vente.getPrixUnitaire().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Le prix unitaire ne peut être négatif");
+            }
+            if (vente.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT) {
+                throw new IllegalArgumentException(
+                        "Une sortie hors vente (perte, vol, don, casse) ne peut pas être à crédit");
+            }
+            return;
+        }
+
+        // Vente commerciale classique : prix obligatoire > 0
+        if (vente.getPrixUnitaire() == null
+                || vente.getPrixUnitaire().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(
+                    "Le prix unitaire doit être supérieur à 0 (ou indiquer un motif de sortie : perte, vol, don…)");
         }
     }
 

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 
 /**
  * Statistiques de bénéfice net sur une période.
@@ -20,6 +21,10 @@ import java.time.LocalDate;
  *
  * Le champ nbVentesSansBenefice compte les ventes de la période qui n'ont
  * AUCUNE ligne de consommation (produit jamais acheté ou stock initial sans achat).
+ *
+ * Les pertes (sorties hors vente : vol, casse, don, crédit impayé) sont
+ * comptabilisées séparément dans totalPertes / pertesParType pour ne pas
+ * polluer le bénéfice commercial.
  */
 @Data
 @Builder
@@ -38,4 +43,21 @@ public class BeneficeStatistiquesDto {
     private long        nbVentes;
     private long        nbVentesAvecBenefice;
     private long        nbVentesSansBenefice;
+
+    /**
+     * Total des pertes (coût FIFO) sur la période, toutes catégories confondues.
+     * = ce que tu as payé pour des marchandises qui sont parties sans contrepartie.
+     */
+    private BigDecimal  totalPertes;
+
+    /**
+     * Détail des pertes par type : clé = "PERTE_CASSE" / "VOL" / "OFFERT" / "CREDIT_IMPAYE" / "AUTRE",
+     * valeur = coût FIFO de cette catégorie.
+     */
+    private Map<String, BigDecimal> pertesParType;
+
+    /**
+     * Nombre de sorties hors vente sur la période.
+     */
+    private long        nbSorties;
 }

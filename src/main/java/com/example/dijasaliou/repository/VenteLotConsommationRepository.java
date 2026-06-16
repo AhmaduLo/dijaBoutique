@@ -30,12 +30,14 @@ public interface VenteLotConsommationRepository
     /**
      * Somme du bénéfice total sur une période, pour un tenant.
      * Filtre tenant EXPLICITE (utilisable dans tous les contextes).
+     * Exclut les sorties hors vente (le bénéfice d'un vol n'a pas de sens).
      */
     @Query("""
             SELECT COALESCE(SUM(v.beneficeTotalLigne), 0)
             FROM VenteLotConsommationEntity v
             WHERE v.tenant = :tenant
               AND v.dateVenteSnapshot BETWEEN :debut AND :fin
+              AND v.vente.typeSortie IS NULL
             """)
     BigDecimal sumBeneficeBetween(@Param("tenant") TenantEntity tenant,
                                   @Param("debut") LocalDateTime debut,
@@ -44,23 +46,48 @@ public interface VenteLotConsommationRepository
     /**
      * Somme du coût d'achat (= prix_achat × quantité) sur une période, pour un tenant.
      * Permet de calculer la marge brute : marge = CA − coût.
+     * Exclut les sorties hors vente.
      */
     @Query("""
             SELECT COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee), 0)
             FROM VenteLotConsommationEntity v
             WHERE v.tenant = :tenant
               AND v.dateVenteSnapshot BETWEEN :debut AND :fin
+              AND v.vente.typeSortie IS NULL
             """)
     BigDecimal sumCoutAchatBetween(@Param("tenant") TenantEntity tenant,
                                    @Param("debut") LocalDateTime debut,
                                    @Param("fin")   LocalDateTime fin);
 
-    /** Nombre de ventes distinctes ayant au moins une ligne de consommation sur la période. */
+    /**
+     * Somme des coûts FIFO des sorties hors vente sur une période, groupée par type.
+     * Retourne List<Object[]> : [typeSortie, sum(coût FIFO)].
+     * C'est la "vraie perte économique" : ce que tu as payé pour des marchandises
+     * qui sont parties sans contrepartie financière (vol, casse, don…).
+     */
+    @Query("""
+            SELECT v.vente.typeSortie,
+                   COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee), 0)
+            FROM VenteLotConsommationEntity v
+            WHERE v.tenant = :tenant
+              AND v.dateVenteSnapshot BETWEEN :debut AND :fin
+              AND v.vente.typeSortie IS NOT NULL
+            GROUP BY v.vente.typeSortie
+            """)
+    List<Object[]> sumPertesFifoParTypeBetween(@Param("tenant") TenantEntity tenant,
+                                               @Param("debut") LocalDateTime debut,
+                                               @Param("fin")   LocalDateTime fin);
+
+    /**
+     * Nombre de ventes distinctes ayant au moins une ligne de consommation sur la période.
+     * Exclut les sorties hors vente (pas comptées comme "ventes").
+     */
     @Query("""
             SELECT COUNT(DISTINCT v.vente.id)
             FROM VenteLotConsommationEntity v
             WHERE v.tenant = :tenant
               AND v.dateVenteSnapshot BETWEEN :debut AND :fin
+              AND v.vente.typeSortie IS NULL
             """)
     long countVentesAvecBeneficeBetween(@Param("tenant") TenantEntity tenant,
                                         @Param("debut") LocalDateTime debut,
@@ -95,6 +122,7 @@ public interface VenteLotConsommationRepository
             WHERE v.tenant = :tenant
               AND v.dateVenteSnapshot BETWEEN :debut AND :fin
               AND v.vente.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT
+              AND v.vente.typeSortie IS NULL
             """)
     BigDecimal sumBeneficeNonCreditBetween(@Param("tenant") TenantEntity tenant,
                                            @Param("debut") LocalDateTime debut,
@@ -103,6 +131,7 @@ public interface VenteLotConsommationRepository
     /**
      * Coût FIFO sur les ventes NON-CRÉDIT d'une période.
      * Pendant comptabilité de caisse de sumCoutAchatBetween.
+     * Exclut aussi les sorties hors vente.
      */
     @Query("""
             SELECT COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee), 0)
@@ -110,6 +139,7 @@ public interface VenteLotConsommationRepository
             WHERE v.tenant = :tenant
               AND v.dateVenteSnapshot BETWEEN :debut AND :fin
               AND v.vente.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT
+              AND v.vente.typeSortie IS NULL
             """)
     BigDecimal sumCoutAchatNonCreditBetween(@Param("tenant") TenantEntity tenant,
                                             @Param("debut") LocalDateTime debut,

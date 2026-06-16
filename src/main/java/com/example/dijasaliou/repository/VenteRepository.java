@@ -118,11 +118,13 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
             @Param("fin") LocalDateTime fin);
 
     /**
-     * Calcule le chiffre d'affaires d'une période directement en SQL (évite le chargement en mémoire)
+     * Calcule le chiffre d'affaires d'une période directement en SQL (évite le chargement en mémoire).
+     * Exclut systématiquement les sorties hors vente (typeSortie != null).
      */
     @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +
            "WHERE v.dateVente BETWEEN :debut AND :fin " +
-           "AND v.tenant.tenantUuid = :tenantUuid")
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.typeSortie IS NULL")
     BigDecimal sumChiffreAffairesPeriode(@Param("debut") LocalDateTime debut,
                                          @Param("fin") LocalDateTime fin,
                                          @Param("tenantUuid") String tenantUuid);
@@ -131,25 +133,60 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
      * CA des ventes payées immédiatement (mode != CREDIT) sur une période.
      * Sert la comptabilité de caisse : seules les ventes encaissées au moment de l'enregistrement
      * comptent ; les ventes crédit sont prises en compte via la table paiements_credit.
+     * Exclut aussi les sorties hors vente.
      */
     @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +
            "WHERE v.dateVente BETWEEN :debut AND :fin " +
            "AND v.tenant.tenantUuid = :tenantUuid " +
-           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT")
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT " +
+           "AND v.typeSortie IS NULL")
     BigDecimal sumChiffreAffairesNonCreditPeriode(@Param("debut") LocalDateTime debut,
                                                   @Param("fin") LocalDateTime fin,
                                                   @Param("tenantUuid") String tenantUuid);
 
     /**
      * Nombre de ventes non-crédit sur une période (pour le décompte "ventes encaissées").
+     * Exclut les sorties hors vente.
      */
     @Query("SELECT COUNT(v) FROM VenteEntity v " +
            "WHERE v.dateVente BETWEEN :debut AND :fin " +
            "AND v.tenant.tenantUuid = :tenantUuid " +
-           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT")
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT " +
+           "AND v.typeSortie IS NULL")
     long countVentesNonCreditPeriode(@Param("debut") LocalDateTime debut,
                                      @Param("fin") LocalDateTime fin,
                                      @Param("tenantUuid") String tenantUuid);
+
+    /**
+     * Groupe les sorties hors vente (perte, vol, casse, don, crédit impayé) par type sur une période.
+     * Retourne List<Object[]> : [typeSortie, count, sumPrixTotal].
+     * Utilisé par le widget "Pertes du mois" sur le dashboard ventes.
+     */
+    @Query("SELECT v.typeSortie, COUNT(v), COALESCE(SUM(v.prixTotal), 0) " +
+           "FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.typeSortie IS NOT NULL " +
+           "GROUP BY v.typeSortie")
+    java.util.List<Object[]> sumSortiesParTypeEtPeriode(@Param("debut") LocalDateTime debut,
+                                                        @Param("fin") LocalDateTime fin,
+                                                        @Param("tenantUuid") String tenantUuid);
+
+    /**
+     * Liste détaillée des sorties hors vente d'une période — triée par date décroissante.
+     * Utilisée par la modale "Pertes" pour afficher la liste filtrable par mois/année.
+     * Charge l'utilisateur en fetch pour éviter les N+1 dans le DTO.
+     */
+    @Query("SELECT v FROM VenteEntity v " +
+           "JOIN FETCH v.utilisateur " +
+           "JOIN FETCH v.tenant " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.typeSortie IS NOT NULL " +
+           "ORDER BY v.dateVente DESC, v.id DESC")
+    java.util.List<VenteEntity> findSortiesBetween(@Param("debut") LocalDateTime debut,
+                                                   @Param("fin") LocalDateTime fin,
+                                                   @Param("tenantUuid") String tenantUuid);
 
     @Query("SELECT COUNT(v) FROM VenteEntity v WHERE v.tenant.tenantUuid = :tenantUuid")
     long countByTenantUuid(@Param("tenantUuid") String tenantUuid);

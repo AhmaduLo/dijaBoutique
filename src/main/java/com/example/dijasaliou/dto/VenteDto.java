@@ -53,6 +53,11 @@ public class VenteDto {
     private Integer annee;
     private Boolean aUnClient;
 
+    // Sortie hors vente (perte, vol, casse, don, crédit impayé)
+    // null quand c'est une vente commerciale classique
+    private String typeSortie;
+    private String motifSortie;
+
     /**
      * Convertit une entité Vente en DTO
      *
@@ -89,6 +94,8 @@ public class VenteDto {
                 .mois(vente.getMois())
                 .annee(vente.getAnnee())
                 .aUnClient(vente.aUnClient())
+                .typeSortie(vente.getTypeSortie() != null ? vente.getTypeSortie().name() : null)
+                .motifSortie(vente.getMotifSortie())
                 .build();
     }
 
@@ -124,6 +131,8 @@ public class VenteDto {
                 .mois(vente.getMois())
                 .annee(vente.getAnnee())
                 .aUnClient(vente.aUnClient())
+                .typeSortie(vente.getTypeSortie() != null ? vente.getTypeSortie().name() : null)
+                .motifSortie(vente.getMotifSortie())
                 .build();
     }
 }
