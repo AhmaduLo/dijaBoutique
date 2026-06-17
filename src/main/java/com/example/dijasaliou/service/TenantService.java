@@ -182,6 +182,18 @@ public class TenantService {
             tenant.setLogoUrl(request.getLogoUrl().trim().isEmpty() ? null : request.getLogoUrl().trim());
         }
 
+        // Mise à jour des conditions & garanties (optionnel, vide → null)
+        if (request.getConditionsGaranties() != null) {
+            String txt = request.getConditionsGaranties().trim();
+            tenant.setConditionsGaranties(txt.isEmpty() ? null : txt);
+        }
+
+        // Mise à jour des mentions légales (optionnel, vide → null)
+        if (request.getMentionsLegales() != null) {
+            String txt = request.getMentionsLegales().trim();
+            tenant.setMentionsLegales(txt.isEmpty() ? null : txt);
+        }
+
         // Forcer la sauvegarde du tenant
         TenantEntity tenantSauvegarde = tenantRepository.saveAndFlush(tenant);
         log.info("Tenant mis à jour : {} (uuid={})", tenantSauvegarde.getNomEntreprise(), tenantSauvegarde.getTenantUuid());

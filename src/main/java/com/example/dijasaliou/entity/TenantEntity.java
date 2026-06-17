@@ -91,6 +91,22 @@ public class TenantEntity {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
+    /**
+     * Texte libre "Conditions et garanties" imprimé en bas de la facture A4.
+     * Vide ou null → le bloc n'apparaît pas sur la facture.
+     * Édité depuis Paramètres → Entreprise, persiste pour toutes les ventes futures.
+     */
+    @Column(name = "conditions_garanties", columnDefinition = "TEXT")
+    private String conditionsGaranties;
+
+    /**
+     * Texte libre "Mentions légales" imprimé en bas de la facture A4, sous les conditions.
+     * Pénalités de retard, juridiction compétente, TVA, escompte, etc.
+     * Vide ou null → le bloc n'apparaît pas sur la facture.
+     */
+    @Column(name = "mentions_legales", columnDefinition = "TEXT")
+    private String mentionsLegales;
+
     /** Devise préférée de cette boutique (code ISO ex: XOF, EUR, USD). Chaque boutique a la sienne. */
     @Column(name = "devise_preferee", length = 10)
     @Builder.Default
