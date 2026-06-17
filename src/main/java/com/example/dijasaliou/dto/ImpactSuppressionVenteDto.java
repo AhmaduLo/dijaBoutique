@@ -40,6 +40,18 @@ public class ImpactSuppressionVenteDto {
     /** Statut du crédit associé (EN_ATTENTE / PARTIEL / SOLDE / PERTE / null). */
     private String creditStatut;
 
+    /** true si la vente est une sortie hors vente (vol, casse, don, offert). */
+    private boolean estSortieHorsVente;
+
+    /** Type de sortie (PERTE_CASSE / VOL / OFFERT / CREDIT_IMPAYE / AUTRE / null). */
+    private String typeSortie;
+
+    /**
+     * Coût FIFO qui sera "dé-compté" des pertes du mois quand on supprime
+     * une sortie hors vente. Renseigné uniquement si estSortieHorsVente.
+     */
+    private java.math.BigDecimal impactPertes;
+
     /** Détail des paiements à annuler. */
     @Builder.Default
     private List<PaiementAAnnuler> paiementsAAnnuler = java.util.Collections.emptyList();
