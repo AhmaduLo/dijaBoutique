@@ -129,6 +129,36 @@ public class CreditController {
         return ResponseEntity.ok(creditClientService.obtenirCredit(id));
     }
 
+    /**
+     * GET /api/credits/{id}/impact-suppression
+     *
+     * Aperçu de l'impact d'une suppression du crédit (= suppression de la vente liée).
+     * Délègue au VenteService car le crédit n'a de sens que dans le contexte de sa vente.
+     */
+    @GetMapping("/{id}/impact-suppression")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<com.example.dijasaliou.dto.ImpactSuppressionVenteDto> impactSuppressionDepuisCredit(
+            @PathVariable String id) {
+        return ResponseEntity.ok(creditClientService.calculerImpactSuppressionDepuisCredit(id));
+    }
+
+    /**
+     * DELETE /api/credits/{id}
+     *
+     * Supprime le crédit ET la vente associée en cascade (paiements + crédit +
+     * vente + restauration stock). Le frontend doit afficher la modale de
+     * confirmation avant d'appeler cet endpoint.
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<Void> supprimerCredit(@PathVariable String id, Authentication auth) {
+        log.info("Suppression cascade du crédit #{} (et vente associée) par {}", id, auth.getName());
+        creditClientService.supprimerCreditEtVenteEnCascade(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/stats")
     @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
     @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})

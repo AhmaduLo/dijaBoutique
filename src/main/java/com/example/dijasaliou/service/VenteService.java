@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -366,6 +367,134 @@ public class VenteService {
             return venteExistante.getClientRef();
         }
         throw new IllegalArgumentException("Un client enregistré est obligatoire pour une vente à crédit");
+    }
+
+    /**
+     * Calcule l'aperçu des conséquences avant de supprimer une vente.
+     * Sert à afficher une modale claire au commerçant : stock à restaurer,
+     * paiements à annuler, CA recalculé par mois affecté.
+     */
+    @Transactional(readOnly = true)
+    public com.example.dijasaliou.dto.ImpactSuppressionVenteDto calculerImpactSuppression(String id) {
+        VenteEntity vente = obtenirVenteParId(id);
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!vente.getTenant().getTenantUuid().equals(tenant.getTenantUuid())) {
+            throw new SecurityException("Accès refusé");
+        }
+
+        boolean estCredit = vente.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT;
+        String creditStatut = null;
+        List<com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler> paiementsAAnnuler = new java.util.ArrayList<>();
+
+        List<CreditClientEntity> credits = creditClientRepository.findByVenteIdWithPaiements(id);
+        for (CreditClientEntity credit : credits) {
+            if (creditStatut == null && credit.getStatut() != null) {
+                creditStatut = credit.getStatut().name();
+            }
+            if (credit.getPaiements() != null) {
+                for (com.example.dijasaliou.entity.PaiementCreditEntity p : credit.getPaiements()) {
+                    paiementsAAnnuler.add(com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler.builder()
+                            .paiementId(p.getId())
+                            .datePaiement(p.getDatePaiement())
+                            .modePaiement(p.getModePaiement() != null ? p.getModePaiement().name() : null)
+                            .montant(p.getMontantPaye())
+                            .build());
+                }
+            }
+        }
+
+        // Agrégat par mode de paiement
+        Map<String, BigDecimal> totauxParMode = new java.util.LinkedHashMap<>();
+        for (var p : paiementsAAnnuler) {
+            totauxParMode.merge(p.getModePaiement(), p.getMontant(), BigDecimal::add);
+        }
+        List<com.example.dijasaliou.dto.ImpactSuppressionVenteDto.MontantParMode> totalParMode = totauxParMode.entrySet().stream()
+                .map(e -> com.example.dijasaliou.dto.ImpactSuppressionVenteDto.MontantParMode.builder()
+                        .modePaiement(e.getKey()).montant(e.getValue()).build())
+                .collect(Collectors.toList());
+
+        // Impact CA par mois — cash basis : chaque paiement compte sur SON mois
+        Map<String, BigDecimal> retraitParMoisKey = new java.util.LinkedHashMap<>();
+        for (var p : paiementsAAnnuler) {
+            if (p.getDatePaiement() == null) continue;
+            String key = p.getDatePaiement().getYear() + "-" + String.format("%02d", p.getDatePaiement().getMonthValue());
+            retraitParMoisKey.merge(key, p.getMontant(), BigDecimal::add);
+        }
+        List<com.example.dijasaliou.dto.ImpactSuppressionVenteDto.ImpactCaMois> impactCaParMois = new java.util.ArrayList<>();
+        String[] moisLibelles = {"Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+                                  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"};
+        for (var entry : retraitParMoisKey.entrySet()) {
+            String[] parts = entry.getKey().split("-");
+            int annee = Integer.parseInt(parts[0]);
+            int mois = Integer.parseInt(parts[1]);
+            LocalDate debutMois = LocalDate.of(annee, mois, 1);
+            LocalDate finMois = debutMois.withDayOfMonth(debutMois.lengthOfMonth());
+            BigDecimal caActuel = calculerChiffreAffaires(debutMois, finMois);
+            BigDecimal diminution = entry.getValue().setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal caApres = caActuel.subtract(diminution).setScale(2, java.math.RoundingMode.HALF_UP);
+            impactCaParMois.add(com.example.dijasaliou.dto.ImpactSuppressionVenteDto.ImpactCaMois.builder()
+                    .annee(annee).mois(mois)
+                    .moisLibelle(moisLibelles[mois - 1] + " " + annee)
+                    .caActuel(caActuel)
+                    .caApres(caApres)
+                    .diminution(diminution)
+                    .build());
+        }
+
+        return com.example.dijasaliou.dto.ImpactSuppressionVenteDto.builder()
+                .venteId(id)
+                .nomProduit(vente.getNomProduit())
+                .quantiteARestaurer(vente.getQuantite())
+                .modePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : "ESPECES")
+                .estVenteCredit(estCredit)
+                .creditStatut(creditStatut)
+                .paiementsAAnnuler(paiementsAAnnuler)
+                .totalParMode(totalParMode)
+                .impactCaParMois(impactCaParMois)
+                .build();
+    }
+
+    /**
+     * Supprime une vente EN CASCADE : annule tous les paiements crédit, supprime
+     * les crédits associés, restaure le stock FIFO, supprime la vente.
+     *
+     * À utiliser uniquement après confirmation explicite par le commerçant
+     * (modale qui montre l'impact via calculerImpactSuppression).
+     *
+     * Différence avec supprimerVente() :
+     *   - supprimerVente : bloque si crédit non soldé a paiements, sinon détache
+     *     (laisse crédit + paiements en BDD comme historique)
+     *   - supprimerVenteEnCascade : supprime TOUT (paiements + crédit + vente)
+     */
+    @Transactional
+    public void supprimerVenteEnCascade(String id) {
+        VenteEntity vente = obtenirVenteParId(id);
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!vente.getTenant().getTenantUuid().equals(tenant.getTenantUuid())) {
+            throw new SecurityException("Accès refusé");
+        }
+
+        // 1. Supprimer en bloc les crédits + paiements (cascade JPA grâce à @OneToMany orphanRemoval=true)
+        List<CreditClientEntity> credits = creditClientRepository.findByVenteIdWithPaiements(id);
+        for (CreditClientEntity credit : credits) {
+            log.info("[CASCADE] Suppression du crédit {} (statut {}, {} paiements) lié à la vente {}",
+                    credit.getId(), credit.getStatut(),
+                    credit.getPaiements() != null ? credit.getPaiements().size() : 0, id);
+            creditClientRepository.delete(credit); // cascade vers paiements via orphanRemoval
+        }
+
+        // 2. FIFO : restaurer le stock dans les lots d'achat
+        try {
+            fifoCalculService.annulerConsommationFifo(id);
+        } catch (Exception e) {
+            log.error("[CASCADE] Échec annulation FIFO pour vente {} : {}", id, e.getMessage(), e);
+        }
+
+        // 3. Supprimer la vente
+        venteRepository.deleteById(id);
+        stockService.invalidateStockCache(tenant.getTenantUuid());
+
+        log.info("[CASCADE] Vente {} supprimée avec succès (cascade complète)", id);
     }
 
     /**

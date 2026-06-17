@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class CreditClientService {
 
     private final CreditClientRepository creditClientRepository;
@@ -41,6 +40,22 @@ public class CreditClientService {
     private final ClientRepository clientRepository;
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
+    // @Lazy : VenteService injecte déjà CreditClientService en @Lazy → on évite la cycle
+    private final VenteService venteService;
+
+    public CreditClientService(CreditClientRepository creditClientRepository,
+                                PaiementCreditRepository paiementCreditRepository,
+                                ClientRepository clientRepository,
+                                VenteRepository venteRepository,
+                                TenantService tenantService,
+                                @org.springframework.context.annotation.Lazy VenteService venteService) {
+        this.creditClientRepository = creditClientRepository;
+        this.paiementCreditRepository = paiementCreditRepository;
+        this.clientRepository = clientRepository;
+        this.venteRepository = venteRepository;
+        this.tenantService = tenantService;
+        this.venteService = venteService;
+    }
 
     /**
      * Appelé par VenteService quand mode_paiement = CREDIT
@@ -307,6 +322,45 @@ public class CreditClientService {
         creditClientRepository.save(credit);
 
         return CreditClientDto.fromEntity(credit);
+    }
+
+    /**
+     * Aperçu de l'impact d'une suppression depuis le crédit.
+     * Délègue au VenteService — le crédit n'a de sens qu'avec sa vente.
+     */
+    @Transactional(readOnly = true)
+    public com.example.dijasaliou.dto.ImpactSuppressionVenteDto calculerImpactSuppressionDepuisCredit(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findById(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(tenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+        if (credit.getVente() == null) {
+            throw new IllegalStateException("Ce crédit n'a pas de vente associée — suppression impossible");
+        }
+        return venteService.calculerImpactSuppression(credit.getVente().getId());
+    }
+
+    /**
+     * Supprime un crédit en cascade — c'est-à-dire supprime la vente associée
+     * (qui à son tour supprime paiements + crédit + restaure stock).
+     *
+     * À utiliser après confirmation utilisateur (modale d'impact).
+     */
+    @Transactional
+    public void supprimerCreditEtVenteEnCascade(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findById(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(tenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+        if (credit.getVente() == null) {
+            throw new IllegalStateException("Ce crédit n'a pas de vente associée — suppression impossible");
+        }
+        // Délègue au VenteService qui supprime tout en cascade (paiements + crédit + vente + stock)
+        venteService.supprimerVenteEnCascade(credit.getVente().getId());
     }
 
     /** Détail d'un crédit (par id), filtré par tenant. */

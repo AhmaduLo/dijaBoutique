@@ -143,12 +143,42 @@ public class VenteController {
     }
 
     /**
-     * DELETE /api/ventes/{id}
+     * DELETE /api/ventes/{id}[?cascade=true]
+     *
+     * Sans cascade (par défaut) : suppression "safe" — bloque si crédit non soldé
+     * a des paiements en cours, sinon détache le crédit (laisse historique).
+     *
+     * Avec cascade=true : suppression COMPLÈTE — annule paiements crédit, supprime
+     * crédit, restaure stock, supprime vente. À utiliser après confirmation
+     * utilisateur (voir endpoint /impact-suppression pour l'aperçu).
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> supprimer(@PathVariable String id) {
-        venteService.supprimerVente(id);
+    public ResponseEntity<Void> supprimer(
+            @PathVariable String id,
+            @RequestParam(name = "cascade", defaultValue = "false") boolean cascade) {
+        if (cascade) {
+            venteService.supprimerVenteEnCascade(id);
+        } else {
+            venteService.supprimerVente(id);
+        }
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/ventes/{id}/impact-suppression
+     *
+     * Aperçu de ce qui se passera si le commerçant supprime cette vente en cascade :
+     *   - quantité à restaurer au stock
+     *   - paiements crédit à annuler (avec mode + montant)
+     *   - impact sur CA mensuel (mois actuel + mois passés affectés)
+     *
+     * Utilisé par le frontend pour afficher une modale claire AVANT confirmation.
+     */
+    @GetMapping("/{id}/impact-suppression")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    public ResponseEntity<com.example.dijasaliou.dto.ImpactSuppressionVenteDto> impactSuppression(
+            @PathVariable String id) {
+        return ResponseEntity.ok(venteService.calculerImpactSuppression(id));
     }
 
     /**
