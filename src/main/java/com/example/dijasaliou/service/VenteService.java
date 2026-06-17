@@ -371,8 +371,17 @@ public class VenteService {
 
     /**
      * Calcule l'aperçu des conséquences avant de supprimer une vente.
-     * Sert à afficher une modale claire au commerçant : stock à restaurer,
-     * paiements à annuler, CA recalculé par mois affecté.
+     * Sert à afficher une modale claire au commerçant.
+     *
+     * Gère les 3 types de ventes :
+     *   - Vente à CRÉDIT  : agrège les paiements crédit (PaiementCreditEntity)
+     *                       par mode et par mois.
+     *   - Vente cash      : crée un "paiement virtuel" représentant l'argent
+     *                       reçu = prix_total payé par mode_paiement à la date
+     *                       de la vente.
+     *   - Sortie hors vente (vol, casse, don) : pas d'impact CA ni caisse,
+     *                       mais on calcule l'impact sur les pertes
+     *                       (coût FIFO qui sera dé-compté).
      */
     @Transactional(readOnly = true)
     public com.example.dijasaliou.dto.ImpactSuppressionVenteDto calculerImpactSuppression(String id) {
@@ -383,23 +392,46 @@ public class VenteService {
         }
 
         boolean estCredit = vente.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT;
+        boolean estSortie = vente.getTypeSortie() != null;
         String creditStatut = null;
+        String typeSortie = vente.getTypeSortie() != null ? vente.getTypeSortie().name() : null;
+        java.math.BigDecimal impactPertes = java.math.BigDecimal.ZERO;
+
         List<com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler> paiementsAAnnuler = new java.util.ArrayList<>();
 
-        List<CreditClientEntity> credits = creditClientRepository.findByVenteIdWithPaiements(id);
-        for (CreditClientEntity credit : credits) {
-            if (creditStatut == null && credit.getStatut() != null) {
-                creditStatut = credit.getStatut().name();
-            }
-            if (credit.getPaiements() != null) {
-                for (com.example.dijasaliou.entity.PaiementCreditEntity p : credit.getPaiements()) {
-                    paiementsAAnnuler.add(com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler.builder()
-                            .paiementId(p.getId())
-                            .datePaiement(p.getDatePaiement())
-                            .modePaiement(p.getModePaiement() != null ? p.getModePaiement().name() : null)
-                            .montant(p.getMontantPaye())
-                            .build());
+        if (estCredit) {
+            // CAS 1 : crédit — vrais paiements crédit en base
+            List<CreditClientEntity> credits = creditClientRepository.findByVenteIdWithPaiements(id);
+            for (CreditClientEntity credit : credits) {
+                if (creditStatut == null && credit.getStatut() != null) {
+                    creditStatut = credit.getStatut().name();
                 }
+                if (credit.getPaiements() != null) {
+                    for (com.example.dijasaliou.entity.PaiementCreditEntity p : credit.getPaiements()) {
+                        paiementsAAnnuler.add(com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler.builder()
+                                .paiementId(p.getId())
+                                .datePaiement(p.getDatePaiement())
+                                .modePaiement(p.getModePaiement() != null ? p.getModePaiement().name() : null)
+                                .montant(p.getMontantPaye())
+                                .build());
+                    }
+                }
+            }
+        } else if (!estSortie && vente.getPrixTotal() != null
+                && vente.getPrixTotal().compareTo(BigDecimal.ZERO) > 0) {
+            // CAS 2 : vente cash (Espèces / Wave / OM / Virement) — paiement virtuel
+            LocalDate dateVente = vente.getDateVente() != null ? vente.getDateVente().toLocalDate() : LocalDate.now();
+            paiementsAAnnuler.add(com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler.builder()
+                    .paiementId(vente.getId())
+                    .datePaiement(dateVente)
+                    .modePaiement(vente.getModePaiement().name())
+                    .montant(vente.getPrixTotal())
+                    .build());
+        } else if (estSortie) {
+            // CAS 3 : sortie hors vente — pas de paiement, mais impact pertes
+            BigDecimal coutFifo = consommationRepository.sumCoutAchatByVenteId(id, tenant);
+            if (coutFifo != null && coutFifo.compareTo(BigDecimal.ZERO) > 0) {
+                impactPertes = coutFifo.setScale(2, java.math.RoundingMode.HALF_UP);
             }
         }
 
@@ -448,6 +480,9 @@ public class VenteService {
                 .modePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : "ESPECES")
                 .estVenteCredit(estCredit)
                 .creditStatut(creditStatut)
+                .estSortieHorsVente(estSortie)
+                .typeSortie(typeSortie)
+                .impactPertes(impactPertes)
                 .paiementsAAnnuler(paiementsAAnnuler)
                 .totalParMode(totalParMode)
                 .impactCaParMois(impactCaParMois)
