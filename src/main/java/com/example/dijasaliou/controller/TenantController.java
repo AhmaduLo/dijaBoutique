@@ -56,7 +56,9 @@ public class TenantController {
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
                 admin != null ? admin.getEmail() : null,
-                tenant.getTimezone()
+                tenant.getTimezone(),
+                tenant.getConditionsGaranties(),
+                tenant.getMentionsLegales()
         );
 
         return ResponseEntity.ok(response);
@@ -87,7 +89,9 @@ public class TenantController {
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
                 admin != null ? admin.getEmail() : null,
-                tenant.getTimezone()
+                tenant.getTimezone(),
+                tenant.getConditionsGaranties(),
+                tenant.getMentionsLegales()
         );
 
         return ResponseEntity.ok(response);
@@ -131,7 +135,9 @@ public class TenantController {
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
                 admin != null ? admin.getEmail() : null,
-                tenantMisAJour.getTimezone()
+                tenantMisAJour.getTimezone(),
+                tenantMisAJour.getConditionsGaranties(),
+                tenantMisAJour.getMentionsLegales()
         );
 
         return ResponseEntity.ok(response);
@@ -175,6 +181,8 @@ public class TenantController {
             String nomProprietaire,
             String prenomProprietaire,
             String emailProprietaire,
-            String timezone
+            String timezone,
+            String conditionsGaranties,
+            String mentionsLegales
     ) {}
 }

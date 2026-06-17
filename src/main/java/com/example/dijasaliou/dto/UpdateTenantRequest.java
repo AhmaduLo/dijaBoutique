@@ -40,4 +40,16 @@ public class UpdateTenantRequest {
      * URL du logo de l'entreprise (stocké sur Cloudinary) - OPTIONNEL
      */
     private String logoUrl;
+
+    /**
+     * Texte libre imprimé en bas de la facture (conditions, garanties, SAV...).
+     * Null ou vide → bloc non imprimé.
+     */
+    private String conditionsGaranties;
+
+    /**
+     * Texte libre imprimé en bas de la facture (mentions légales : pénalités,
+     * juridiction, TVA, escompte...). Null ou vide → bloc non imprimé.
+     */
+    private String mentionsLegales;
 }
