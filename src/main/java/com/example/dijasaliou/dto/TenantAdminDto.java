@@ -34,6 +34,8 @@ public class TenantAdminDto {
     private String adminNom;
     private String adminPrenom;
     private String adminTelephone;
+    /** true si l'admin a vérifié son adresse email. Utilisé par le super admin pour filtrer. */
+    private Boolean adminEmailVerifie;
 
     // CRM super-admin
     private String sourceAcquisition;
@@ -68,6 +70,7 @@ public class TenantAdminDto {
                 .adminNom(admin != null ? admin.getNom() : null)
                 .adminPrenom(admin != null ? admin.getPrenom() : null)
                 .adminTelephone(admin != null ? admin.getNumeroTelephone() : null)
+                .adminEmailVerifie(admin != null ? admin.getEmailVerifie() : null)
                 .plan(tenant.getPlan())
                 .actif(tenant.getActif())
                 .dateCreation(tenant.getDateCreation())
