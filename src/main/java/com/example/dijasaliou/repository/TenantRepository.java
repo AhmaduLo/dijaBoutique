@@ -141,4 +141,15 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
            "  AND u.derniereConnexion IS NOT NULL" +
            ")")
     List<TenantEntity> findFantomes(@Param("seuilCreation") LocalDateTime seuilCreation);
+
+    /**
+     * IDs des tenants dont l'admin propriétaire a vérifié son adresse email.
+     * Utilisé par le super admin pour filtrer la liste.
+     */
+    @Query("SELECT DISTINCT t.id FROM TenantEntity t " +
+           "JOIN UserEntity u ON u.tenant = t " +
+           "WHERE t.deleted = false AND u.deleted = false " +
+           "AND u.role = com.example.dijasaliou.entity.UserEntity.Role.ADMIN " +
+           "AND u.emailVerifie = true")
+    List<Long> findTenantIdsWithVerifiedEmail();
 }

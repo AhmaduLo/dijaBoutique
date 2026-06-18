@@ -195,6 +195,13 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
     long countByTenantId(@Param("tenantId") Long tenantId);
 
     /**
+     * IDs des tenants qui ont enregistré au moins une vente.
+     * Utilisé par le super admin pour filtrer les boutiques actives commercialement.
+     */
+    @Query("SELECT DISTINCT v.tenant.id FROM VenteEntity v")
+    java.util.List<Long> findDistinctTenantIdsWithVentes();
+
+    /**
      * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_vente_tenant_date.
      */
     @Query(value = "SELECT v FROM VenteEntity v JOIN FETCH v.utilisateur JOIN FETCH v.tenant WHERE " +

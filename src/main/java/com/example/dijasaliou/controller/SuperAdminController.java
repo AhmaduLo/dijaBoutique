@@ -79,9 +79,21 @@ public class SuperAdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String activite) {
+            @RequestParam(required = false) String activite,
+            @RequestParam(required = false) String emailVerifie,
+            @RequestParam(required = false) String aVendu) {
         if (size > 100) size = 100;
-        return ResponseEntity.ok(superAdminService.getAllTenants(page, size, search, activite));
+        return ResponseEntity.ok(superAdminService.getAllTenants(page, size, search, activite, emailVerifie, aVendu));
+    }
+
+    /**
+     * GET /superadmin/tenants/stats
+     * Compteurs pour les filtres : total, vérifiés/non vérifiés, ont vendu/pas vendu.
+     * Léger, à appeler au chargement de la liste pour afficher les compteurs dans les sélecteurs.
+     */
+    @GetMapping("/tenants/stats")
+    public ResponseEntity<Map<String, Long>> getTenantsStats() {
+        return ResponseEntity.ok(superAdminService.getTenantsStats());
     }
 
     /**

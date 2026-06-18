@@ -107,35 +107,56 @@ public class SuperAdminService {
      *   - "ghost"        : créé > 5 mois sans qu'aucun user ne se soit jamais connecté
      *   - null/vide      : tous les tenants
      */
-    public PagedResponse<TenantAdminDto> getAllTenants(int page, int size, String search, String activite) {
+    public PagedResponse<TenantAdminDto> getAllTenants(int page, int size, String search, String activite,
+                                                       String emailVerifie, String aVendu) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
 
-        // Pas de filtre activité → comportement original (paginé direct par la query)
-        if (activite == null || activite.isBlank()) {
+        boolean hasActivite = activite != null && !activite.isBlank();
+        boolean hasEmailFilter = emailVerifie != null && !emailVerifie.isBlank();
+        boolean hasVenduFilter = aVendu != null && !aVendu.isBlank();
+
+        // Aucun filtre custom → comportement direct paginé par la DB
+        if (!hasActivite && !hasEmailFilter && !hasVenduFilter) {
             Page<TenantEntity> tenantsPage = tenantRepository.findByDeletedFalseWithSearch(searchParam, pageable);
             return PagedResponse.from(tenantsPage.map(this::toDto));
         }
 
-        // Avec filtre activité : on récupère tous les tenants matching search,
-        // on filtre en mémoire par activité, puis on pagine. Acceptable jusqu'à
-        // quelques centaines de tenants ; à optimiser avec une query SQL dédiée
-        // si tu dépasses 1000 tenants.
-        Set<Long> tenantIdsMatchingActivite = getTenantIdsForActivite(activite);
-
+        // Au moins un filtre custom → fetch tout, filtre en mémoire, pagine manuellement.
+        // Acceptable jusqu'à quelques centaines de tenants. Les filtres se cumulent.
         List<TenantEntity> tous = tenantRepository
                 .findByDeletedFalseWithSearch(searchParam, PageRequest.of(0, 5000, Sort.by(Sort.Direction.DESC, "id")))
                 .getContent();
 
-        List<TenantEntity> filtres = tous.stream()
-                .filter(t -> tenantIdsMatchingActivite.contains(t.getId()))
-                .toList();
+        // Filtre activité (réutilise la logique existante)
+        if (hasActivite) {
+            Set<Long> ids = getTenantIdsForActivite(activite);
+            tous = tous.stream().filter(t -> ids.contains(t.getId())).toList();
+        }
+
+        // Filtre email vérifié (oui / non) — basé sur une seule requête optimisée
+        if (hasEmailFilter) {
+            Set<Long> verifiedIds = Set.copyOf(tenantRepository.findTenantIdsWithVerifiedEmail());
+            boolean wantVerified = "oui".equalsIgnoreCase(emailVerifie);
+            tous = tous.stream()
+                    .filter(t -> verifiedIds.contains(t.getId()) == wantVerified)
+                    .toList();
+        }
+
+        // Filtre "a déjà vendu" (oui / non) — basé sur une seule requête optimisée
+        if (hasVenduFilter) {
+            Set<Long> idsWithVentes = Set.copyOf(venteRepository.findDistinctTenantIdsWithVentes());
+            boolean wantSold = "oui".equalsIgnoreCase(aVendu);
+            tous = tous.stream()
+                    .filter(t -> idsWithVentes.contains(t.getId()) == wantSold)
+                    .toList();
+        }
 
         // Pagination manuelle sur la liste filtrée
-        int total = filtres.size();
+        int total = tous.size();
         int from = Math.min(page * size, total);
         int to = Math.min(from + size, total);
-        List<TenantAdminDto> contentDto = filtres.subList(from, to).stream().map(this::toDto).toList();
+        List<TenantAdminDto> contentDto = tous.subList(from, to).stream().map(this::toDto).toList();
 
         return PagedResponse.<TenantAdminDto>builder()
                 .content(contentDto)
@@ -146,6 +167,30 @@ public class SuperAdminService {
                 .first(page == 0)
                 .last(to >= total)
                 .build();
+    }
+
+    /**
+     * Compteurs globaux pour les filtres du super admin.
+     * Renvoie : nombre total de tenants (non supprimés), nombre dont l'admin a vérifié son email,
+     * nombre dont l'admin ne l'a PAS vérifié, nombre ayant au moins une vente, nombre n'ayant pas
+     * encore vendu. Permet d'afficher les compteurs dans les sélecteurs côté UI.
+     */
+    public java.util.Map<String, Long> getTenantsStats() {
+        java.util.Set<Long> nonDeletedIds = tenantRepository.findByDeletedFalse().stream()
+                .map(TenantEntity::getId).collect(Collectors.toSet());
+        long total = nonDeletedIds.size();
+        // Note : on intersecte avec nonDeletedIds pour ne pas compter les tenants supprimés.
+        long emailVerifie = tenantRepository.findTenantIdsWithVerifiedEmail().stream()
+                .filter(nonDeletedIds::contains).count();
+        long aVendu = venteRepository.findDistinctTenantIdsWithVentes().stream()
+                .filter(nonDeletedIds::contains).count();
+        java.util.Map<String, Long> stats = new java.util.LinkedHashMap<>();
+        stats.put("total", total);
+        stats.put("emailVerifie", emailVerifie);
+        stats.put("emailNonVerifie", Math.max(0, total - emailVerifie));
+        stats.put("aVendu", aVendu);
+        stats.put("pasVendu", Math.max(0, total - aVendu));
+        return stats;
     }
 
     /** IDs des tenants matchant un filtre activité donné. */
