@@ -14,11 +14,13 @@ import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.PlatformConfigService;
 import com.example.dijasaliou.service.SuperAdminService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -254,6 +256,19 @@ public class SuperAdminController {
                 auth.getName(), userId, tenantId);
         superAdminService.resendVerificationEmailForUser(tenantId, userId);
         return ResponseEntity.ok(Map.of("message", "Email de vérification renvoyé avec succès."));
+    }
+
+    /**
+     * POST /superadmin/users/resend-verification-bulk?since=YYYY-MM-DD
+     * Renvoie en masse l'email de vérification à tous les comptes non-vérifiés inscrits depuis `since`.
+     */
+    @PostMapping("/users/resend-verification-bulk")
+    public ResponseEntity<Map<String, Object>> resendVerificationBulk(
+            @RequestParam("since") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate since,
+            Authentication auth) {
+        log.info("[SUPER_ADMIN] {} déclenche le renvoi en masse des emails de vérification depuis {}",
+                auth.getName(), since);
+        return ResponseEntity.ok(superAdminService.resendVerificationEmailToAllUnverified(since.atStartOfDay()));
     }
 
     /**

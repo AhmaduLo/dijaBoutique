@@ -637,6 +637,36 @@ public class SuperAdminService {
         authService.resendVerificationEmail(user.getEmail());
     }
 
+    /**
+     * Renvoie en masse l'email de vérification à tous les utilisateurs non-vérifiés inscrits depuis `since`.
+     * Le filtre temporel évite de relancer des comptes très anciens (risque de plaintes spam → blocage Brevo).
+     */
+    @Transactional
+    public Map<String, Object> resendVerificationEmailToAllUnverified(LocalDateTime since) {
+        List<UserEntity> users = userRepository.findUnverifiedSince(since, UserEntity.Role.SUPER_ADMIN);
+        int sent = 0;
+        int failed = 0;
+        List<String> erreurs = new ArrayList<>();
+        for (UserEntity user : users) {
+            try {
+                authService.resendVerificationEmail(user.getEmail());
+                sent++;
+            } catch (Exception e) {
+                failed++;
+                erreurs.add(user.getEmail() + " : " + e.getMessage());
+                log.warn("Bulk resend verification : échec pour {} — {}", user.getEmail(), e.getMessage());
+            }
+        }
+        log.info("[SUPER_ADMIN] Bulk resend verification depuis {} : total={}, dispatched={}, échecs={}",
+                since, users.size(), sent, failed);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", users.size());
+        result.put("dispatched", sent);
+        result.put("failed", failed);
+        if (!erreurs.isEmpty()) result.put("erreurs", erreurs);
+        return result;
+    }
+
     // ==================== NOTES INTERNES ====================
 
     public List<NoteInterne> getNotesByTenant(Long tenantId) {
