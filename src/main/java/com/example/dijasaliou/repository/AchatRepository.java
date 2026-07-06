@@ -159,4 +159,17 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
             @Param("tenant") TenantEntity tenant,
             @Param("debut") LocalDateTime debut,
             @Param("fin") LocalDateTime fin);
+
+    /**
+     * Noms de fournisseurs distincts pour un tenant, triés alphabétiquement.
+     * Alimente l'autocomplétion du champ fournisseur dans le formulaire d'achat.
+     * Exclut la valeur fallback "Fournisseur" (utilisée quand l'utilisateur n'a rien saisi).
+     */
+    @Query("SELECT DISTINCT a.fournisseur FROM AchatEntity a " +
+           "WHERE a.tenant = :tenant " +
+           "AND a.fournisseur IS NOT NULL " +
+           "AND a.fournisseur <> '' " +
+           "AND a.fournisseur <> 'Fournisseur' " +
+           "ORDER BY a.fournisseur ASC")
+    List<String> findDistinctFournisseursByTenant(@Param("tenant") TenantEntity tenant);
 }

@@ -329,4 +329,13 @@ public class AchatService {
         return achatRepository.findAllByTenant(tenantService.getCurrentTenant());
     }
 
+    /**
+     * Retourne la liste des fournisseurs distincts pour le tenant courant.
+     * Alimente l'autocomplétion côté frontend dans le formulaire d'achat.
+     */
+    @Transactional(readOnly = true)
+    public List<String> obtenirFournisseursDistincts() {
+        return achatRepository.findDistinctFournisseursByTenant(tenantService.getCurrentTenant());
+    }
+
 }

@@ -198,4 +198,14 @@ public class AchatController {
 
         return ResponseEntity.ok(produits);
     }
+
+    /**
+     * GET /api/achats/fournisseurs
+     * Retourne la liste des noms de fournisseurs distincts déjà utilisés par le tenant.
+     * Utilisé par l'autocomplétion du champ fournisseur dans le formulaire d'achat.
+     */
+    @GetMapping("/fournisseurs")
+    public ResponseEntity<List<String>> obtenirFournisseurs() {
+        return ResponseEntity.ok(achatService.obtenirFournisseursDistincts());
+    }
 }
