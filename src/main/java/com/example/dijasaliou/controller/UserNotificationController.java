@@ -110,11 +110,12 @@ public class UserNotificationController {
         UserEntity user = userRepository.findByEmailAndDeletedFalse(auth.getName())
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Envoi de test sans passer par les préférences : on veut valider l'infra
-        // même si aucun type "test" n'existe. On envoie directement à cet user.
-        pushService.notifyUser(
+        // Envoi INCONDITIONNEL — but diagnostic : vérifier que l'infra Web Push
+        // fonctionne bout en bout, indépendamment des préférences utilisateur.
+        // Sinon si l'admin a désactivé tous les types dans /notifications, le
+        // test ne partirait jamais et il croirait que rien ne marche.
+        pushService.notifyUserRaw(
                 user,
-                UserNotificationType.STOCK_BAS, // type technique pour passer le filtre — l'utilisateur en test l'a probablement activé
                 "🔔 EasyStock — Test",
                 "Tes notifications fonctionnent correctement !",
                 "/notifications"

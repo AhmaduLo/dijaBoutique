@@ -122,6 +122,31 @@ public class UserPushNotificationService {
     }
 
     /**
+     * Envoi INCONDITIONNEL à toutes les subscriptions d'un utilisateur,
+     * sans passer par le filtre des préférences.
+     *
+     * Réservé au diagnostic (bouton "Envoyer un test") — permet de vérifier
+     * l'infra Web Push même si l'utilisateur a désactivé tous les types dans
+     * ses préférences. Ne PAS utiliser pour les notifs métier réelles.
+     */
+    @Async
+    public void notifyUserRaw(UserEntity user, String title, String body, String url) {
+        if (!enabled || user == null) return;
+        List<UserPushSubscription> subs = repository.findByUser(user);
+        if (subs.isEmpty()) {
+            log.warn("[USER_PUSH] Aucune subscription pour {} — l'envoi de test ne partira nulle part",
+                    user.getEmail());
+            return;
+        }
+        String payload = buildPayload(title, body, url);
+        for (UserPushSubscription sub : subs) {
+            sendOne(sub, payload);
+        }
+        log.info("[USER_PUSH] Test envoyé à {} subscription(s) pour user={}",
+                subs.size(), user.getEmail());
+    }
+
+    /**
      * Envoie à tous les admins d'un tenant qui ont activé ce type.
      * Utilisé quand l'événement n'est pas rattaché à un user précis
      * (par ex. cron de résumé quotidien).
