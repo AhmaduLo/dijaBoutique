@@ -46,7 +46,12 @@ public class UserNotificationPreference {
     @JoinColumn(name = "tenant_id", nullable = false)
     private TenantEntity tenant;
 
-    @Enumerated(EnumType.STRING)
+    /**
+     * Utilise un converter tolérant (retourne null si la valeur en base n'est
+     * plus reconnue par l'enum Java). Les lignes orphelines seront filtrées
+     * dans le service — plus jamais de plantage Hibernate.
+     */
+    @Convert(converter = UserNotificationTypeConverter.class)
     @Column(name = "type_notification", nullable = false, length = 50)
     private UserNotificationType type;
 

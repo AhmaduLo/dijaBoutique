@@ -51,7 +51,10 @@ public class UserNotificationPreferenceService {
         UserEntity user = userRepository.findByEmailAndDeletedFalse(userEmail)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable : " + userEmail));
 
+        // On filtre les préférences orphelines (type == null : valeur en base plus
+        // reconnue par l'enum, gérée par UserNotificationTypeConverter).
         Map<UserNotificationType, UserNotificationPreference> stored = repository.findByUser(user).stream()
+                .filter(p -> p.getType() != null)
                 .collect(Collectors.toMap(
                         UserNotificationPreference::getType,
                         p -> p));
