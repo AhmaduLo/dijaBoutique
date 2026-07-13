@@ -3,6 +3,7 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.entity.StockAlertHistory;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.entity.UserNotificationType;
 import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.repository.StockAlertHistoryRepository;
 import com.example.dijasaliou.repository.UserRepository;
@@ -40,6 +41,7 @@ public class StockAlertService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final TenantService tenantService;
+    private final UserPushNotificationService userPushService;
 
     // Seuils d'alerte (en ordre décroissant)
     private static final double[] SEUILS_ALERTE = {15, 10, 5, 0};
@@ -49,13 +51,15 @@ public class StockAlertService {
                              StockAlertHistoryRepository stockAlertHistoryRepository,
                              UserRepository userRepository,
                              EmailService emailService,
-                             TenantService tenantService) {
+                             TenantService tenantService,
+                             UserPushNotificationService userPushService) {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
         this.stockAlertHistoryRepository = stockAlertHistoryRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
         this.tenantService = tenantService;
+        this.userPushService = userPushService;
     }
 
     /**
@@ -138,6 +142,20 @@ public class StockAlertService {
                 stockActuelInt,
                 stockActuelInt  // Le seuil d'alerte = le stock actuel (car stock == seuil)
         );
+
+        // 4bis. Envoyer aussi une notification push (respecte les préférences user)
+        // Type RUPTURE si stock == 0, sinon STOCK_BAS pour les paliers 15/10/5.
+        // Non bloquant (@Async) — un échec push n'empêche pas l'enregistrement historique.
+        UserNotificationType typeNotif = stockActuelInt == 0
+                ? UserNotificationType.RUPTURE
+                : UserNotificationType.STOCK_BAS;
+        String titrePush = stockActuelInt == 0
+                ? "🛑 Rupture de stock — " + nomProduit
+                : "📉 Stock faible — " + nomProduit + " (" + stockActuelInt + " restants)";
+        String bodyPush = stockActuelInt == 0
+                ? "Le produit est en rupture. Réapprovisionner rapidement pour ne plus perdre de ventes."
+                : "Le stock est descendu à " + stockActuelInt + " unités. Pense à commander.";
+        userPushService.notifyUser(admin, typeNotif, titrePush, bodyPush, "/stock");
 
         // 5. Enregistrer l'alerte dans l'historique
         StockAlertHistory history = StockAlertHistory.builder()
