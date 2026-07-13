@@ -1,6 +1,9 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.ResumeHebdoConfig;
+import com.example.dijasaliou.dto.ResumeMensuelConfig;
 import com.example.dijasaliou.dto.ResumeQuotidienConfig;
+import com.example.dijasaliou.dto.SeuilMontantConfig;
 import com.example.dijasaliou.dto.UserNotificationPreferenceDto;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
@@ -114,8 +117,21 @@ public class UserNotificationPreferenceService {
                     ResumeQuotidienConfig config = objectMapper.convertValue(rawConfig, ResumeQuotidienConfig.class);
                     return objectMapper.writeValueAsString(config);
                 }
+                case RESUME_HEBDO -> {
+                    ResumeHebdoConfig config = objectMapper.convertValue(rawConfig, ResumeHebdoConfig.class);
+                    return objectMapper.writeValueAsString(config);
+                }
+                case RESUME_MENSUEL -> {
+                    ResumeMensuelConfig config = objectMapper.convertValue(rawConfig, ResumeMensuelConfig.class);
+                    return objectMapper.writeValueAsString(config);
+                }
+                case VENTE_EMPLOYE, SORTIE_CAISSE_IMPORTANTE, NOUVEAU_CREDIT -> {
+                    SeuilMontantConfig config = objectMapper.convertValue(rawConfig, SeuilMontantConfig.class);
+                    return objectMapper.writeValueAsString(config);
+                }
                 default -> {
-                    // Types sans schéma typé pour l'instant : on accepte tel quel (JSON générique).
+                    // Types sans schéma typé (STOCK_BAS, RUPTURE, VENTE_A_PERTE, etc.)
+                    // acceptent le JSON générique mais ne l'utilisent pas.
                     return objectMapper.writeValueAsString(rawConfig);
                 }
             }
@@ -126,22 +142,47 @@ public class UserNotificationPreferenceService {
         }
     }
 
+    /** Config typée pour RESUME_HEBDO — fallback aux défauts si absente / illisible. */
+    @Transactional(readOnly = true)
+    public ResumeHebdoConfig getResumeHebdoConfig(UserEntity user) {
+        return readConfigOrDefault(user, UserNotificationType.RESUME_HEBDO,
+                ResumeHebdoConfig.class, ResumeHebdoConfig.defaults());
+    }
+
+    /** Config typée pour RESUME_MENSUEL — fallback aux défauts si absente / illisible. */
+    @Transactional(readOnly = true)
+    public ResumeMensuelConfig getResumeMensuelConfig(UserEntity user) {
+        return readConfigOrDefault(user, UserNotificationType.RESUME_MENSUEL,
+                ResumeMensuelConfig.class, ResumeMensuelConfig.defaults());
+    }
+
+    /** Config typée "seuil montant" pour un type donné (VENTE_EMPLOYE, SORTIE_CAISSE_IMPORTANTE, NOUVEAU_CREDIT). */
+    @Transactional(readOnly = true)
+    public SeuilMontantConfig getSeuilMontantConfig(UserEntity user, UserNotificationType type) {
+        return readConfigOrDefault(user, type, SeuilMontantConfig.class, SeuilMontantConfig.defaults());
+    }
+
+    private <T> T readConfigOrDefault(UserEntity user, UserNotificationType type, Class<T> clazz, T defaults) {
+        Optional<UserNotificationPreference> pref = repository.findByUserAndType(user, type);
+        String json = pref.map(UserNotificationPreference::getConfig).orElse(null);
+        if (json == null || json.isBlank()) return defaults;
+        try {
+            return objectMapper.readValue(json, clazz);
+        } catch (Exception e) {
+            log.warn("[USER_NOTIF_PREF] Config {} illisible pour user={}, retour au défaut : {}",
+                    type, user.getEmail(), e.getMessage());
+            return defaults;
+        }
+    }
+
     /**
      * Retourne la config typée pour RESUME_QUOTIDIEN pour un user donné,
      * ou les valeurs par défaut si absente / illisible.
      */
     @Transactional(readOnly = true)
     public ResumeQuotidienConfig getResumeQuotidienConfig(UserEntity user) {
-        Optional<UserNotificationPreference> pref = repository.findByUserAndType(user, UserNotificationType.RESUME_QUOTIDIEN);
-        String json = pref.map(UserNotificationPreference::getConfig).orElse(null);
-        if (json == null || json.isBlank()) return ResumeQuotidienConfig.defaults();
-        try {
-            return objectMapper.readValue(json, ResumeQuotidienConfig.class);
-        } catch (Exception e) {
-            log.warn("[USER_NOTIF_PREF] Config RESUME_QUOTIDIEN illisible pour user={}, retour au défaut : {}",
-                    user.getEmail(), e.getMessage());
-            return ResumeQuotidienConfig.defaults();
-        }
+        return readConfigOrDefault(user, UserNotificationType.RESUME_QUOTIDIEN,
+                ResumeQuotidienConfig.class, ResumeQuotidienConfig.defaults());
     }
 
     /**

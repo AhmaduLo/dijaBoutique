@@ -11,12 +11,15 @@ import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import com.example.dijasaliou.entity.PaiementCreditEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.entity.UserNotificationType;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
+import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteLotConsommationRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import com.example.dijasaliou.dto.SeuilMontantConfig;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -49,6 +52,9 @@ public class VenteService {
     private final PaiementCreditRepository paiementCreditRepository;
     private final FifoCalculService fifoCalculService;
     private final VenteLotConsommationRepository consommationRepository;
+    private final UserPushNotificationService userPushService;
+    private final UserNotificationPreferenceService prefService;
+    private final UserRepository userRepository;
 
     public VenteService(VenteRepository venteRepository,
                         @Lazy StockService stockService,
@@ -59,7 +65,10 @@ public class VenteService {
                         CreditClientRepository creditClientRepository,
                         PaiementCreditRepository paiementCreditRepository,
                         FifoCalculService fifoCalculService,
-                        VenteLotConsommationRepository consommationRepository) {
+                        VenteLotConsommationRepository consommationRepository,
+                        UserPushNotificationService userPushService,
+                        UserNotificationPreferenceService prefService,
+                        UserRepository userRepository) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
         this.tenantService = tenantService;
@@ -70,6 +79,9 @@ public class VenteService {
         this.paiementCreditRepository = paiementCreditRepository;
         this.fifoCalculService = fifoCalculService;
         this.consommationRepository = consommationRepository;
+        this.userPushService = userPushService;
+        this.prefService = prefService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -231,7 +243,79 @@ public class VenteService {
                     vente.getDateEcheance());
         }
 
+        // NOTIFICATIONS PUSH — non bloquantes, sans jamais faire échouer la vente.
+        try {
+            envoyerNotificationsVente(venteSauvegardee, utilisateur);
+        } catch (Exception e) {
+            log.warn("[VENTE_NOTIF] Echec envoi notifs pour vente {} : {}",
+                    venteSauvegardee.getId(), e.getMessage());
+        }
+
         return venteSauvegardee;
+    }
+
+    /**
+     * Détecte deux cas et envoie les push correspondants :
+     *   - VENTE_A_PERTE : prix vente unitaire < prix d'achat moyen (perte réelle)
+     *   - VENTE_EMPLOYE : la vente est saisie par un non-ADMIN et le montant
+     *     dépasse le seuil configuré par l'admin (0 = toutes les ventes)
+     */
+    private void envoyerNotificationsVente(VenteEntity vente, UserEntity auteur) {
+        if (vente == null || auteur == null) return;
+        TenantEntity tenant = vente.getTenant();
+        if (tenant == null) return;
+
+        // On récupère l'admin du tenant une seule fois (utile pour les deux notifs)
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+
+        // ─── VENTE_A_PERTE ─────────────────────────────────────────────
+        // Cas : vente au comptant OU crédit, dès que PV < prix achat moyen.
+        // On récupère le prix d'achat moyen depuis le stock (peut être null si
+        // le produit est en stock négatif ou n'existe pas encore côté stock).
+        try {
+            StockDto stock = stockService.obtenirStockParNomProduit(vente.getNomProduit());
+            BigDecimal prixMoyen = stock != null ? stock.getPrixMoyenAchat() : null;
+            if (prixMoyen != null && prixMoyen.signum() > 0
+                    && vente.getPrixUnitaire() != null
+                    && vente.getPrixUnitaire().compareTo(prixMoyen) < 0) {
+
+                BigDecimal perteParUnite = prixMoyen.subtract(vente.getPrixUnitaire());
+                BigDecimal perteTotale = perteParUnite.multiply(BigDecimal.valueOf(vente.getQuantite()));
+
+                String title = "Vente à perte détectée";
+                String body = vente.getNomProduit() + " vendu à " + fmt(vente.getPrixUnitaire())
+                        + " CFA (achat moyen : " + fmt(prixMoyen)
+                        + " CFA). Perte estimée : " + fmt(perteTotale) + " CFA.";
+                String url = "/ventes";
+
+                // On notifie l'auteur (peut réagir tout de suite s'il s'agit d'une erreur de saisie)
+                userPushService.notifyUser(auteur, UserNotificationType.VENTE_A_PERTE, title, body, url);
+                // Et l'admin s'il est distinct
+                if (admin != null && !admin.getId().equals(auteur.getId())) {
+                    userPushService.notifyUser(admin, UserNotificationType.VENTE_A_PERTE, title, body, url);
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // stock introuvable → on ne peut pas comparer, on skip
+        }
+
+        // ─── VENTE_EMPLOYE ─────────────────────────────────────────────
+        // Cas : auteur ≠ ADMIN + montant total > seuil de l'admin
+        if (admin != null && auteur.getRole() != UserEntity.Role.ADMIN) {
+            SeuilMontantConfig cfg = prefService.getSeuilMontantConfig(admin, UserNotificationType.VENTE_EMPLOYE);
+            BigDecimal total = vente.getPrixTotal() != null ? vente.getPrixTotal() : BigDecimal.ZERO;
+            if (total.compareTo(cfg.seuilMontant()) >= 0) {
+                String title = "Vente par " + auteur.getPrenom();
+                String body = auteur.getPrenom() + " " + auteur.getNom() + " vient d'enregistrer "
+                        + vente.getNomProduit() + " pour " + fmt(total) + " CFA.";
+                userPushService.notifyUser(admin, UserNotificationType.VENTE_EMPLOYE, title, body, "/ventes");
+            }
+        }
+    }
+
+    private static String fmt(BigDecimal montant) {
+        if (montant == null) return "0";
+        return String.format("%,d", montant.longValue()).replace(',', ' ');
     }
 
     /**

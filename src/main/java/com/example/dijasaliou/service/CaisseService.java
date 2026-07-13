@@ -5,6 +5,7 @@ import com.example.dijasaliou.dto.CaisseSoldeDto;
 import com.example.dijasaliou.dto.MouvementCaisseRequest;
 import com.example.dijasaliou.dto.MouvementHistoriqueDto;
 import com.example.dijasaliou.dto.MouvementHistoriqueDto.TypeHistorique;
+import com.example.dijasaliou.dto.SeuilMontantConfig;
 import com.example.dijasaliou.dto.TransfertCaisseRequest;
 import com.example.dijasaliou.entity.*;
 import com.example.dijasaliou.entity.MouvementCaisseManuelEntity.TypeMouvement;
@@ -60,6 +61,8 @@ public class CaisseService {
     private final PaiementCreditRepository            paiementCreditRepository;
     private final TenantService                       tenantService;
     private final UserRepository                      userRepository;
+    private final UserPushNotificationService         userPushService;
+    private final UserNotificationPreferenceService   prefService;
 
     /**
      * Borne supérieure utilisée pour la vue "temps réel" (asOfDate non fourni).
@@ -409,6 +412,16 @@ public class CaisseService {
                 request.getCompteSource(), request.getCompteDestination(),
                 request.getMontant(), tenant.getTenantUuid());
 
+        // NOTIFICATION PUSH — TRANSACTION_MANUELLE (un transfert entre comptes)
+        try {
+            envoyerNotifTransactionManuelle(tenant, userUuid,
+                    "Transfert " + request.getCompteSource() + " → " + request.getCompteDestination(),
+                    request.getMontant(),
+                    request.getMotif());
+        } catch (Exception e) {
+            log.warn("[CAISSE_NOTIF] Echec envoi notif transfert : {}", e.getMessage());
+        }
+
         return getSoldeActuel();
     }
 
@@ -445,7 +458,62 @@ public class CaisseService {
                 request.getTypeMouvement(), request.getCompte(),
                 request.getMontant(), tenant.getTenantUuid());
 
+        // NOTIFICATIONS PUSH — TRANSACTION_MANUELLE (toujours) + SORTIE_CAISSE_IMPORTANTE si sortie
+        try {
+            String kind = request.getTypeMouvement() == TypeMouvement.ENTREE ? "Dépôt" : "Retrait";
+            envoyerNotifTransactionManuelle(tenant, userUuid,
+                    kind + " sur " + request.getCompte(),
+                    request.getMontant(),
+                    request.getMotif());
+
+            if (request.getTypeMouvement() == TypeMouvement.SORTIE) {
+                envoyerNotifSortieCaisseImportante(tenant, request.getCompte(),
+                        request.getMontant(), request.getMotif());
+            }
+        } catch (Exception e) {
+            log.warn("[CAISSE_NOTIF] Echec envoi notif mouvement manuel : {}", e.getMessage());
+        }
+
         return getSoldeActuel();
+    }
+
+    /**
+     * Notifie l'admin d'une transaction manuelle en caisse (transfert, dépôt, retrait).
+     * Pas de seuil : toute transaction manuelle notifie si le type est activé.
+     */
+    private void envoyerNotifTransactionManuelle(TenantEntity tenant, String userUuid,
+                                                  String description, BigDecimal montant, String motif) {
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        String body = description + " : " + fmtMontant(montant) + " CFA"
+                + (motif != null && !motif.isBlank() ? " (" + motif + ")" : "") + ".";
+        userPushService.notifyUser(admin, UserNotificationType.TRANSACTION_MANUELLE,
+                "Transaction en caisse", body, "/caisse");
+    }
+
+    /**
+     * Notifie l'admin quand une sortie de caisse manuelle dépasse le seuil configuré.
+     * Seuil par défaut 0 → toutes les sorties notifient. Admin peut relever le seuil
+     * dans /notifications.
+     */
+    private void envoyerNotifSortieCaisseImportante(TenantEntity tenant, Object compte,
+                                                     BigDecimal montant, String motif) {
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        SeuilMontantConfig cfg = prefService.getSeuilMontantConfig(admin, UserNotificationType.SORTIE_CAISSE_IMPORTANTE);
+        if (montant == null || montant.compareTo(cfg.seuilMontant()) < 0) return;
+
+        String body = "Retrait de " + fmtMontant(montant) + " CFA sur " + compte
+                + (motif != null && !motif.isBlank() ? " (" + motif + ")" : "") + ".";
+        userPushService.notifyUser(admin, UserNotificationType.SORTIE_CAISSE_IMPORTANTE,
+                "Sortie de caisse importante", body, "/caisse");
+    }
+
+    private static String fmtMontant(BigDecimal montant) {
+        if (montant == null) return "0";
+        return String.format("%,d", montant.longValue()).replace(',', ' ');
     }
 
     // ── HISTORIQUE ────────────────────────────────────────────────────────────

@@ -3,11 +3,13 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.CreditClientDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.PaiementCreditDto;
+import com.example.dijasaliou.dto.SeuilMontantConfig;
 import com.example.dijasaliou.entity.*;
 import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
+import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,19 +44,28 @@ public class CreditClientService {
     private final TenantService tenantService;
     // @Lazy : VenteService injecte déjà CreditClientService en @Lazy → on évite la cycle
     private final VenteService venteService;
+    private final UserPushNotificationService userPushService;
+    private final UserNotificationPreferenceService prefService;
+    private final UserRepository userRepository;
 
     public CreditClientService(CreditClientRepository creditClientRepository,
                                 PaiementCreditRepository paiementCreditRepository,
                                 ClientRepository clientRepository,
                                 VenteRepository venteRepository,
                                 TenantService tenantService,
-                                @org.springframework.context.annotation.Lazy VenteService venteService) {
+                                @org.springframework.context.annotation.Lazy VenteService venteService,
+                                UserPushNotificationService userPushService,
+                                UserNotificationPreferenceService prefService,
+                                UserRepository userRepository) {
         this.creditClientRepository = creditClientRepository;
         this.paiementCreditRepository = paiementCreditRepository;
         this.clientRepository = clientRepository;
         this.venteRepository = venteRepository;
         this.tenantService = tenantService;
         this.venteService = venteService;
+        this.userPushService = userPushService;
+        this.prefService = prefService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -94,7 +105,54 @@ public class CreditClientService {
                 vente.getPrixTotal(), client.getNom(), vente.getId(),
                 vente.getTenant().getTenantUuid());
 
+        // NOTIFICATION PUSH — NOUVEAU_CREDIT (avec seuil configurable par admin)
+        try {
+            envoyerNotifNouveauCredit(saved, employe);
+        } catch (Exception e) {
+            log.warn("[CREDIT_NOTIF] Echec envoi notif NOUVEAU_CREDIT pour credit {} : {}",
+                    saved.getId(), e.getMessage());
+        }
+
         return saved;
+    }
+
+    private void envoyerNotifNouveauCredit(CreditClientEntity credit, UserEntity auteur) {
+        TenantEntity tenant = credit.getTenant();
+        if (tenant == null) return;
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        BigDecimal montant = credit.getMontantInitial() != null ? credit.getMontantInitial() : BigDecimal.ZERO;
+        SeuilMontantConfig cfg = prefService.getSeuilMontantConfig(admin, UserNotificationType.NOUVEAU_CREDIT);
+        if (montant.compareTo(cfg.seuilMontant()) < 0) return;
+
+        String clientNom = credit.getClient() != null ? credit.getClient().getNom() : "Client";
+        String parQui = (auteur != null && !auteur.getId().equals(admin.getId()))
+                ? " par " + auteur.getPrenom() : "";
+        String title = "Nouveau crédit accordé" + parQui;
+        String body = clientNom + " · " + fmt(montant) + " CFA"
+                + (credit.getDateEcheance() != null ? " (échéance " + credit.getDateEcheance() + ")." : ".");
+        userPushService.notifyUser(admin, UserNotificationType.NOUVEAU_CREDIT, title, body, "/credits");
+    }
+
+    private void envoyerNotifCreditRembourse(CreditClientEntity credit, UserEntity encaisseur) {
+        TenantEntity tenant = credit.getTenant();
+        if (tenant == null) return;
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        String clientNom = credit.getClient() != null ? credit.getClient().getNom() : "Client";
+        BigDecimal totalInitial = credit.getMontantInitial() != null ? credit.getMontantInitial() : BigDecimal.ZERO;
+        String parQui = (encaisseur != null && !encaisseur.getId().equals(admin.getId()))
+                ? " (encaissé par " + encaisseur.getPrenom() + ")" : "";
+        String title = "Crédit remboursé";
+        String body = clientNom + " a soldé son crédit de " + fmt(totalInitial) + " CFA" + parQui + ".";
+        userPushService.notifyUser(admin, UserNotificationType.CREDIT_REMBOURSE, title, body, "/credits");
+    }
+
+    private static String fmt(BigDecimal montant) {
+        if (montant == null) return "0";
+        return String.format("%,d", montant.longValue()).replace(',', ' ');
     }
 
     /**
@@ -206,6 +264,14 @@ public class CreditClientService {
             }
             log.info("Crédit #{} soldé pour {} (tenant: {})",
                     creditId, client.getNom(), currentTenant.getTenantUuid());
+
+            // NOTIFICATION PUSH — CREDIT_REMBOURSE (bonne nouvelle, pas de seuil)
+            try {
+                envoyerNotifCreditRembourse(credit, employe);
+            } catch (Exception e) {
+                log.warn("[CREDIT_NOTIF] Echec envoi notif CREDIT_REMBOURSE pour credit {} : {}",
+                        creditId, e.getMessage());
+            }
         } else {
             // Paiement partiel
             credit.setStatut(StatutCredit.PARTIEL);
