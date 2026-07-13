@@ -100,16 +100,10 @@ public enum UserNotificationType {
     ABONNEMENT_EXPIRE_1J(
             "🚨 Abonnement expire demain",
             "Dernier rappel avant blocage.",
-            Categorie.ABONNEMENT, true),
-
-    // ─── 🎯 OBJECTIFS ────────────────────────────────────────────────────
-    OBJECTIF_JOURNALIER(
-            "🎯 Objectif journalier atteint",
-            "Ton objectif de chiffre d'affaires du jour vient d'être atteint.",
-            Categorie.OBJECTIFS, false);
+            Categorie.ABONNEMENT, true);
 
     public enum Categorie {
-        STOCK, VENTES, CAISSE, CREDITS, DEPENSES, RESUMES, ABONNEMENT, OBJECTIFS
+        STOCK, VENTES, CAISSE, CREDITS, DEPENSES, RESUMES, ABONNEMENT
     }
 
     private final String libelle;
