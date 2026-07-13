@@ -128,7 +128,7 @@ public class UserNotificationPreferenceService {
                     ResumeMensuelConfig config = objectMapper.convertValue(rawConfig, ResumeMensuelConfig.class);
                     return objectMapper.writeValueAsString(config);
                 }
-                case VENTE_EMPLOYE, SORTIE_CAISSE_IMPORTANTE, NOUVEAU_CREDIT -> {
+                case VENTE_EMPLOYE, SORTIE_CAISSE_IMPORTANTE, NOUVEAU_CREDIT, ACHAT_EMPLOYE -> {
                     SeuilMontantConfig config = objectMapper.convertValue(rawConfig, SeuilMontantConfig.class);
                     return objectMapper.writeValueAsString(config);
                 }

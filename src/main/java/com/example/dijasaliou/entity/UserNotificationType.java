@@ -70,6 +70,12 @@ public enum UserNotificationType {
             "Un gérant ou vendeur a enregistré une dépense.",
             Categorie.DEPENSES, false),
 
+    // ─── 🛒 ACHATS ───────────────────────────────────────────────────────
+    ACHAT_EMPLOYE(
+            "🛒 Achat saisi par un employé",
+            "Un gérant ou vendeur a enregistré un achat fournisseur.",
+            Categorie.ACHATS, false),
+
     // ─── 📊 RÉSUMÉS ──────────────────────────────────────────────────────
     RESUME_QUOTIDIEN(
             "📊 Résumé quotidien",
@@ -103,7 +109,7 @@ public enum UserNotificationType {
             Categorie.ABONNEMENT, true);
 
     public enum Categorie {
-        STOCK, VENTES, CAISSE, CREDITS, DEPENSES, RESUMES, ABONNEMENT
+        STOCK, VENTES, CAISSE, CREDITS, DEPENSES, ACHATS, RESUMES, ABONNEMENT
     }
 
     private final String libelle;

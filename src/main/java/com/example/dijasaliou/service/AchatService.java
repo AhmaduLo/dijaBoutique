@@ -2,12 +2,15 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.AchatDto;
 import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.SeuilMontantConfig;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.entity.UserNotificationType;
 import com.example.dijasaliou.exception.ConflictException;
 import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -48,17 +51,26 @@ public class AchatService {
      */
     private final ProduitReferenceService produitReferenceService;
     private final ArchiveStockService archiveStockService;
+    private final UserPushNotificationService userPushService;
+    private final UserNotificationPreferenceService prefService;
+    private final UserRepository userRepository;
 
     public AchatService(AchatRepository achatRepository, TenantService tenantService,
                         StockService stockService, VenteRepository venteRepository,
                         ProduitReferenceService produitReferenceService,
-                        ArchiveStockService archiveStockService) {
+                        ArchiveStockService archiveStockService,
+                        UserPushNotificationService userPushService,
+                        UserNotificationPreferenceService prefService,
+                        UserRepository userRepository) {
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
         this.stockService = stockService;
         this.venteRepository = venteRepository;
         this.produitReferenceService = produitReferenceService;
         this.archiveStockService = archiveStockService;
+        this.userPushService = userPushService;
+        this.prefService = prefService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -156,7 +168,41 @@ public class AchatService {
             }
         }
 
+        // 10. NOTIFICATION PUSH — ACHAT_EMPLOYE si l'auteur n'est pas ADMIN
+        try {
+            envoyerNotifAchatEmploye(saved, utilisateur);
+        } catch (Exception e) {
+            log.warn("[ACHAT_NOTIF] Echec envoi notif pour achat {} : {}", saved.getId(), e.getMessage());
+        }
+
         return saved;
+    }
+
+    /**
+     * Notifie l'admin quand un achat est saisi par un employé (non-ADMIN),
+     * au-dessus du seuil configuré. Contrôle interne : le patron sait
+     * quand ses gérants passent commande chez les fournisseurs.
+     */
+    private void envoyerNotifAchatEmploye(AchatEntity achat, UserEntity auteur) {
+        if (auteur == null || auteur.getRole() == UserEntity.Role.ADMIN) return;
+        TenantEntity tenant = achat.getTenant();
+        if (tenant == null) return;
+
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        BigDecimal montant = achat.getPrixTotal() != null ? achat.getPrixTotal() : BigDecimal.ZERO;
+        SeuilMontantConfig cfg = prefService.getSeuilMontantConfig(admin, UserNotificationType.ACHAT_EMPLOYE);
+        if (montant.compareTo(cfg.seuilMontant()) < 0) return;
+
+        String montantFmt = String.format("%,d", montant.longValue()).replace(',', ' ');
+        String title = "Achat par " + auteur.getPrenom();
+        String fournisseurLabel = achat.getFournisseur() != null && !achat.getFournisseur().isBlank()
+                ? " chez " + achat.getFournisseur()
+                : "";
+        String body = auteur.getPrenom() + " " + auteur.getNom() + " vient d'enregistrer "
+                + achat.getNomProduit() + fournisseurLabel + " pour " + montantFmt + " CFA.";
+        userPushService.notifyUser(admin, UserNotificationType.ACHAT_EMPLOYE, title, body, "/achats");
     }
 
     /**
