@@ -42,6 +42,13 @@ public class StockDto {
     private String unite;
 
     /**
+     * Catégorie du produit — remontée depuis le dernier achat non vide.
+     * Utilisée par l'autocomplétion nom-produit en multi-achat pour
+     * pré-remplir la catégorie du nouvel achat.
+     */
+    private String categorie;
+
+    /**
      * Quantité totale achetée
      */
     private Double quantiteAchetee;

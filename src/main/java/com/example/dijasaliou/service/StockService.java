@@ -476,11 +476,20 @@ public class StockService {
                 .map(AchatEntity::getCodeBarre)
                 .orElse(null);
 
+        // Récupérer la catégorie depuis le dernier achat qui en a une non-vide.
+        // Sert au pré-remplissage automatique en multi-achat côté front.
+        String categorie = achats.stream()
+                .filter(a -> a.getCategorie() != null && !a.getCategorie().isBlank())
+                .max(Comparator.comparing(AchatEntity::getDateAchat))
+                .map(AchatEntity::getCategorie)
+                .orElse(null);
+
         return StockDto.builder()
                 .nomProduit(nomProduit)
                 .photoUrl(photoUrl)
                 .codeBarre(codeBarre)
                 .unite(unite)
+                .categorie(categorie)
                 .quantiteAchetee(quantiteAchetee)
                 .quantiteVendue(quantiteVendue)
                 .stockDisponible(stockDisponible)
