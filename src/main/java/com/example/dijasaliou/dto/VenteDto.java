@@ -44,6 +44,13 @@ public class VenteDto {
     private String modePaiement;
     private Boolean estSoldee;
 
+    /**
+     * Date d'échéance du crédit associé (null si pas de crédit, ou crédit soldé).
+     * Vient de credits_clients.date_echeance — jamais de VenteEntity.dateEcheance
+     * qui est @Transient et n'est jamais persisté sur la vente elle-même.
+     */
+    private java.time.LocalDate dateEcheance;
+
     // Informations sur l'utilisateur qui a créé la vente
     private UserDto utilisateur;
 

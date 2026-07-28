@@ -32,6 +32,7 @@ public class CreditClientDto {
     private LocalDate dateEcheance;
     private String employeNom;
     private LocalDateTime createdDate;
+    private LocalDateTime dateVente;
     private List<PaiementCreditDto> paiements;
 
     public static CreditClientDto fromEntity(CreditClientEntity credit) {
@@ -65,6 +66,7 @@ public class CreditClientDto {
                 .dateEcheance(credit.getDateEcheance())
                 .employeNom(credit.getEmployeNom())
                 .createdDate(credit.getCreatedDate())
+                .dateVente(credit.getVente() != null ? credit.getVente().getDateVente() : null)
                 .paiements(paiementsDto)
                 .build();
     }

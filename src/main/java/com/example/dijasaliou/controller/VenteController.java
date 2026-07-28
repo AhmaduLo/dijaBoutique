@@ -67,8 +67,7 @@ public class VenteController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<VenteDto> obtenirParId(@PathVariable String id) {
-        VenteEntity vente = venteService.obtenirVenteParId(id);
-        return ResponseEntity.ok(VenteDto.fromEntity(vente));
+        return ResponseEntity.ok(venteService.obtenirVenteDtoParId(id));
     }
 
     /**

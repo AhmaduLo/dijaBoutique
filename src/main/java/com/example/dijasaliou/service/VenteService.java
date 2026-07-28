@@ -138,14 +138,18 @@ public class VenteService {
         if (venteIds.isEmpty()) return;
 
         Map<String, String> statutParVenteId = new java.util.HashMap<>();
+        Map<String, LocalDate> echeanceParVenteId = new java.util.HashMap<>();
         for (Object[] row : creditClientRepository.findStatutByVenteIds(venteIds, tenantUuid)) {
             String venteId = (String) row[0];
             Object statut = row[1];
             statutParVenteId.put(venteId, statut != null ? statut.toString() : null);
+            if (row[2] != null) echeanceParVenteId.put(venteId, (LocalDate) row[2]);
         }
         for (VenteDto dto : ventes) {
             String s = statutParVenteId.get(dto.getId());
             if (s != null) dto.setCreditStatut(s);
+            LocalDate echeance = echeanceParVenteId.get(dto.getId());
+            if (echeance != null) dto.setDateEcheance(echeance);
         }
     }
 
@@ -156,6 +160,18 @@ public class VenteService {
     public VenteEntity obtenirVenteParId(String id) {
         return venteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vente non trouvée avec l'ID : " + id));
+    }
+
+    /**
+     * Récupérer une vente par ID sous forme de DTO, enrichie du statut/échéance
+     * du crédit associé (nécessaire pour préremplir le formulaire de modification).
+     */
+    @Transactional(readOnly = true)
+    public VenteDto obtenirVenteDtoParId(String id) {
+        VenteEntity vente = obtenirVenteParId(id);
+        VenteDto dto = VenteDto.fromEntity(vente);
+        enrichirCreditStatut(List.of(dto), tenantService.getCurrentTenant().getTenantUuid());
+        return dto;
     }
 
     /**
@@ -415,8 +431,9 @@ public class VenteService {
             return venteSauvegardee;
 
         } else if (aUnCreditActif) {
-            // Cas 3 : CRÉDIT → CRÉDIT — mettre à jour le montant du crédit existant
-            creditClientService.mettreAJourCreditDeLaVente(id, venteExistante.getPrixTotal());
+            // Cas 3 : CRÉDIT → CRÉDIT — mettre à jour le montant et l'échéance du crédit existant
+            creditClientService.mettreAJourCreditDeLaVente(
+                    id, venteExistante.getPrixTotal(), venteModifiee.getDateEcheance());
             venteExistante.setEstSoldee(false);
 
         }

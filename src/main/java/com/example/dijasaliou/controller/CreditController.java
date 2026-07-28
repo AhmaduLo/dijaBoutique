@@ -65,9 +65,10 @@ public class CreditController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String statut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+            @RequestParam(required = false) Integer joursRetardMin) {
         if (size > 100) size = 100;
-        return ResponseEntity.ok(creditClientService.obtenirCredits(page, size, search, statut, dateDebut, dateFin));
+        return ResponseEntity.ok(creditClientService.obtenirCredits(page, size, search, statut, dateDebut, dateFin, joursRetardMin));
     }
 
     @GetMapping("/client/{id}")

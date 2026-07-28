@@ -289,7 +289,8 @@ public class CreditClientService {
 
     @Transactional(readOnly = true)
     public PagedResponse<CreditClientDto> obtenirCredits(int page, int size, String search,
-                                                          String statut, LocalDate dateDebut, LocalDate dateFin) {
+                                                          String statut, LocalDate dateDebut, LocalDate dateFin,
+                                                          Integer joursRetardMin) {
         Pageable pageable = PageRequest.of(page, size,
                 org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdDate"));
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
@@ -325,6 +326,15 @@ public class CreditClientService {
             if (dateFin != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("createdDate"),
                         dateFin.atTime(23, 59, 59)));
+            }
+
+            // Filtre "en retard depuis plus de X jours" — basé sur dateEcheance,
+            // appliqué AVANT la pagination pour que "size" reste exact page par page.
+            if (joursRetardMin != null) {
+                predicates.add(cb.and(
+                        cb.isNotNull(root.get("dateEcheance")),
+                        cb.lessThan(root.get("dateEcheance"), LocalDate.now().minusDays(joursRetardMin))
+                ));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -461,6 +471,11 @@ public class CreditClientService {
      */
     @Transactional
     public void mettreAJourCreditDeLaVente(String venteId, BigDecimal newPrixTotal) {
+        mettreAJourCreditDeLaVente(venteId, newPrixTotal, null);
+    }
+
+    @Transactional
+    public void mettreAJourCreditDeLaVente(String venteId, BigDecimal newPrixTotal, LocalDate newDateEcheance) {
         List<CreditClientEntity> credits = creditClientRepository.findByVenteId(venteId);
         for (CreditClientEntity credit : credits) {
             if (credit.getStatut() != StatutCredit.SOLDE) {
@@ -477,6 +492,9 @@ public class CreditClientService {
 
                 credit.setMontantInitial(newPrixTotal);
                 credit.setMontantRestant(newMontantRestant);
+                if (newDateEcheance != null) {
+                    credit.setDateEcheance(newDateEcheance);
+                }
                 if (newMontantRestant.compareTo(BigDecimal.ZERO) == 0) {
                     credit.setStatut(StatutCredit.SOLDE);
                 }
