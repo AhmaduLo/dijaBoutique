@@ -39,6 +39,7 @@ class AuthServiceTest {
     @Mock private AchatRepository achatRepository;
     @Mock private VenteRepository venteRepository;
     @Mock private DepenseRepository depenseRepository;
+    @Mock private UserPushSubscriptionRepository pushSubscriptionRepository;
 
     @InjectMocks
     private AuthService authService;

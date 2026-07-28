@@ -27,9 +27,15 @@ public interface UserPushSubscriptionRepository extends JpaRepository<UserPushSu
      * Utilisateurs distincts ayant au moins une subscription active.
      * Utilisé par les crons de résumé pour ne calculer les stats qu'une fois
      * par user (un user peut avoir plusieurs appareils = plusieurs subscriptions).
+     * Exclut les comptes/tenants supprimés (soft delete) — sinon un compte
+     * supprimé continue de recevoir des résumés tant que sa subscription
+     * n'a pas été explicitement effacée.
      */
-    @Query("SELECT DISTINCT s.user FROM UserPushSubscription s")
+    @Query("SELECT DISTINCT s.user FROM UserPushSubscription s " +
+           "WHERE s.user.deleted = false AND s.user.tenant.deleted = false")
     List<UserEntity> findDistinctSubscribedUsers();
 
     void deleteByEndpoint(String endpoint);
+
+    void deleteByUser(UserEntity user);
 }

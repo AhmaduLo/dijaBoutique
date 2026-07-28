@@ -11,6 +11,7 @@ import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.jwt.JwtService;
 import com.example.dijasaliou.repository.PasswordResetTokenRepository;
 import com.example.dijasaliou.repository.TenantRepository;
+import com.example.dijasaliou.repository.UserPushSubscriptionRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class AuthService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
     private final PushNotificationService pushService;
+    private final UserPushSubscriptionRepository pushSubscriptionRepository;
 
     public AuthService(UserRepository userRepository,
                        TenantRepository tenantRepository,
@@ -44,7 +46,8 @@ public class AuthService {
                        JwtService jwtService,
                        PasswordResetTokenRepository passwordResetTokenRepository,
                        EmailService emailService,
-                       PushNotificationService pushService) {
+                       PushNotificationService pushService,
+                       UserPushSubscriptionRepository pushSubscriptionRepository) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
@@ -52,6 +55,7 @@ public class AuthService {
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.emailService = emailService;
         this.pushService = pushService;
+        this.pushSubscriptionRepository = pushSubscriptionRepository;
     }
 
     /**
@@ -512,6 +516,9 @@ public class AuthService {
             utilisateur.setDeleted(true);
             utilisateur.setDateSuppression(maintenant);
             passwordResetTokenRepository.deleteByUser(utilisateur);
+            // Sans ça, les crons de résumé (quotidien/hebdo/mensuel) continuent
+            // de notifier ce compte indéfiniment malgré la suppression.
+            pushSubscriptionRepository.deleteByUser(utilisateur);
         }
         userRepository.saveAll(utilisateurs);
 
