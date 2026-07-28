@@ -171,7 +171,7 @@ class VenteControllerTest {
     void obtenirParId_DevraitRetournerVente() throws Exception {
         // Arrange
         String venteId = "test-id-1";
-        when(venteService.obtenirVenteParId(venteId)).thenReturn(venteTest);
+        when(venteService.obtenirVenteDtoParId(venteId)).thenReturn(VenteDto.fromEntity(venteTest));
 
         // Act & Assert
         mockMvc.perform(get("/ventes/{id}", venteId)
@@ -184,7 +184,7 @@ class VenteControllerTest {
                 .andExpect(jsonPath("$.prixTotal", is(750000.00)))
                 .andExpect(jsonPath("$.client", is("Mme Ndiaye")));
 
-        verify(venteService, times(1)).obtenirVenteParId(venteId);
+        verify(venteService, times(1)).obtenirVenteDtoParId(venteId);
     }
 
     @Test
@@ -192,7 +192,7 @@ class VenteControllerTest {
     void obtenirParId_DevraitLancerExceptionSiVenteInexistante() throws Exception {
         // Arrange
         String venteId = "999";
-        when(venteService.obtenirVenteParId(venteId))
+        when(venteService.obtenirVenteDtoParId(venteId))
                 .thenThrow(new RuntimeException("Vente non trouvée"));
 
         // Act & Assert
@@ -200,7 +200,7 @@ class VenteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
 
-        verify(venteService, times(1)).obtenirVenteParId(venteId);
+        verify(venteService, times(1)).obtenirVenteDtoParId(venteId);
     }
 
     // ==================== Tests pour POST /ventes ====================
