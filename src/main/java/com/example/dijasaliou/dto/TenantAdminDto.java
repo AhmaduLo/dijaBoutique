@@ -84,7 +84,7 @@ public class TenantAdminDto {
                 .build();
     }
 
-    private static String calculerStatut(TenantEntity tenant) {
+    public static String calculerStatut(TenantEntity tenant) {
         if (!Boolean.TRUE.equals(tenant.getActif())) return "SUSPENDU";
         if (tenant.essaiGratuitValide()) return "ESSAI";
         if (tenant.getPlan() == TenantEntity.Plan.GRATUIT) return "EXPIRE";

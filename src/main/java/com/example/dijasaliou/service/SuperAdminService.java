@@ -108,16 +108,19 @@ public class SuperAdminService {
      *   - null/vide      : tous les tenants
      */
     public PagedResponse<TenantAdminDto> getAllTenants(int page, int size, String search, String activite,
-                                                       String emailVerifie, String aVendu) {
+                                                       String emailVerifie, String aVendu, String statut,
+                                                       String plan, boolean expiringSoon) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
 
         boolean hasActivite = activite != null && !activite.isBlank();
         boolean hasEmailFilter = emailVerifie != null && !emailVerifie.isBlank();
         boolean hasVenduFilter = aVendu != null && !aVendu.isBlank();
+        boolean hasStatutFilter = statut != null && !statut.isBlank();
+        boolean hasPlanFilter = plan != null && !plan.isBlank();
 
         // Aucun filtre custom → comportement direct paginé par la DB
-        if (!hasActivite && !hasEmailFilter && !hasVenduFilter) {
+        if (!hasActivite && !hasEmailFilter && !hasVenduFilter && !hasStatutFilter && !hasPlanFilter && !expiringSoon) {
             Page<TenantEntity> tenantsPage = tenantRepository.findByDeletedFalseWithSearch(searchParam, pageable);
             return PagedResponse.from(tenantsPage.map(this::toDto));
         }
@@ -149,6 +152,31 @@ public class SuperAdminService {
             boolean wantSold = "oui".equalsIgnoreCase(aVendu);
             tous = tous.stream()
                     .filter(t -> idsWithVentes.contains(t.getId()) == wantSold)
+                    .toList();
+        }
+
+        // Filtre statut (ESSAI/ACTIF/EXPIRE/SUSPENDU) — même logique que l'affichage (calculerStatut).
+        if (hasStatutFilter) {
+            tous = tous.stream()
+                    .filter(t -> statut.equalsIgnoreCase(TenantAdminDto.calculerStatut(t)))
+                    .toList();
+        }
+
+        // Filtre plan (GRATUIT/STARTER/PRO/BUSINESS)
+        if (hasPlanFilter) {
+            tous = tous.stream()
+                    .filter(t -> t.getPlan() != null && plan.equalsIgnoreCase(t.getPlan().name()))
+                    .toList();
+        }
+
+        // Filtre "expire dans les 7 prochains jours"
+        if (expiringSoon) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime in7Days = now.plusDays(7);
+            tous = tous.stream()
+                    .filter(t -> t.getDateExpiration() != null
+                            && !t.getDateExpiration().isBefore(now)
+                            && !t.getDateExpiration().isAfter(in7Days))
                     .toList();
         }
 

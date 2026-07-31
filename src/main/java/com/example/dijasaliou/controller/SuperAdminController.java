@@ -83,9 +83,13 @@ public class SuperAdminController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String activite,
             @RequestParam(required = false) String emailVerifie,
-            @RequestParam(required = false) String aVendu) {
+            @RequestParam(required = false) String aVendu,
+            @RequestParam(required = false) String statut,
+            @RequestParam(required = false) String plan,
+            @RequestParam(defaultValue = "false") boolean expiringSoon) {
         if (size > 100) size = 100;
-        return ResponseEntity.ok(superAdminService.getAllTenants(page, size, search, activite, emailVerifie, aVendu));
+        return ResponseEntity.ok(superAdminService.getAllTenants(
+                page, size, search, activite, emailVerifie, aVendu, statut, plan, expiringSoon));
     }
 
     /**
