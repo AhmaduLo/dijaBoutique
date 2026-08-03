@@ -2,6 +2,7 @@ package com.example.dijasaliou.exception;
 
 import com.example.dijasaliou.aspect.PlanRestrictionAspect;
 import com.example.dijasaliou.service.SystemNotificationsService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -11,6 +12,8 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -196,6 +199,48 @@ public class GlobalExceptionHandler {
         errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
         errorResponse.put("error", "Opération non autorisée");
         errorResponse.put("message", isUserFacing ? message : "Opération non autorisée.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    /**
+     * Gestion des uploads dont la partie multipart attendue (ex: "file") est absente.
+     * Cas typique : formulaire d'upload de photo. Le message reste actionnable pour
+     * le client (retenter), mais surtout on logge les infos de la requête entrante
+     * (Content-Type, Content-Length) — normalement absentes des logs par défaut de
+     * Spring pour cette exception — pour pouvoir diagnostiquer les cas où le fichier
+     * semble valide côté client mais n'arrive jamais entier côté serveur.
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingServletRequestPart(
+            MissingServletRequestPartException ex, HttpServletRequest request) {
+        log.error("[UPLOAD] Partie multipart '{}' manquante — URI={}, Content-Type={}, Content-Length={}",
+                ex.getRequestPartName(), request.getRequestURI(),
+                request.getContentType(), request.getContentLengthLong());
+
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
+        errorResponse.put("error", "Fichier manquant");
+        errorResponse.put("message", "Le fichier n'a pas été reçu correctement. Vérifiez votre connexion et réessayez.");
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    /**
+     * Fichier trop volumineux (dépasse spring.servlet.multipart.max-file-size/max-request-size).
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        log.warn("[UPLOAD] Taille maximale dépassée — URI={}, Content-Length={}",
+                request.getRequestURI(), request.getContentLengthLong());
+
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
+        errorResponse.put("error", "Fichier trop volumineux");
+        errorResponse.put("message", "Le fichier dépasse la taille maximale autorisée (5 MB).");
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
