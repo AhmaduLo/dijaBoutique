@@ -57,6 +57,11 @@ public enum NotificationType {
     PIC_ERREURS_SERVEUR(
             "🔥 Pic d'erreurs serveur",
             "Plus de 10 erreurs serveur dans la dernière heure",
+            Categorie.TECHNIQUE, true),
+
+    ECHEC_ENVOI_EMAIL(
+            "📧 Échec d'envoi d'emails",
+            "Brevo rejette les emails (clé API invalide, IP non autorisée, etc.)",
             Categorie.TECHNIQUE, true);
 
     public enum Categorie {

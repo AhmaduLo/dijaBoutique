@@ -16,9 +16,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Notifications système au super admin :
  *  - 💾 Stockage BDD > 80%  (cron quotidien 6h)
  *  - 🔥 Pic d'erreurs serveur (cron horaire, seuil 10/h)
+ *  - 📧 Échec d'envoi d'emails (cron horaire, seuil 3/h)
  *
  * Le compteur d'erreurs est incrémenté par {@link com.example.dijasaliou.exception.GlobalExceptionHandler}
  * via {@link #recordError()} et remis à zéro à chaque tick horaire.
+ * Le compteur d'échecs email est incrémenté par {@link com.example.dijasaliou.service.EmailService}
+ * via {@link #recordEmailFailure()} et remis à zéro à chaque tick horaire.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,9 +31,11 @@ public class SystemNotificationsService {
     private static final int SEUIL_BDD_POURCENTAGE = 80;
     private static final long BDD_MAX_MB = 1000; // Railway hobby = 1 GB
     private static final int SEUIL_ERREURS_PAR_HEURE = 10;
+    private static final int SEUIL_ECHECS_EMAIL_PAR_HEURE = 3;
 
     private final PushNotificationService pushService;
     private final AtomicInteger erreursDansHeure = new AtomicInteger(0);
+    private final AtomicInteger echecsEmailDansHeure = new AtomicInteger(0);
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -38,6 +43,11 @@ public class SystemNotificationsService {
     /** À appeler depuis le GlobalExceptionHandler à chaque exception serveur (5xx). */
     public void recordError() {
         erreursDansHeure.incrementAndGet();
+    }
+
+    /** À appeler depuis l'EmailService à chaque échec d'envoi via Brevo. */
+    public void recordEmailFailure() {
+        echecsEmailDansHeure.incrementAndGet();
     }
 
     /**
@@ -89,6 +99,24 @@ public class SystemNotificationsService {
                     "/superadmin/monitoring"
             );
             log.warn("[SYSTEM] Alerte pic d'erreurs envoyée ({} erreurs)", erreurs);
+        }
+    }
+
+    /**
+     * Toutes les heures pile : si plus de N échecs d'envoi email dans l'heure écoulée → notif.
+     * Envoyée en push (pas email) : si Brevo est cassé, un email d'alerte n'arriverait jamais.
+     */
+    @Scheduled(cron = "0 0 * * * *")
+    public void verifierEchecsEmail() {
+        int echecs = echecsEmailDansHeure.getAndSet(0);
+        if (echecs >= SEUIL_ECHECS_EMAIL_PAR_HEURE) {
+            pushService.notify(
+                    NotificationType.ECHEC_ENVOI_EMAIL,
+                    "📧 Échec d'envoi d'emails",
+                    echecs + " emails n'ont pas pu être envoyés dans la dernière heure (Brevo). Vérifie la clé API et les IPs autorisées.",
+                    "/superadmin/monitoring"
+            );
+            log.warn("[SYSTEM] Alerte échecs email envoyée ({} échecs)", echecs);
         }
     }
 }

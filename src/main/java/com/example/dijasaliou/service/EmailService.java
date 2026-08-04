@@ -29,6 +29,11 @@ public class EmailService {
     private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final SystemNotificationsService systemNotificationsService;
+
+    public EmailService(SystemNotificationsService systemNotificationsService) {
+        this.systemNotificationsService = systemNotificationsService;
+    }
 
     @Value("${brevo.api.key:disabled}")
     private String brevoApiKey;
@@ -1082,6 +1087,11 @@ public class EmailService {
         body.put("trackOpens", false);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-        restTemplate.postForEntity(BREVO_API_URL, request, String.class);
+        try {
+            restTemplate.postForEntity(BREVO_API_URL, request, String.class);
+        } catch (RuntimeException e) {
+            systemNotificationsService.recordEmailFailure();
+            throw e;
+        }
     }
 }
