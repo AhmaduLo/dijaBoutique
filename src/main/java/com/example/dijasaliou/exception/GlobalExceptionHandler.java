@@ -213,15 +213,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<Map<String, Object>> handleMissingServletRequestPart(
             MissingServletRequestPartException ex, HttpServletRequest request) {
+        long contentLength = request.getContentLengthLong();
         log.error("[UPLOAD] Partie multipart '{}' manquante — URI={}, Content-Type={}, Content-Length={}",
                 ex.getRequestPartName(), request.getRequestURI(),
-                request.getContentType(), request.getContentLengthLong());
+                request.getContentType(), contentLength);
+
+        // Content-Length à 0 avec un Content-Type multipart valide (boundary présent) veut dire
+        // que le navigateur a bien entamé la requête mais n'a jamais pu y attacher les octets du
+        // fichier. Cas observé en pratique : stockage de l'appareil (iPhone) presque plein, qui
+        // empêche iOS/Safari d'écrire les fichiers temporaires nécessaires à l'envoi (notamment la
+        // conversion HEIC → JPEG). Un vrai souci réseau tronque la requête en cours de route et
+        // laisse un Content-Length positif mais incomplet, d'où le message différent ci-dessous.
+        String message = contentLength == 0
+                ? "Le fichier n'a pas pu être envoyé (il semble vide). Si vous êtes sur téléphone, vérifiez l'espace de stockage disponible sur l'appareil, puis réessayez."
+                : "Le fichier n'a pas été reçu correctement. Vérifiez votre connexion et réessayez.";
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
         errorResponse.put("error", "Fichier manquant");
-        errorResponse.put("message", "Le fichier n'a pas été reçu correctement. Vérifiez votre connexion et réessayez.");
+        errorResponse.put("message", message);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
