@@ -27,6 +27,9 @@ public interface VenteLotConsommationRepository
     /** Lignes de consommation d'un achat (utile pour rollback ou audit). */
     List<VenteLotConsommationEntity> findByAchatId(String achatId);
 
+    /** true si ce lot d'achat a déjà été (au moins partiellement) consommé par une vente — bloque sa suppression. */
+    boolean existsByAchatId(String achatId);
+
     /**
      * Somme du bénéfice total sur une période, pour un tenant.
      * Filtre tenant EXPLICITE (utilisable dans tous les contextes).

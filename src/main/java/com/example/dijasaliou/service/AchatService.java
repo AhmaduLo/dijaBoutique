@@ -10,7 +10,9 @@ import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.UserNotificationType;
 import com.example.dijasaliou.exception.ConflictException;
 import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.repository.ProductionRepository;
 import com.example.dijasaliou.repository.UserRepository;
+import com.example.dijasaliou.repository.VenteLotConsommationRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -54,6 +56,8 @@ public class AchatService {
     private final UserPushNotificationService userPushService;
     private final UserNotificationPreferenceService prefService;
     private final UserRepository userRepository;
+    private final VenteLotConsommationRepository venteLotConsommationRepository;
+    private final ProductionRepository productionRepository;
 
     public AchatService(AchatRepository achatRepository, TenantService tenantService,
                         StockService stockService, VenteRepository venteRepository,
@@ -61,7 +65,9 @@ public class AchatService {
                         ArchiveStockService archiveStockService,
                         UserPushNotificationService userPushService,
                         UserNotificationPreferenceService prefService,
-                        UserRepository userRepository) {
+                        UserRepository userRepository,
+                        VenteLotConsommationRepository venteLotConsommationRepository,
+                        ProductionRepository productionRepository) {
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
         this.stockService = stockService;
@@ -71,6 +77,8 @@ public class AchatService {
         this.userPushService = userPushService;
         this.prefService = prefService;
         this.userRepository = userRepository;
+        this.venteLotConsommationRepository = venteLotConsommationRepository;
+        this.productionRepository = productionRepository;
     }
 
     /**
@@ -294,6 +302,7 @@ public class AchatService {
     /**
      * Supprimer un achat
      */
+    @Transactional
     public void supprimerAchat(String id) {
         // 1. Récupérer l'achat existant
         AchatEntity achatExistant = obtenirAchatParId(id);
@@ -324,6 +333,24 @@ public class AchatService {
                     "deviendrait négatif (" + String.format("%.0f", stockApresSupp) + "). " +
                     "Il y a " + String.format("%.0f", totalVentes) + " vente(s) pour ce produit.");
         }
+
+        // 3bis. Bloquer si CE lot précis a déjà été consommé par le FIFO (vente_lot_consommation).
+        // Le calcul agrégé ci-dessus porte sur le produit dans son ensemble ; il ne suffit pas à
+        // garantir que ce lot spécifique est libre — sans ce garde-fou, la suppression finit en
+        // violation de contrainte FK (vente_lot_consommation.achat_id est en ON DELETE RESTRICT).
+        if (venteLotConsommationRepository.existsByAchatId(id)) {
+            throw new ConflictException(
+                    "Impossible de supprimer cet achat : il a déjà été (au moins partiellement) vendu. " +
+                    "Annulez d'abord les ventes concernées.");
+        }
+
+        // 3ter. Si ce lot vient d'une production, supprimer d'abord l'enregistrement de
+        // production (+ ses ingrédients, via cascade JPA orphanRemoval) — NE PAS compter sur
+        // la cascade SQL de la contrainte FK : spring.jpa.hibernate.ddl-auto=update peut avoir
+        // recréé la contrainte sans respecter le ON DELETE CASCADE défini dans la migration,
+        // ce qui ferait échouer la suppression de l'achat avec une violation de contrainte.
+        productionRepository.findByAchat_IdAndTenant(id, tenantActuel)
+                .ifPresent(productionRepository::delete);
 
         // 4. Supprimer + invalider le cache tenant
         achatRepository.deleteById(id);

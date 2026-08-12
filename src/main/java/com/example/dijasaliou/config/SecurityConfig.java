@@ -132,6 +132,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent créer
                         .requestMatchers(HttpMethod.PUT, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent modifier
                         .requestMatchers(HttpMethod.DELETE, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent supprimer
+
+                        // Routes production (produits fabriqués) : mêmes règles que les achats classiques,
+                        // puisqu'une production crée/modifie un lot d'achat en interne.
+                        .requestMatchers(HttpMethod.GET, "/productions/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/productions/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/productions/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/produits-fabriques/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/produits-fabriques/**").hasAnyAuthority("GERANT", "ADMIN")
+
                         .requestMatchers("/depenses/**").hasAnyAuthority("GERANT", "ADMIN")
                         .requestMatchers("/tenant/**").hasAnyAuthority("GERANT", "ADMIN")
 
