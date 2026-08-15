@@ -80,8 +80,8 @@ public class ProductionController {
      */
     @PostMapping
     @RequiresPlan(
-            plans = {TenantEntity.Plan.STARTER},
-            message = "La gestion de production est en test — pour l'instant réservée au plan Starter"
+            plans = {TenantEntity.Plan.STARTER, TenantEntity.Plan.BUSINESS},
+            message = "La gestion de production est en test — pour l'instant réservée aux plans Starter et Business"
     )
     public ResponseEntity<ProductionDto> creer(
             @Valid @RequestBody CreerProductionRequest request,
@@ -100,8 +100,8 @@ public class ProductionController {
      */
     @PutMapping("/{id}")
     @RequiresPlan(
-            plans = {TenantEntity.Plan.STARTER},
-            message = "La gestion de production est en test — pour l'instant réservée au plan Starter"
+            plans = {TenantEntity.Plan.STARTER, TenantEntity.Plan.BUSINESS},
+            message = "La gestion de production est en test — pour l'instant réservée aux plans Starter et Business"
     )
     public ResponseEntity<ProductionDto> modifier(
             @PathVariable String id,
