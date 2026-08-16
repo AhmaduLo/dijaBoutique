@@ -1,5 +1,6 @@
 package com.example.dijasaliou.dto;
 
+import com.example.dijasaliou.entity.ModePaiementCaisse;
 import com.example.dijasaliou.entity.ProductionEntity;
 import com.example.dijasaliou.entity.ProductionIngredientEntity;
 import lombok.AllArgsConstructor;
@@ -28,6 +29,7 @@ public class ProductionDto {
     private String notes;
     private String photoUrl;
     private BigDecimal prixVenteSuggere;
+    private ModePaiementCaisse modePaiement;
     private List<IngredientLigneDto> ingredients;
 
     @Data
@@ -62,6 +64,7 @@ public class ProductionDto {
                 .notes(production.getNotes())
                 .photoUrl(production.getAchat() != null ? production.getAchat().getPhotoUrl() : null)
                 .prixVenteSuggere(production.getAchat() != null ? production.getAchat().getPrixVenteSuggere() : null)
+                .modePaiement(production.getAchat() != null ? production.getAchat().getModePaiement() : null)
                 .ingredients(lignes)
                 .build();
     }

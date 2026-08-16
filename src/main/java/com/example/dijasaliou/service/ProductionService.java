@@ -92,8 +92,7 @@ public class ProductionService {
 
         // Créer le lot de stock via le chemin normal des achats — aucune logique
         // stock/cache/FIFO dupliquée ici. prixTotal n'est pas fourni : AchatService
-        // le recalcule automatiquement (prixUnitaire × quantite), cohérent avec un
-        // prix d'achat éventuellement modifié à la main.
+        // le recalcule automatiquement (prixUnitaire × quantite).
         AchatEntity lotProduction = AchatEntity.builder()
                 .nomProduit(produitFabrique.getNomProduit())
                 .quantite(request.getQuantiteProduite())
@@ -103,6 +102,7 @@ public class ProductionService {
                 .unite(produitFabrique.getUnite())
                 .prixVenteSuggere(request.getPrixVenteSuggere())
                 .photoUrl(request.getPhotoUrl())
+                .modePaiement(request.getModePaiement())
                 .build();
 
         AchatEntity achatCree = achatService.creerAchat(lotProduction, utilisateur);
@@ -156,6 +156,7 @@ public class ProductionService {
                 .unite(produitFabrique.getUnite())
                 .prixVenteSuggere(request.getPrixVenteSuggere())
                 .photoUrl(request.getPhotoUrl())
+                .modePaiement(request.getModePaiement())
                 .utilisateur(utilisateur)
                 .build();
         achatService.modifierAchat(production.getAchat().getId(), achatModifie);
@@ -174,12 +175,16 @@ public class ProductionService {
         return productionRepository.save(production);
     }
 
-    /** Coût total des ingrédients (valeur exacte, saisie) et coût unitaire réellement retenu pour le lot. */
+    /** Coût total des ingrédients et coût unitaire — tous deux calculés, jamais saisis directement. */
     private record Couts(BigDecimal ingredientsTotal, BigDecimal unitaireFinal) {}
 
+    /**
+     * Le prix d'achat (coût par unité) est TOUJOURS calculé à partir des ingrédients — un
+     * éventuel {@code request.getPrixUnitaire()} envoyé par le client est ignoré. Ce n'est
+     * plus un champ modifiable côté formulaire ; l'ignorer ici empêche aussi de le contourner
+     * via un appel direct à l'API.
+     */
     private Couts calculerCouts(CreerProductionRequest request) {
-        // Coût total = somme des coûts ingrédients (valeur exacte, conservée pour la traçabilité
-        // même si le prix d'achat ci-dessous est modifié à la main).
         BigDecimal ingredientsTotal = request.getIngredients().stream()
                 .map(CreerProductionRequest.IngredientLigne::getCout)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -187,13 +192,7 @@ public class ProductionService {
         BigDecimal unitaireCalcule = ingredientsTotal.divide(
                 BigDecimal.valueOf(request.getQuantiteProduite()), 2, RoundingMode.HALF_UP);
 
-        // Le prix d'achat saisi par le commerçant prime sur le calcul automatique
-        // s'il est renseigné — c'est ce prix qui devient le coût réel du lot.
-        BigDecimal unitaireFinal = (request.getPrixUnitaire() != null && request.getPrixUnitaire().compareTo(BigDecimal.valueOf(0.01)) >= 0)
-                ? request.getPrixUnitaire()
-                : unitaireCalcule;
-
-        return new Couts(ingredientsTotal, unitaireFinal);
+        return new Couts(ingredientsTotal, unitaireCalcule);
     }
 
     private List<ProductionIngredientEntity> construireIngredients(ProductionEntity production, TenantEntity tenant,

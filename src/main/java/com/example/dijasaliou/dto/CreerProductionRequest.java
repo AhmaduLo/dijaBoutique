@@ -1,5 +1,6 @@
 package com.example.dijasaliou.dto;
 
+import com.example.dijasaliou.entity.ModePaiementCaisse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -47,17 +48,16 @@ public class CreerProductionRequest {
     @Size(max = 500, message = "L'URL de la photo ne peut dépasser 500 caractères")
     private String photoUrl;
 
-    /**
-     * Prix d'achat (coût unitaire) saisi/modifié par le commerçant. Si présent
-     * et &gt; 0, PRIME sur le calcul automatique (total ingrédients / quantité)
-     * — c'est ce prix qui devient le coût réel du lot de stock généré.
-     */
-    @DecimalMin(value = "0.01", message = "Le prix d'achat doit être supérieur à 0")
-    private BigDecimal prixUnitaire;
-
     /** Prix de vente suggéré pour ce produit fabriqué, optionnel. */
     @DecimalMin(value = "0.01", message = "Le prix de vente suggéré doit être supérieur à 0")
     private BigDecimal prixVenteSuggere;
+
+    /**
+     * Mode de paiement (caisse multi-comptes BUSINESS) — optionnel. Si renseigné, le coût
+     * total de la production (prix d'achat × quantité) est compté comme une sortie sur ce
+     * compte, exactement comme pour un achat classique.
+     */
+    private ModePaiementCaisse modePaiement;
 
     @NotEmpty(message = "Au moins un ingrédient est requis")
     @Valid
