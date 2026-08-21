@@ -2,6 +2,8 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.WavePaymentRequest;
 import com.example.dijasaliou.dto.WavePaymentResponse;
+import com.example.dijasaliou.entity.NotificationType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -49,9 +51,11 @@ public class WaveService {
     private String waveWebhookUrl;
 
     private final RestTemplate restTemplate;
+    private final PushNotificationService pushService;
 
-    public WaveService() {
+    public WaveService(PushNotificationService pushService) {
         this.restTemplate = new RestTemplate();
+        this.pushService = pushService;
     }
 
     /**
@@ -221,6 +225,13 @@ public class WaveService {
      * @param signature La signature fournie par Wave dans l'en-tête X-Wave-Signature
      * @return true si la signature est valide
      */
+    /**
+     * Indique si la signature webhook est requise (secret API configuré en production).
+     */
+    public boolean isSignatureRequired() {
+        return waveApiSecret != null && !waveApiSecret.isEmpty() && !"disabled".equals(waveApiSecret);
+    }
+
     public boolean verifyWebhookSignature(String payload, String signature) {
         // En mode développement sans clés API, autoriser tous les webhooks
         if (waveApiSecret == null || waveApiSecret.isEmpty()) {
@@ -300,6 +311,12 @@ public class WaveService {
                 return true;
             } else if ("failed".equalsIgnoreCase(status)) {
                 log.warn("❌ Paiement Wave échoué: {}", transactionId);
+                pushService.notify(
+                        NotificationType.ERREUR_WEBHOOK_PAIEMENT,
+                        "🚨 Paiement Wave échoué",
+                        "Transaction " + transactionId + " marquée failed par Wave",
+                        "/superadmin/dashboard"
+                );
                 return false;
             }
 
@@ -307,6 +324,12 @@ public class WaveService {
 
         } catch (Exception e) {
             log.error("Erreur lors du traitement du webhook Wave: {}", e.getMessage(), e);
+            pushService.notify(
+                    NotificationType.ERREUR_WEBHOOK_PAIEMENT,
+                    "🚨 Erreur webhook Wave",
+                    "Exception lors du traitement : " + e.getMessage(),
+                    "/superadmin/dashboard"
+            );
             return false;
         }
     }

@@ -17,6 +17,7 @@ public record PaiementSuperAdminDto(
         LocalDateTime datePaiement,
         String moisDebut,
         String modePaiement,
+        String periode,
         String note,
         Long validePar,
         LocalDateTime createdAt
@@ -31,6 +32,7 @@ public record PaiementSuperAdminDto(
                 e.getDatePaiement(),
                 e.getMoisDebut(),
                 e.getModePaiement(),
+                e.getPeriode(),
                 e.getNote(),
                 e.getValidePar(),
                 e.getCreatedAt()

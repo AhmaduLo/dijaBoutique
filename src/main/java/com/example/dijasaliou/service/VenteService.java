@@ -1,6 +1,7 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.exception.ConflictException;
+import com.example.dijasaliou.dto.BeneficeStatistiquesDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.VenteDto;
@@ -10,11 +11,15 @@ import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import com.example.dijasaliou.entity.PaiementCreditEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.entity.UserNotificationType;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
+import com.example.dijasaliou.repository.UserRepository;
+import com.example.dijasaliou.repository.VenteLotConsommationRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import com.example.dijasaliou.dto.SeuilMontantConfig;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import com.example.dijasaliou.entity.DeviseEntity;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -48,6 +54,11 @@ public class VenteService {
     private final CreditClientRepository creditClientRepository;
     private final PaiementCreditRepository paiementCreditRepository;
     private final DeviseService deviseService;
+    private final FifoCalculService fifoCalculService;
+    private final VenteLotConsommationRepository consommationRepository;
+    private final UserPushNotificationService userPushService;
+    private final UserNotificationPreferenceService prefService;
+    private final UserRepository userRepository;
 
     public VenteService(VenteRepository venteRepository,
                         @Lazy StockService stockService,
@@ -57,7 +68,12 @@ public class VenteService {
                         ClientRepository clientRepository,
                         CreditClientRepository creditClientRepository,
                         PaiementCreditRepository paiementCreditRepository,
-                        DeviseService deviseService) {
+                        DeviseService deviseService,
+                        FifoCalculService fifoCalculService,
+                        VenteLotConsommationRepository consommationRepository,
+                        UserPushNotificationService userPushService,
+                        UserNotificationPreferenceService prefService,
+                        UserRepository userRepository) {
         this.venteRepository = venteRepository;
         this.stockService = stockService;
         this.tenantService = tenantService;
@@ -67,6 +83,11 @@ public class VenteService {
         this.creditClientRepository = creditClientRepository;
         this.paiementCreditRepository = paiementCreditRepository;
         this.deviseService = deviseService;
+        this.fifoCalculService = fifoCalculService;
+        this.consommationRepository = consommationRepository;
+        this.userPushService = userPushService;
+        this.prefService = prefService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -89,6 +110,7 @@ public class VenteService {
         LocalDateTime finDt = dateFin != null ? dateFin.atTime(LocalTime.MAX) : null;
         Page<VenteEntity> ventesPage = venteRepository.findAllWithSearch(tenantUuid, searchParam, debutDt, finDt, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
+        enrichirCreditStatut(dtoPage.getContent(), tenantUuid);
         return PagedResponse.from(dtoPage);
     }
 
@@ -104,7 +126,37 @@ public class VenteService {
         LocalDateTime finDt2 = dateFin != null ? dateFin.atTime(LocalTime.MAX) : null;
         Page<VenteEntity> ventesPage = venteRepository.findByUtilisateurWithSearch(utilisateur, tenantUuid, searchParam, debutDt2, finDt2, pageable);
         Page<VenteDto> dtoPage = ventesPage.map(VenteDto::fromEntity);
+        enrichirCreditStatut(dtoPage.getContent(), tenantUuid);
         return PagedResponse.from(dtoPage);
+    }
+
+    /**
+     * Enrichit une liste de VenteDto avec le statut de leur crédit associé (s'il existe).
+     * Utilise une seule query bulk pour éviter le N+1 sur les ventes paginées.
+     */
+    private void enrichirCreditStatut(List<VenteDto> ventes, String tenantUuid) {
+        if (ventes == null || ventes.isEmpty()) return;
+        List<String> venteIds = ventes.stream()
+                .filter(v -> "CREDIT".equals(v.getModePaiement()))
+                .map(VenteDto::getId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        if (venteIds.isEmpty()) return;
+
+        Map<String, String> statutParVenteId = new java.util.HashMap<>();
+        Map<String, LocalDate> echeanceParVenteId = new java.util.HashMap<>();
+        for (Object[] row : creditClientRepository.findStatutByVenteIds(venteIds, tenantUuid)) {
+            String venteId = (String) row[0];
+            Object statut = row[1];
+            statutParVenteId.put(venteId, statut != null ? statut.toString() : null);
+            if (row[2] != null) echeanceParVenteId.put(venteId, (LocalDate) row[2]);
+        }
+        for (VenteDto dto : ventes) {
+            String s = statutParVenteId.get(dto.getId());
+            if (s != null) dto.setCreditStatut(s);
+            LocalDate echeance = echeanceParVenteId.get(dto.getId());
+            if (echeance != null) dto.setDateEcheance(echeance);
+        }
     }
 
     /**
@@ -114,6 +166,18 @@ public class VenteService {
     public VenteEntity obtenirVenteParId(String id) {
         return venteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vente non trouvée avec l'ID : " + id));
+    }
+
+    /**
+     * Récupérer une vente par ID sous forme de DTO, enrichie du statut/échéance
+     * du crédit associé (nécessaire pour préremplir le formulaire de modification).
+     */
+    @Transactional(readOnly = true)
+    public VenteDto obtenirVenteDtoParId(String id) {
+        VenteEntity vente = obtenirVenteParId(id);
+        VenteDto dto = VenteDto.fromEntity(vente);
+        enrichirCreditStatut(List.of(dto), tenantService.getCurrentTenant().getTenantUuid());
+        return dto;
     }
 
     /**
@@ -172,6 +236,16 @@ public class VenteService {
         VenteEntity venteSauvegardee = venteRepository.save(vente);
         stockService.invalidateStockCache(venteSauvegardee.getTenant().getTenantUuid());
 
+        // FIFO : consommer le stock dans les lots d'achat (du plus ancien au plus récent)
+        // et calculer le bénéfice net de la vente.
+        // Ne JAMAIS bloquer la vente si le FIFO échoue (logique non critique).
+        try {
+            fifoCalculService.consommerStockFifo(venteSauvegardee);
+        } catch (Exception e) {
+            log.error("FIFO : échec du calcul de bénéfice pour la vente {} : {}",
+                    venteSauvegardee.getId(), e.getMessage(), e);
+        }
+
         // ALERTE DE STOCK : Vérifier le stock après la vente et envoyer une alerte si nécessaire
         // (uniquement pour les plans PREMIUM et ENTREPRISE)
         try {
@@ -203,7 +277,79 @@ public class VenteService {
                     vente.getDateEcheance());
         }
 
+        // NOTIFICATIONS PUSH — non bloquantes, sans jamais faire échouer la vente.
+        try {
+            envoyerNotificationsVente(venteSauvegardee, utilisateur);
+        } catch (Exception e) {
+            log.warn("[VENTE_NOTIF] Echec envoi notifs pour vente {} : {}",
+                    venteSauvegardee.getId(), e.getMessage());
+        }
+
         return venteSauvegardee;
+    }
+
+    /**
+     * Détecte deux cas et envoie les push correspondants :
+     *   - VENTE_A_PERTE : prix vente unitaire < prix d'achat moyen (perte réelle)
+     *   - VENTE_EMPLOYE : la vente est saisie par un non-ADMIN et le montant
+     *     dépasse le seuil configuré par l'admin (0 = toutes les ventes)
+     */
+    private void envoyerNotificationsVente(VenteEntity vente, UserEntity auteur) {
+        if (vente == null || auteur == null) return;
+        TenantEntity tenant = vente.getTenant();
+        if (tenant == null) return;
+
+        // On récupère l'admin du tenant une seule fois (utile pour les deux notifs)
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+
+        // ─── VENTE_A_PERTE ─────────────────────────────────────────────
+        // Cas : vente au comptant OU crédit, dès que PV < prix achat moyen.
+        // On récupère le prix d'achat moyen depuis le stock (peut être null si
+        // le produit est en stock négatif ou n'existe pas encore côté stock).
+        try {
+            StockDto stock = stockService.obtenirStockParNomProduit(vente.getNomProduit());
+            BigDecimal prixMoyen = stock != null ? stock.getPrixMoyenAchat() : null;
+            if (prixMoyen != null && prixMoyen.signum() > 0
+                    && vente.getPrixUnitaire() != null
+                    && vente.getPrixUnitaire().compareTo(prixMoyen) < 0) {
+
+                BigDecimal perteParUnite = prixMoyen.subtract(vente.getPrixUnitaire());
+                BigDecimal perteTotale = perteParUnite.multiply(BigDecimal.valueOf(vente.getQuantite()));
+
+                String title = "Vente à perte détectée";
+                String body = vente.getNomProduit() + " vendu à " + fmt(vente.getPrixUnitaire())
+                        + " CFA (achat moyen : " + fmt(prixMoyen)
+                        + " CFA). Perte estimée : " + fmt(perteTotale) + " CFA.";
+                String url = "/ventes";
+
+                // On notifie l'auteur (peut réagir tout de suite s'il s'agit d'une erreur de saisie)
+                userPushService.notifyUser(auteur, UserNotificationType.VENTE_A_PERTE, title, body, url);
+                // Et l'admin s'il est distinct
+                if (admin != null && !admin.getId().equals(auteur.getId())) {
+                    userPushService.notifyUser(admin, UserNotificationType.VENTE_A_PERTE, title, body, url);
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // stock introuvable → on ne peut pas comparer, on skip
+        }
+
+        // ─── VENTE_EMPLOYE ─────────────────────────────────────────────
+        // Cas : auteur ≠ ADMIN + montant total > seuil de l'admin
+        if (admin != null && auteur.getRole() != UserEntity.Role.ADMIN) {
+            SeuilMontantConfig cfg = prefService.getSeuilMontantConfig(admin, UserNotificationType.VENTE_EMPLOYE);
+            BigDecimal total = vente.getPrixTotal() != null ? vente.getPrixTotal() : BigDecimal.ZERO;
+            if (total.compareTo(cfg.seuilMontant()) >= 0) {
+                String title = "Vente par " + auteur.getPrenom();
+                String body = auteur.getPrenom() + " " + auteur.getNom() + " vient d'enregistrer "
+                        + vente.getNomProduit() + " pour " + fmt(total) + " CFA.";
+                userPushService.notifyUser(admin, UserNotificationType.VENTE_EMPLOYE, title, body, "/ventes");
+            }
+        }
+    }
+
+    private static String fmt(BigDecimal montant) {
+        if (montant == null) return "0";
+        return String.format("%,d", montant.longValue()).replace(',', ' ');
     }
 
     /**
@@ -252,6 +398,10 @@ public class VenteService {
         if (venteModifiee.getModePaiement() != null) {
             venteExistante.setModePaiement(venteModifiee.getModePaiement());
         }
+        // Sortie hors vente (perte, vol, casse, don, crédit impayé) — toujours synchroniser,
+        // y compris quand on REMET à null (ex: passer d'une sortie à une vraie vente).
+        venteExistante.setTypeSortie(venteModifiee.getTypeSortie());
+        venteExistante.setMotifSortie(venteModifiee.getMotifSortie());
 
         // Photo
         if (produitChange) {
@@ -287,11 +437,21 @@ public class VenteService {
             creditClientService.creerCreditDepuisVente(
                     venteSauvegardee, client, employe, venteModifiee.getDateEcheance());
             stockService.invalidateStockCache(venteSauvegardee.getTenant().getTenantUuid());
+
+            // FIFO : recalculer après modification
+            try {
+                fifoCalculService.recalculerFifo(venteSauvegardee);
+            } catch (Exception e) {
+                log.error("FIFO : échec du recalcul de bénéfice pour la vente {} : {}",
+                        venteSauvegardee.getId(), e.getMessage(), e);
+            }
+
             return venteSauvegardee;
 
         } else if (aUnCreditActif) {
-            // Cas 3 : CRÉDIT → CRÉDIT — mettre à jour le montant du crédit existant
-            creditClientService.mettreAJourCreditDeLaVente(id, venteExistante.getPrixTotal());
+            // Cas 3 : CRÉDIT → CRÉDIT — mettre à jour le montant et l'échéance du crédit existant
+            creditClientService.mettreAJourCreditDeLaVente(
+                    id, venteExistante.getPrixTotal(), venteModifiee.getDateEcheance());
             venteExistante.setEstSoldee(false);
 
         }
@@ -299,6 +459,16 @@ public class VenteService {
 
         VenteEntity saved = venteRepository.save(venteExistante);
         stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
+
+        // FIFO : recalculer les lignes de consommation
+        // (rend les unités aux lots puis refait le calcul avec les nouvelles valeurs)
+        try {
+            fifoCalculService.recalculerFifo(saved);
+        } catch (Exception e) {
+            log.error("FIFO : échec du recalcul de bénéfice pour la vente {} : {}",
+                    saved.getId(), e.getMessage(), e);
+        }
+
         return saved;
     }
 
@@ -316,6 +486,169 @@ public class VenteService {
             return venteExistante.getClientRef();
         }
         throw new IllegalArgumentException("Un client enregistré est obligatoire pour une vente à crédit");
+    }
+
+    /**
+     * Calcule l'aperçu des conséquences avant de supprimer une vente.
+     * Sert à afficher une modale claire au commerçant.
+     *
+     * Gère les 3 types de ventes :
+     *   - Vente à CRÉDIT  : agrège les paiements crédit (PaiementCreditEntity)
+     *                       par mode et par mois.
+     *   - Vente cash      : crée un "paiement virtuel" représentant l'argent
+     *                       reçu = prix_total payé par mode_paiement à la date
+     *                       de la vente.
+     *   - Sortie hors vente (vol, casse, don) : pas d'impact CA ni caisse,
+     *                       mais on calcule l'impact sur les pertes
+     *                       (coût FIFO qui sera dé-compté).
+     */
+    @Transactional(readOnly = true)
+    public com.example.dijasaliou.dto.ImpactSuppressionVenteDto calculerImpactSuppression(String id) {
+        VenteEntity vente = obtenirVenteParId(id);
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!vente.getTenant().getTenantUuid().equals(tenant.getTenantUuid())) {
+            throw new SecurityException("Accès refusé");
+        }
+
+        boolean estCredit = vente.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT;
+        boolean estSortie = vente.getTypeSortie() != null;
+        String creditStatut = null;
+        String typeSortie = vente.getTypeSortie() != null ? vente.getTypeSortie().name() : null;
+        java.math.BigDecimal impactPertes = java.math.BigDecimal.ZERO;
+
+        List<com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler> paiementsAAnnuler = new java.util.ArrayList<>();
+
+        if (estCredit) {
+            // CAS 1 : crédit — vrais paiements crédit en base
+            List<CreditClientEntity> credits = creditClientRepository.findByVenteIdWithPaiements(id);
+            for (CreditClientEntity credit : credits) {
+                if (creditStatut == null && credit.getStatut() != null) {
+                    creditStatut = credit.getStatut().name();
+                }
+                if (credit.getPaiements() != null) {
+                    for (com.example.dijasaliou.entity.PaiementCreditEntity p : credit.getPaiements()) {
+                        paiementsAAnnuler.add(com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler.builder()
+                                .paiementId(p.getId())
+                                .datePaiement(p.getDatePaiement())
+                                .modePaiement(p.getModePaiement() != null ? p.getModePaiement().name() : null)
+                                .montant(p.getMontantPaye())
+                                .build());
+                    }
+                }
+            }
+        } else if (!estSortie && vente.getPrixTotal() != null
+                && vente.getPrixTotal().compareTo(BigDecimal.ZERO) > 0) {
+            // CAS 2 : vente cash (Espèces / Wave / OM / Virement) — paiement virtuel
+            LocalDate dateVente = vente.getDateVente() != null ? vente.getDateVente().toLocalDate() : LocalDate.now();
+            paiementsAAnnuler.add(com.example.dijasaliou.dto.ImpactSuppressionVenteDto.PaiementAAnnuler.builder()
+                    .paiementId(vente.getId())
+                    .datePaiement(dateVente)
+                    .modePaiement(vente.getModePaiement().name())
+                    .montant(vente.getPrixTotal())
+                    .build());
+        } else if (estSortie) {
+            // CAS 3 : sortie hors vente — pas de paiement, mais impact pertes
+            BigDecimal coutFifo = consommationRepository.sumCoutAchatByVenteId(id, tenant);
+            if (coutFifo != null && coutFifo.compareTo(BigDecimal.ZERO) > 0) {
+                impactPertes = coutFifo.setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+        }
+
+        // Agrégat par mode de paiement
+        Map<String, BigDecimal> totauxParMode = new java.util.LinkedHashMap<>();
+        for (var p : paiementsAAnnuler) {
+            totauxParMode.merge(p.getModePaiement(), p.getMontant(), BigDecimal::add);
+        }
+        List<com.example.dijasaliou.dto.ImpactSuppressionVenteDto.MontantParMode> totalParMode = totauxParMode.entrySet().stream()
+                .map(e -> com.example.dijasaliou.dto.ImpactSuppressionVenteDto.MontantParMode.builder()
+                        .modePaiement(e.getKey()).montant(e.getValue()).build())
+                .collect(Collectors.toList());
+
+        // Impact CA par mois — cash basis : chaque paiement compte sur SON mois
+        Map<String, BigDecimal> retraitParMoisKey = new java.util.LinkedHashMap<>();
+        for (var p : paiementsAAnnuler) {
+            if (p.getDatePaiement() == null) continue;
+            String key = p.getDatePaiement().getYear() + "-" + String.format("%02d", p.getDatePaiement().getMonthValue());
+            retraitParMoisKey.merge(key, p.getMontant(), BigDecimal::add);
+        }
+        List<com.example.dijasaliou.dto.ImpactSuppressionVenteDto.ImpactCaMois> impactCaParMois = new java.util.ArrayList<>();
+        String[] moisLibelles = {"Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+                                  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"};
+        for (var entry : retraitParMoisKey.entrySet()) {
+            String[] parts = entry.getKey().split("-");
+            int annee = Integer.parseInt(parts[0]);
+            int mois = Integer.parseInt(parts[1]);
+            LocalDate debutMois = LocalDate.of(annee, mois, 1);
+            LocalDate finMois = debutMois.withDayOfMonth(debutMois.lengthOfMonth());
+            BigDecimal caActuel = calculerChiffreAffaires(debutMois, finMois);
+            BigDecimal diminution = entry.getValue().setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal caApres = caActuel.subtract(diminution).setScale(2, java.math.RoundingMode.HALF_UP);
+            impactCaParMois.add(com.example.dijasaliou.dto.ImpactSuppressionVenteDto.ImpactCaMois.builder()
+                    .annee(annee).mois(mois)
+                    .moisLibelle(moisLibelles[mois - 1] + " " + annee)
+                    .caActuel(caActuel)
+                    .caApres(caApres)
+                    .diminution(diminution)
+                    .build());
+        }
+
+        return com.example.dijasaliou.dto.ImpactSuppressionVenteDto.builder()
+                .venteId(id)
+                .nomProduit(vente.getNomProduit())
+                .quantiteARestaurer(vente.getQuantite())
+                .modePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : "ESPECES")
+                .estVenteCredit(estCredit)
+                .creditStatut(creditStatut)
+                .estSortieHorsVente(estSortie)
+                .typeSortie(typeSortie)
+                .impactPertes(impactPertes)
+                .paiementsAAnnuler(paiementsAAnnuler)
+                .totalParMode(totalParMode)
+                .impactCaParMois(impactCaParMois)
+                .build();
+    }
+
+    /**
+     * Supprime une vente EN CASCADE : annule tous les paiements crédit, supprime
+     * les crédits associés, restaure le stock FIFO, supprime la vente.
+     *
+     * À utiliser uniquement après confirmation explicite par le commerçant
+     * (modale qui montre l'impact via calculerImpactSuppression).
+     *
+     * Différence avec supprimerVente() :
+     *   - supprimerVente : bloque si crédit non soldé a paiements, sinon détache
+     *     (laisse crédit + paiements en BDD comme historique)
+     *   - supprimerVenteEnCascade : supprime TOUT (paiements + crédit + vente)
+     */
+    @Transactional
+    public void supprimerVenteEnCascade(String id) {
+        VenteEntity vente = obtenirVenteParId(id);
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!vente.getTenant().getTenantUuid().equals(tenant.getTenantUuid())) {
+            throw new SecurityException("Accès refusé");
+        }
+
+        // 1. Supprimer en bloc les crédits + paiements (cascade JPA grâce à @OneToMany orphanRemoval=true)
+        List<CreditClientEntity> credits = creditClientRepository.findByVenteIdWithPaiements(id);
+        for (CreditClientEntity credit : credits) {
+            log.info("[CASCADE] Suppression du crédit {} (statut {}, {} paiements) lié à la vente {}",
+                    credit.getId(), credit.getStatut(),
+                    credit.getPaiements() != null ? credit.getPaiements().size() : 0, id);
+            creditClientRepository.delete(credit); // cascade vers paiements via orphanRemoval
+        }
+
+        // 2. FIFO : restaurer le stock dans les lots d'achat
+        try {
+            fifoCalculService.annulerConsommationFifo(id);
+        } catch (Exception e) {
+            log.error("[CASCADE] Échec annulation FIFO pour vente {} : {}", id, e.getMessage(), e);
+        }
+
+        // 3. Supprimer la vente
+        venteRepository.deleteById(id);
+        stockService.invalidateStockCache(tenant.getTenantUuid());
+
+        log.info("[CASCADE] Vente {} supprimée avec succès (cascade complète)", id);
     }
 
     /**
@@ -345,6 +678,15 @@ public class VenteService {
         // Option A : solder les crédits actifs + détacher la FK vente → historique préservé
         creditClientService.solderEtDetacherCreditsDeLaVente(id);
 
+        // FIFO : annuler la consommation (rendre les unités aux lots) AVANT la suppression
+        // pour que les FK soient propres et que le stock soit cohérent.
+        try {
+            fifoCalculService.annulerConsommationFifo(id);
+        } catch (Exception e) {
+            log.error("FIFO : échec de l'annulation de bénéfice pour la vente {} : {}",
+                    id, e.getMessage(), e);
+        }
+
         venteRepository.deleteById(id);
         stockService.invalidateStockCache(tenantActuel.getTenantUuid());
     }
@@ -367,13 +709,224 @@ public class VenteService {
     }
 
     /**
-     * Calculer le chiffre d'affaires d'une période
+     * Calculer le chiffre d'affaires d'une période — comptabilité de caisse.
+     *
+     * LOGIQUE CASH BASIS :
+     *   CA = (somme des ventes payées immédiatement, mode != CREDIT)
+     *      + (somme des paiements crédit reçus sur la période)
+     *
+     * Une vente crédit n'entre PAS dans le CA tant que le client ne paye pas.
+     * À chaque paiement reçu, le montant payé s'ajoute au CA de la période du paiement.
      */
     @Transactional(readOnly = true)
     public BigDecimal calculerChiffreAffaires(LocalDate debut, LocalDate fin) {
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+
+        BigDecimal caNonCredit = venteRepository.sumChiffreAffairesNonCreditPeriode(
+                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), tenantUuid);
+        if (caNonCredit == null) caNonCredit = BigDecimal.ZERO;
+
+        BigDecimal caPaiementsCredit = paiementCreditRepository.sumMontantPayeBetweenAndTenant(
+                debut, fin, tenantUuid);
+        if (caPaiementsCredit == null) caPaiementsCredit = BigDecimal.ZERO;
+
+        return caNonCredit.add(caPaiementsCredit);
+    }
+
+    /**
+     * Ancienne méthode : CA en comptabilité d'engagement (toutes ventes confondues, crédit inclus).
+     * Conservée pour usage interne uniquement (le rapport modes de paiement par exemple).
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal calculerChiffreAffairesAccrual(LocalDate debut, LocalDate fin) {
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
         return venteRepository.sumChiffreAffairesPeriode(
                 debut.atStartOfDay(), fin.atTime(LocalTime.MAX), tenantUuid);
+    }
+
+    /**
+     * Liste détaillée des sorties hors vente (perte, vol, casse, don) ET des crédits
+     * passés en perte sur une période. Utilisée par la modale "Pertes" du frontend.
+     *
+     * Les crédits perdus sont convertis en VenteDto virtuels (typeSortie=CREDIT_IMPAYE)
+     * pour partager la même structure que les vraies sorties — le frontend les affiche
+     * de manière unifiée dans le tableau.
+     */
+    @Transactional(readOnly = true)
+    public List<com.example.dijasaliou.dto.VenteDto> obtenirSortiesPeriode(LocalDate debut, LocalDate fin) {
+        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        LocalDateTime debutDt = debut.atStartOfDay();
+        LocalDateTime finDt = fin.atTime(LocalTime.MAX);
+
+        List<com.example.dijasaliou.dto.VenteDto> resultat = new java.util.ArrayList<>(
+                venteRepository.findSortiesBetween(debutDt, finDt, tenantUuid).stream()
+                        .map(com.example.dijasaliou.dto.VenteDto::fromEntity)
+                        .toList()
+        );
+
+        // Crédits passés en perte sur la période — virtual sorties
+        for (com.example.dijasaliou.entity.CreditClientEntity credit :
+                creditClientRepository.findCreditsPassesEnPerteBetween(debut, fin, tenantUuid)) {
+            resultat.add(com.example.dijasaliou.dto.VenteDto.fromCreditPerdu(credit));
+        }
+
+        // Tri global par date desc
+        resultat.sort((a, b) -> {
+            if (a.getDateVente() == null) return 1;
+            if (b.getDateVente() == null) return -1;
+            return b.getDateVente().compareTo(a.getDateVente());
+        });
+
+        return resultat;
+    }
+
+    /**
+     * Calculer les statistiques de bénéfice net (FIFO) sur une période — comptabilité de caisse.
+     *
+     * LOGIQUE CASH BASIS :
+     *   CA          = ventes non-crédit de la période + paiements crédit reçus dans la période
+     *   coût FIFO   = coût des ventes non-crédit + coût prorata des ventes crédit pour la part payée
+     *   bénéfice    = CA − coût FIFO
+     *
+     * EXEMPLE :
+     *   Vente crédit 100k (coût FIFO 60k). Mr Diop paye 50k en juin → on attribue :
+     *     • CA juin     += 50k
+     *     • Coût juin   += 60k × (50k / 100k) = 30k
+     *     • Bénéfice    += 20k
+     *
+     * Les ventes sans ligne de consommation (produit jamais acheté ⇒ coût FIFO inconnu)
+     * sont comptées dans nbVentesSansBenefice.
+     */
+    @Transactional(readOnly = true)
+    public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        LocalDateTime debutDt = debut.atStartOfDay();
+        LocalDateTime finDt   = fin.atTime(LocalTime.MAX);
+        String tenantUuid = tenant.getTenantUuid();
+
+        // 1. Partie NON-CRÉDIT : ventes payées immédiatement → on prend tout (CA + coût + bénéfice complets)
+        BigDecimal caNonCredit = venteRepository.sumChiffreAffairesNonCreditPeriode(debutDt, finDt, tenantUuid);
+        if (caNonCredit == null) caNonCredit = BigDecimal.ZERO;
+
+        BigDecimal coutAchat = consommationRepository.sumCoutAchatNonCreditBetween(tenant, debutDt, finDt);
+        if (coutAchat == null) coutAchat = BigDecimal.ZERO;
+
+        BigDecimal benefice  = consommationRepository.sumBeneficeNonCreditBetween(tenant, debutDt, finDt);
+        if (benefice == null) benefice = BigDecimal.ZERO;
+
+        // 2. Partie CRÉDIT : pour chaque paiement reçu dans la période, attribution prorata du coût/bénéfice
+        List<PaiementCreditEntity> paiements = paiementCreditRepository.findPaiementsAvecVenteBetween(
+                debut, fin, tenantUuid);
+
+        BigDecimal caPaiementsCredit  = BigDecimal.ZERO;
+        BigDecimal coutPaiementsCredit = BigDecimal.ZERO;
+        BigDecimal beneficePaiementsCredit = BigDecimal.ZERO;
+
+        for (PaiementCreditEntity p : paiements) {
+            BigDecimal montantPaye = p.getMontantPaye();
+            if (montantPaye == null || montantPaye.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            VenteEntity vente = (p.getCredit() != null) ? p.getCredit().getVente() : null;
+            if (vente == null || vente.getPrixTotal() == null
+                    || vente.getPrixTotal().compareTo(BigDecimal.ZERO) <= 0) {
+                // Paiement sans vente ou vente à prix 0 : on ajoute juste le CA, pas de coût attribuable
+                caPaiementsCredit = caPaiementsCredit.add(montantPaye);
+                continue;
+            }
+
+            // Prorata = montant payé / prix total de la vente
+            BigDecimal prorata = montantPaye.divide(vente.getPrixTotal(), 6, java.math.RoundingMode.HALF_UP);
+
+            BigDecimal coutVente     = consommationRepository.sumCoutAchatByVenteId(vente.getId(), tenant);
+            if (coutVente == null) coutVente = BigDecimal.ZERO;
+            BigDecimal beneficeVente = consommationRepository.sumBeneficeByVenteId(vente.getId(), tenant);
+            if (beneficeVente == null) beneficeVente = BigDecimal.ZERO;
+
+            caPaiementsCredit       = caPaiementsCredit.add(montantPaye);
+            coutPaiementsCredit     = coutPaiementsCredit.add(coutVente.multiply(prorata));
+            beneficePaiementsCredit = beneficePaiementsCredit.add(beneficeVente.multiply(prorata));
+        }
+
+        // 3. Agrégation finale
+        BigDecimal ca         = caNonCredit.add(caPaiementsCredit);
+        BigDecimal coutTotal  = coutAchat.add(coutPaiementsCredit).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal beneficeTotal = benefice.add(beneficePaiementsCredit).setScale(2, java.math.RoundingMode.HALF_UP);
+
+        // 4. Comptages
+        long nbVentesNonCredit  = venteRepository.countVentesNonCreditPeriode(debutDt, finDt, tenantUuid);
+        long nbPaiementsCredit  = paiementCreditRepository.countByPeriodeAndTenant(debut, fin, tenantUuid);
+        long nbVentes           = nbVentesNonCredit + nbPaiementsCredit;
+        long nbVentesAvecBenefice = consommationRepository.countVentesAvecBeneficeBetween(tenant, debutDt, finDt);
+        long nbVentesSansBenefice = Math.max(0L, nbVentes - nbVentesAvecBenefice);
+
+        // 5. Sorties hors vente (pertes, vols, dons) — comptabilisées séparément
+        java.util.Map<String, BigDecimal> pertesParType = new java.util.LinkedHashMap<>();
+        BigDecimal totalPertes = BigDecimal.ZERO;
+        long nbSorties = 0L;
+        for (Object[] row : consommationRepository.sumPertesFifoParTypeBetween(tenant, debutDt, finDt)) {
+            String type = row[0] != null ? row[0].toString() : "AUTRE";
+            BigDecimal cout = row[1] instanceof BigDecimal ? (BigDecimal) row[1]
+                    : (row[1] instanceof Number ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO);
+            pertesParType.put(type, cout.setScale(2, java.math.RoundingMode.HALF_UP));
+            totalPertes = totalPertes.add(cout);
+        }
+        // Compte les sorties via la query sumSortiesParTypeEtPeriode (compte les ventes, pas les lignes FIFO)
+        for (Object[] row : venteRepository.sumSortiesParTypeEtPeriode(debutDt, finDt, tenantUuid)) {
+            nbSorties += row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
+        }
+
+        // 5bis. Crédits impayés passés en perte sur la période
+        // Pour chaque crédit en perte : perte FIFO = coût total vente × (montant restant / prix total vente)
+        BigDecimal pertesCreditImpaye = BigDecimal.ZERO;
+        long nbCreditsEnPerte = 0L;
+        for (CreditClientEntity credit : creditClientRepository.findCreditsPassesEnPerteBetween(debut, fin, tenantUuid)) {
+            BigDecimal montantRestant = credit.getMontantRestant();
+            if (montantRestant == null || montantRestant.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            VenteEntity vente = credit.getVente();
+            if (vente == null || vente.getPrixTotal() == null
+                    || vente.getPrixTotal().compareTo(BigDecimal.ZERO) <= 0) {
+                // Sans vente associée, on prend la perte = montant restant (pas de coût FIFO calculable)
+                pertesCreditImpaye = pertesCreditImpaye.add(montantRestant);
+                nbCreditsEnPerte++;
+                continue;
+            }
+
+            // Prorata FIFO : part non payée × coût total de la vente
+            BigDecimal proratNonPaye = montantRestant.divide(vente.getPrixTotal(), 6, java.math.RoundingMode.HALF_UP);
+            BigDecimal coutVente = consommationRepository.sumCoutAchatByVenteId(vente.getId(), tenant);
+            if (coutVente == null) coutVente = BigDecimal.ZERO;
+            pertesCreditImpaye = pertesCreditImpaye.add(coutVente.multiply(proratNonPaye));
+            nbCreditsEnPerte++;
+        }
+        pertesCreditImpaye = pertesCreditImpaye.setScale(2, java.math.RoundingMode.HALF_UP);
+        if (pertesCreditImpaye.compareTo(BigDecimal.ZERO) > 0) {
+            pertesParType.merge("CREDIT_IMPAYE", pertesCreditImpaye, BigDecimal::add);
+            totalPertes = totalPertes.add(pertesCreditImpaye);
+            nbSorties += nbCreditsEnPerte;
+        }
+
+        BigDecimal marge = BigDecimal.ZERO;
+        if (ca.compareTo(BigDecimal.ZERO) > 0) {
+            marge = beneficeTotal
+                    .multiply(new BigDecimal("100"))
+                    .divide(ca, 2, java.math.RoundingMode.HALF_UP);
+        }
+
+        return BeneficeStatistiquesDto.builder()
+                .dateDebut(debut)
+                .dateFin(fin)
+                .chiffreAffaires(ca)
+                .totalCoutAchat(coutTotal)
+                .beneficeNet(beneficeTotal)
+                .totalPertes(totalPertes.setScale(2, java.math.RoundingMode.HALF_UP))
+                .pertesParType(pertesParType)
+                .nbSorties(nbSorties)
+                .margePourcentage(marge)
+                .nbVentes(nbVentes)
+                .nbVentesAvecBenefice(nbVentesAvecBenefice)
+                .nbVentesSansBenefice(nbVentesSansBenefice)
+                .build();
     }
 
     /**
@@ -407,7 +960,7 @@ public class VenteService {
 
         Map<String, BigDecimal> totaux = new LinkedHashMap<>();
         Map<String, Long> nombres = new LinkedHashMap<>();
-        for (String mode : List.of("ESPECES", "WAVE", "ORANGE_MONEY", "CREDIT")) {
+        for (String mode : List.of("ESPECES", "WAVE", "ORANGE_MONEY", "VIREMENT", "CREDIT")) {
             totaux.put(mode, BigDecimal.ZERO);
             nombres.put(mode, 0L);
         }
@@ -458,13 +1011,31 @@ public class VenteService {
             throw new IllegalArgumentException("La quantité doit être supérieure à 0");
         }
 
-        if (vente.getPrixUnitaire() == null ||
-                vente.getPrixUnitaire().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Le prix unitaire doit être supérieur à 0");
-        }
-
         if (vente.getNomProduit() == null || vente.getNomProduit().trim().isEmpty()) {
             throw new IllegalArgumentException("Le nom du produit est obligatoire");
+        }
+
+        // Cas sortie hors vente (perte, vol, casse, don, crédit impayé) :
+        //   - prixUnitaire peut être 0 (la marchandise sort sans contrepartie financière)
+        //   - typeSortie obligatoire pour expliquer pourquoi
+        //   - le mode paiement CREDIT n'a pas de sens dans ce cas
+        if (vente.getTypeSortie() != null) {
+            if (vente.getPrixUnitaire() == null
+                    || vente.getPrixUnitaire().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Le prix unitaire ne peut être négatif");
+            }
+            if (vente.getModePaiement() == VenteEntity.ModePaiementVente.CREDIT) {
+                throw new IllegalArgumentException(
+                        "Une sortie hors vente (perte, vol, don, casse) ne peut pas être à crédit");
+            }
+            return;
+        }
+
+        // Vente commerciale classique : prix obligatoire > 0
+        if (vente.getPrixUnitaire() == null
+                || vente.getPrixUnitaire().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(
+                    "Le prix unitaire doit être supérieur à 0 (ou indiquer un motif de sortie : perte, vol, don…)");
         }
     }
 

@@ -30,6 +30,9 @@ public class ProduitPourVenteDto {
     /** Devise dans laquelle prixVenteSuggere a été saisi — nécessaire pour la conversion frontend */
     private String deviseCode;
     private Double tauxChangeApplique;
+    private String codeBarre;
+    private String photoUrl;
+    private String unite;
 
     /**
      * Convertit un achat en DTO simplifié pour la vente
@@ -44,6 +47,9 @@ public class ProduitPourVenteDto {
                 .prixVenteSuggere(achat.getPrixVenteSuggere())
                 .deviseCode(achat.getDeviseCode())
                 .tauxChangeApplique(achat.getTauxChangeApplique())
+                .codeBarre(achat.getCodeBarre())
+                .photoUrl(achat.getPhotoUrl())
+                .unite(achat.getUnite())
                 .build();
     }
 }

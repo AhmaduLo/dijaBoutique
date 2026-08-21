@@ -6,7 +6,10 @@ import com.example.dijasaliou.entity.DepenseEntity;
 import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.entity.UserNotificationType;
 import com.example.dijasaliou.repository.DepenseRepository;
+import com.example.dijasaliou.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -23,17 +26,25 @@ import java.util.List;
  * Service pour la logique métier des dépenses
  */
 @Service
+@Slf4j
 public class DepenseService {
 
     private final DepenseRepository depenseRepository;
     private final TenantService tenantService;
     private final DeviseService deviseService;
+    private final UserPushNotificationService userPushService;
+    private final UserRepository userRepository;
 
-    public DepenseService(DepenseRepository depenseRepository, TenantService tenantService,
-                          DeviseService deviseService) {
+    public DepenseService(DepenseRepository depenseRepository,
+                          TenantService tenantService,
+                          DeviseService deviseService,
+                          UserPushNotificationService userPushService,
+                          UserRepository userRepository) {
         this.depenseRepository = depenseRepository;
         this.tenantService = tenantService;
         this.deviseService = deviseService;
+        this.userPushService = userPushService;
+        this.userRepository = userRepository;
     }
 
 
@@ -105,7 +116,42 @@ public class DepenseService {
             depense.setDateDepense(LocalDateTime.now());
         }
 
-        return depenseRepository.save(depense);
+        DepenseEntity saved = depenseRepository.save(depense);
+
+        // NOTIFICATION PUSH — DEPENSE_EMPLOYE si auteur ≠ ADMIN
+        try {
+            envoyerNotifDepenseEmploye(saved, utilisateur);
+        } catch (Exception e) {
+            log.warn("[DEPENSE_NOTIF] Echec envoi notif pour depense {} : {}",
+                    saved.getId(), e.getMessage());
+        }
+
+        return saved;
+    }
+
+    /**
+     * Notifie l'admin quand une dépense est saisie par un employé (non-ADMIN).
+     * Le patron veut savoir tout de suite quand ses gérants ou vendeurs
+     * enregistrent des sorties d'argent (contrôle interne).
+     */
+    private void envoyerNotifDepenseEmploye(DepenseEntity depense, UserEntity auteur) {
+        if (auteur == null || auteur.getRole() == UserEntity.Role.ADMIN) return;
+        TenantEntity tenant = depense.getTenant();
+        if (tenant == null) return;
+
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        String montantFmt = depense.getMontant() != null
+                ? String.format("%,d", depense.getMontant().longValue()).replace(',', ' ')
+                : "0";
+        String title = "Dépense saisie par " + auteur.getPrenom();
+        String categorieLabel = depense.getCategorie() != null ? depense.getCategorie().getLibelle() : null;
+        String body = auteur.getPrenom() + " " + auteur.getNom() + " vient d'enregistrer une dépense de "
+                + montantFmt + " CFA"
+                + (categorieLabel != null && !categorieLabel.isBlank()
+                    ? " (" + categorieLabel + ")." : ".");
+        userPushService.notifyUser(admin, UserNotificationType.DEPENSE_EMPLOYE, title, body, "/depenses");
     }
 
     /**
@@ -130,6 +176,10 @@ public class DepenseService {
         depenseExistante.setUtilisateur(depenseModifiee.getUtilisateur());
         if (depenseModifiee.getDateDepense() != null) {
             depenseExistante.setDateDepense(depenseModifiee.getDateDepense());
+        }
+        // Caisse multi-comptes : permettre la modification du mode de paiement
+        if (depenseModifiee.getModePaiement() != null) {
+            depenseExistante.setModePaiement(depenseModifiee.getModePaiement());
         }
 
         return depenseRepository.save(depenseExistante);

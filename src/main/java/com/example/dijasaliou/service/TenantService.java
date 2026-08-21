@@ -10,6 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -51,6 +54,55 @@ public class TenantService {
                 .orElseThrow(() -> new IllegalStateException(
                     "Tenant introuvable pour l'UUID: " + tenantId
                 ));
+    }
+
+    /**
+     * Retourne l'heure courante dans le fuseau horaire du tenant.
+     *
+     * À utiliser à la place de {@link LocalDateTime#now()} pour toutes les
+     * dates métier (activation caisse, transferts, mouvements, etc.) afin que
+     * l'heure stockée corresponde à celle vue par l'utilisateur côté frontend,
+     * indépendamment du fuseau horaire du serveur Railway/AWS.
+     */
+    public LocalDateTime nowInTenantTz() {
+        TenantEntity tenant = getCurrentTenant();
+        String tz = tenant.getTimezone();
+        if (tz == null || tz.isBlank()) tz = "Africa/Dakar";
+        try {
+            return LocalDateTime.now(ZoneId.of(tz));
+        } catch (Exception e) {
+            log.warn("Fuseau invalide '{}' sur tenant {}, fallback Africa/Dakar",
+                    tz, tenant.getTenantUuid());
+            return LocalDateTime.now(ZoneId.of("Africa/Dakar"));
+        }
+    }
+
+    /** Variante {@link LocalDate} pour les champs jour-seul (datePaiement). */
+    public LocalDate todayInTenantTz() {
+        return nowInTenantTz().toLocalDate();
+    }
+
+    /**
+     * Met à jour le fuseau horaire du tenant courant (paramétrage utilisateur).
+     * Vérifie que le fuseau est un identifiant IANA valide.
+     */
+    @Transactional
+    public TenantEntity updateTimezone(String newTimezone) {
+        if (newTimezone == null || newTimezone.isBlank()) {
+            throw new IllegalArgumentException("Le fuseau horaire est obligatoire");
+        }
+        try {
+            ZoneId.of(newTimezone);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                "Fuseau horaire invalide : " + newTimezone + " (ex: Africa/Dakar)");
+        }
+        TenantEntity tenant = getCurrentTenant();
+        tenant.setTimezone(newTimezone);
+        TenantEntity saved = tenantRepository.save(tenant);
+        log.info("Fuseau horaire mis à jour pour tenant {} : {}",
+                tenant.getTenantUuid(), newTimezone);
+        return saved;
     }
 
     /**
@@ -100,18 +152,15 @@ public class TenantService {
             if (!nouveauNomEntreprise.equals(tenant.getNomEntreprise())) {
                 nomEntrepriseChange = true;
                 tenant.setNomEntreprise(nouveauNomEntreprise);
-                log.info("Mise à jour nom entreprise: {} -> {}", tenantActuel.getNomEntreprise(), nouveauNomEntreprise);
             }
         }
 
         if (request.getNumeroTelephone() != null && !request.getNumeroTelephone().trim().isEmpty()) {
             tenant.setNumeroTelephone(request.getNumeroTelephone().trim());
-            log.info("Mise à jour numéro téléphone: {} -> {}", tenantActuel.getNumeroTelephone(), request.getNumeroTelephone());
         }
 
         if (request.getAdresse() != null) {
             tenant.setAdresse(request.getAdresse().trim().isEmpty() ? null : request.getAdresse().trim());
-            log.info("Mise à jour adresse: {} -> {}", tenantActuel.getAdresse(), request.getAdresse());
         }
 
         if (request.getVille() != null) {
@@ -126,7 +175,6 @@ public class TenantService {
         if (request.getNineaSiret() != null) {
             String nineaSiret = request.getNineaSiret().trim().isEmpty() ? null : request.getNineaSiret().trim();
             tenant.setNineaSiret(nineaSiret);
-            log.info("Mise à jour NINEA/SIRET: {} -> {}", tenantActuel.getNineaSiret(), nineaSiret);
         }
 
         // Mise à jour de l'URL du logo (optionnel)
@@ -134,25 +182,29 @@ public class TenantService {
             tenant.setLogoUrl(request.getLogoUrl().trim().isEmpty() ? null : request.getLogoUrl().trim());
         }
 
+        // Mise à jour des conditions & garanties (optionnel, vide → null)
+        if (request.getConditionsGaranties() != null) {
+            String txt = request.getConditionsGaranties().trim();
+            tenant.setConditionsGaranties(txt.isEmpty() ? null : txt);
+        }
+
+        // Mise à jour des mentions légales (optionnel, vide → null)
+        if (request.getMentionsLegales() != null) {
+            String txt = request.getMentionsLegales().trim();
+            tenant.setMentionsLegales(txt.isEmpty() ? null : txt);
+        }
+
         // Forcer la sauvegarde du tenant
         TenantEntity tenantSauvegarde = tenantRepository.saveAndFlush(tenant);
-        log.info("Tenant mis à jour avec succès : {} - {} - {} - {}",
-                tenantSauvegarde.getNomEntreprise(),
-                tenantSauvegarde.getNumeroTelephone(),
-                tenantSauvegarde.getAdresse(),
-                tenantSauvegarde.getTenantUuid());
+        log.info("Tenant mis à jour : {} (uuid={})", tenantSauvegarde.getNomEntreprise(), tenantSauvegarde.getTenantUuid());
 
         // Si le nom de l'entreprise a changé, mettre à jour tous les utilisateurs de ce tenant
         if (nomEntrepriseChange) {
             List<UserEntity> utilisateurs = tenant.getUtilisateurs();
-            log.info("Mise à jour du nom d'entreprise pour {} utilisateurs", utilisateurs.size());
-
             for (UserEntity user : utilisateurs) {
                 user.setNomEntreprise(nouveauNomEntreprise);
             }
-
             userRepository.saveAllAndFlush(utilisateurs);
-            log.info("Tous les utilisateurs ont été mis à jour avec le nouveau nom d'entreprise: {}", nouveauNomEntreprise);
         }
 
         return tenantSauvegarde;

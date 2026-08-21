@@ -29,6 +29,11 @@ public class EmailService {
     private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final SystemNotificationsService systemNotificationsService;
+
+    public EmailService(SystemNotificationsService systemNotificationsService) {
+        this.systemNotificationsService = systemNotificationsService;
+    }
 
     @Value("${brevo.api.key:disabled}")
     private String brevoApiKey;
@@ -38,6 +43,9 @@ public class EmailService {
 
     @Value("${app.email.support:contact@heasystock.com}")
     private String supportEmail;
+
+    @Value("${app.email.reply-to:${app.email.support:contact@heasystock.com}}")
+    private String replyToEmail;
 
     @Value("${app.frontend.url:http://localhost:4200}")
     private String frontendUrl;
@@ -82,7 +90,7 @@ public class EmailService {
         try {
             String resetLink = frontendUrl + "/reset-password/" + token;
 
-            String subject = "Réinitialisation de votre mot de passe - Dija Saliou";
+            String subject = "Réinitialisation de votre mot de passe - HeasyStock";
 
             String htmlContent = buildPasswordResetEmailContent(userName, resetLink);
 
@@ -163,7 +171,7 @@ public class EmailService {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>Dija Saliou</h1>
+                        <h1>HeasyStock</h1>
                         <p>Gestion de Boutique</p>
                     </div>
 
@@ -191,7 +199,7 @@ public class EmailService {
 
                     <div class="footer">
                         <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
-                        <p>&copy; 2025 Dija Saliou - Tous droits réservés</p>
+                        <p>&copy; 2025 HeasyStock - Tous droits réservés</p>
                     </div>
                 </div>
             </body>
@@ -301,7 +309,7 @@ public class EmailService {
                 <div class="container">
                     <div class="header">
                         <h1>📧 Nouveau Message de Contact</h1>
-                        <p style="margin: 5px 0;">Dija Saliou - Application de Gestion</p>
+                        <p style="margin: 5px 0;">HeasyStock - Application de Gestion</p>
                     </div>
 
                     <div class="content">
@@ -339,8 +347,8 @@ public class EmailService {
                     </div>
 
                     <div class="footer">
-                        <p>Cet email a été envoyé automatiquement depuis l'application Dija Saliou.</p>
-                        <p>&copy; 2025 Dija Saliou - Tous droits réservés</p>
+                        <p>Cet email a été envoyé automatiquement depuis l'application HeasyStock.</p>
+                        <p>&copy; 2025 HeasyStock - Tous droits réservés</p>
                     </div>
                 </div>
             </body>
@@ -535,7 +543,7 @@ public class EmailService {
                         <p style="font-size: 16px;">
                             Nous avons bien reçu votre paiement. Votre abonnement <strong>%s</strong>
                             est maintenant actif et vous pouvez profiter pleinement de toutes les fonctionnalités
-                            de Dija Saliou !
+                            de HeasyStock !
                         </p>
 
                         <div class="info-box">
@@ -592,7 +600,7 @@ public class EmailService {
                     <div class="footer">
                         <p><strong>Merci de votre confiance !</strong></p>
                         <p>Cet email a été envoyé automatiquement suite à votre paiement.</p>
-                        <p>&copy; 2025 Dija Saliou - Gestion de Boutique - Tous droits réservés</p>
+                        <p>&copy; 2025 HeasyStock - Gestion de Boutique - Tous droits réservés</p>
                     </div>
                 </div>
             </body>
@@ -869,7 +877,7 @@ public class EmailService {
 
                     <div class="footer">
                         <p>Cet email a été envoyé automatiquement par le système d'alerte de stock.</p>
-                        <p>&copy; 2025 Dija Saliou - Gestion de Boutique - Tous droits réservés</p>
+                        <p>&copy; 2025 HeasyStock - Gestion de Boutique - Tous droits réservés</p>
                     </div>
                 </div>
             </body>
@@ -967,7 +975,7 @@ public class EmailService {
                     <h3>Émetteur</h3>
                     <p class="company">HeasyStock</p>
                     <p>Plateforme SaaS de gestion de boutique</p>
-                    <p>support@heasystock.com</p>
+                    <p>%s</p>
                   </div>
                   <div class="col">
                     <h3>Client</h3>
@@ -1005,7 +1013,7 @@ public class EmailService {
 
                 <p style="font-size:13px;color:#666;margin-top:20px;">
                   Merci pour votre confiance. Pour toute question concernant cette facture,
-                  contactez-nous à <a href="mailto:support@heasystock.com">support@heasystock.com</a>
+                  contactez-nous à <a href="mailto:%s">%s</a>
                 </p>
               </div>
               <div class="footer">
@@ -1028,7 +1036,10 @@ public class EmailService {
                 facture.getPlan() != null ? facture.getPlan() : "—",
                 dateDebut, dateFin,
                 montantCFA, montantEur,
-                montantCFA, montantEur
+                montantCFA, montantEur,
+                // Email support dans le footer
+                supportEmail,
+                supportEmail, supportEmail
         );
     }
 
@@ -1036,6 +1047,13 @@ public class EmailService {
      * Méthode générique pour envoyer un email HTML via l'API Brevo (HTTPS port 443)
      */
     private void sendHtmlEmail(String to, String subject, String htmlContent) {
+        sendViaBrevo(to, subject, htmlContent, null);
+    }
+
+    /**
+     * Méthode publique pour envoyer un email HTML — utilisée par NotificationService
+     */
+    public void sendHtmlEmailPublic(String to, String subject, String htmlContent) {
         sendViaBrevo(to, subject, htmlContent, null);
     }
 
@@ -1060,13 +1078,20 @@ public class EmailService {
         body.put("to", List.of(Map.of("email", to)));
         body.put("subject", subject);
         body.put("htmlContent", htmlContent);
-        if (replyTo != null) {
-            body.put("replyTo", Map.of("email", replyTo));
+        // Reply-To : si spécifié → utiliser, sinon → email par défaut (variable d'env)
+        String effectiveReplyTo = (replyTo != null) ? replyTo : replyToEmail;
+        if (effectiveReplyTo != null && !effectiveReplyTo.isBlank()) {
+            body.put("replyTo", Map.of("email", effectiveReplyTo));
         }
         body.put("trackClicks", false);
         body.put("trackOpens", false);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-        restTemplate.postForEntity(BREVO_API_URL, request, String.class);
+        try {
+            restTemplate.postForEntity(BREVO_API_URL, request, String.class);
+        } catch (RuntimeException e) {
+            systemNotificationsService.recordEmailFailure();
+            throw e;
+        }
     }
 }

@@ -112,4 +112,16 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     @Transactional
     @Query("UPDATE UserEntity u SET u.derniereConnexion = :now WHERE u.email = :email")
     void updateDerniereConnexion(@Param("email") String email, @Param("now") LocalDateTime now);
+
+    /**
+     * Utilisateurs non vérifiés inscrits depuis `since`, en excluant un rôle (ex. SUPER_ADMIN).
+     * Utilisé pour le renvoi en masse des emails de vérification (cf. SuperAdminService).
+     */
+    @Query("SELECT u FROM UserEntity u " +
+           "WHERE u.emailVerifie = false " +
+           "AND u.deleted = false " +
+           "AND u.dateCreation > :since " +
+           "AND u.role <> :excludeRole")
+    List<UserEntity> findUnverifiedSince(@Param("since") LocalDateTime since,
+                                          @Param("excludeRole") UserEntity.Role excludeRole);
 }

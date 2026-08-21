@@ -50,9 +50,8 @@ public class SetupController {
 
         String hashedPassword = passwordEncoder.encode(motDePasse);
 
-        Optional<UserEntity> existingSuperAdmin = userRepository.findAll().stream()
-                .filter(u -> u.getRole() == UserEntity.Role.SUPER_ADMIN)
-                .findFirst();
+        Optional<UserEntity> existingSuperAdmin = userRepository.findByRole(UserEntity.Role.SUPER_ADMIN)
+                .stream().findFirst();
 
         if (existingSuperAdmin.isPresent()) {
             UserEntity superAdmin = existingSuperAdmin.get();

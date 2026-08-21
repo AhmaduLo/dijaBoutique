@@ -2,13 +2,19 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.AchatDto;
 import com.example.dijasaliou.dto.PagedResponse;
+import com.example.dijasaliou.dto.SeuilMontantConfig;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
+import com.example.dijasaliou.entity.UserNotificationType;
 import com.example.dijasaliou.exception.ConflictException;
 import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.repository.ProductionRepository;
+import com.example.dijasaliou.repository.UserRepository;
+import com.example.dijasaliou.repository.VenteLotConsommationRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -29,6 +35,7 @@ import com.example.dijasaliou.entity.DeviseEntity;
  * Spring va créer automatiquement une instance (injection de dépendances)
  */
 @Service
+@Slf4j
 public class AchatService {
 
     // Le repository pour accéder à la base
@@ -47,14 +54,36 @@ public class AchatService {
      * Constructeur
      * Spring injecte automatiquement achatRepository, tenantService, stockService, venteRepository et deviseService
      */
+    private final ProduitReferenceService produitReferenceService;
+    private final ArchiveStockService archiveStockService;
+    private final UserPushNotificationService userPushService;
+    private final UserNotificationPreferenceService prefService;
+    private final UserRepository userRepository;
+    private final VenteLotConsommationRepository venteLotConsommationRepository;
+    private final ProductionRepository productionRepository;
+
     public AchatService(AchatRepository achatRepository, TenantService tenantService,
                         StockService stockService, VenteRepository venteRepository,
-                        DeviseService deviseService) {
+                        DeviseService deviseService,
+                        ProduitReferenceService produitReferenceService,
+                        ArchiveStockService archiveStockService,
+                        UserPushNotificationService userPushService,
+                        UserNotificationPreferenceService prefService,
+                        UserRepository userRepository,
+                        VenteLotConsommationRepository venteLotConsommationRepository,
+                        ProductionRepository productionRepository) {
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
         this.stockService = stockService;
         this.venteRepository = venteRepository;
         this.deviseService = deviseService;
+        this.produitReferenceService = produitReferenceService;
+        this.archiveStockService = archiveStockService;
+        this.userPushService = userPushService;
+        this.prefService = prefService;
+        this.userRepository = userRepository;
+        this.venteLotConsommationRepository = venteLotConsommationRepository;
+        this.productionRepository = productionRepository;
     }
 
     /**
@@ -120,20 +149,85 @@ public class AchatService {
             achat.setTauxChangeApplique(1.0);
         }
 
-        // 4. DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
+        // 4. CODE-BARRE : Nettoyer si présent
+        if (achat.getCodeBarre() != null) {
+            achat.setCodeBarre(achat.getCodeBarre().trim());
+            if (achat.getCodeBarre().isEmpty()) {
+                achat.setCodeBarre(null);
+            }
+        }
+
+        // 5. DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
         if (achat.getDateAchat() == null) {
             achat.setDateAchat(LocalDateTime.now());
         }
 
-        // 4. LOGIQUE : Calculer le prix total (si pas fait)
+        // 6. LOGIQUE : Calculer le prix total (si pas fait)
         if (achat.getPrixTotal() == null) {
             achat.calculerPrixTotal();
         }
 
-        // 5. SAUVEGARDE : Enregistrer en base
+        // 7. SAUVEGARDE : Enregistrer en base
         AchatEntity saved = achatRepository.save(achat);
         stockService.invalidateStockCache(saved.getTenant().getTenantUuid());
+
+        // 8. DÉSARCHIVAGE : Si le produit était archivé, le désarchiver
+        try {
+            archiveStockService.desarchiverSiNecessaire(saved.getTenant(), saved.getNomProduit());
+        } catch (Exception e) {
+            // Ne pas bloquer l'achat
+        }
+
+        // 9. CONTRIBUTION : Si code-barre présent, copier dans la base partagée
+        if (saved.getCodeBarre() != null && !saved.getCodeBarre().isBlank()) {
+            try {
+                produitReferenceService.contribuer(
+                        saved.getCodeBarre(),
+                        saved.getNomProduit(),
+                        saved.getPhotoUrl(),
+                        achat.getCategorie(),
+                        saved.getTenant().getNomEntreprise()
+                );
+            } catch (Exception e) {
+                // Ne pas bloquer l'achat si la contribution échoue
+            }
+        }
+
+        // 10. NOTIFICATION PUSH — ACHAT_EMPLOYE si l'auteur n'est pas ADMIN
+        try {
+            envoyerNotifAchatEmploye(saved, utilisateur);
+        } catch (Exception e) {
+            log.warn("[ACHAT_NOTIF] Echec envoi notif pour achat {} : {}", saved.getId(), e.getMessage());
+        }
+
         return saved;
+    }
+
+    /**
+     * Notifie l'admin quand un achat est saisi par un employé (non-ADMIN),
+     * au-dessus du seuil configuré. Contrôle interne : le patron sait
+     * quand ses gérants passent commande chez les fournisseurs.
+     */
+    private void envoyerNotifAchatEmploye(AchatEntity achat, UserEntity auteur) {
+        if (auteur == null || auteur.getRole() == UserEntity.Role.ADMIN) return;
+        TenantEntity tenant = achat.getTenant();
+        if (tenant == null) return;
+
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        BigDecimal montant = achat.getPrixTotal() != null ? achat.getPrixTotal() : BigDecimal.ZERO;
+        SeuilMontantConfig cfg = prefService.getSeuilMontantConfig(admin, UserNotificationType.ACHAT_EMPLOYE);
+        if (montant.compareTo(cfg.seuilMontant()) < 0) return;
+
+        String montantFmt = String.format("%,d", montant.longValue()).replace(',', ' ');
+        String title = "Achat par " + auteur.getPrenom();
+        String fournisseurLabel = achat.getFournisseur() != null && !achat.getFournisseur().isBlank()
+                ? " chez " + achat.getFournisseur()
+                : "";
+        String body = auteur.getPrenom() + " " + auteur.getNom() + " vient d'enregistrer "
+                + achat.getNomProduit() + fournisseurLabel + " pour " + montantFmt + " CFA.";
+        userPushService.notifyUser(admin, UserNotificationType.ACHAT_EMPLOYE, title, body, "/achats");
     }
 
     /**
@@ -200,8 +294,14 @@ public class AchatService {
         achatExistant.setUtilisateur(achatModifie.getUtilisateur());
         achatExistant.setPhotoUrl(achatModifie.getPhotoUrl());
         achatExistant.setUnite(achatModifie.getUnite());
+        achatExistant.setCategorie(achatModifie.getCategorie());
+        achatExistant.setDescription(achatModifie.getDescription());
         if (achatModifie.getDateAchat() != null) {
             achatExistant.setDateAchat(achatModifie.getDateAchat());
+        }
+        // Caisse multi-comptes : permettre la modification du mode de paiement
+        if (achatModifie.getModePaiement() != null) {
+            achatExistant.setModePaiement(achatModifie.getModePaiement());
         }
 
         // NOTE : On ne modifie PAS le tenant pour des raisons de sécurité
@@ -219,6 +319,7 @@ public class AchatService {
     /**
      * Supprimer un achat
      */
+    @Transactional
     public void supprimerAchat(String id) {
         // 1. Récupérer l'achat existant
         AchatEntity achatExistant = obtenirAchatParId(id);
@@ -229,15 +330,44 @@ public class AchatService {
             throw new SecurityException("Accès refusé : cette ressource ne vous appartient pas");
         }
 
-        // 3. Bloquer si des ventes existent pour ce produit (évite stock incohérent)
-        var ventesExistantes = venteRepository.findByNomProduitAndTenant(
-                achatExistant.getNomProduit(), tenantActuel);
-        if (!ventesExistantes.isEmpty()) {
+        // 3. Bloquer seulement si la suppression rendrait le stock négatif
+        String nomProduit = achatExistant.getNomProduit();
+        Double quantiteAchatSupprime = achatExistant.getQuantite() != null ? achatExistant.getQuantite() : 0.0;
+
+        Double totalAchats = achatRepository.sumQuantiteByNomProduitAndTenant(nomProduit, tenantActuel);
+        if (totalAchats == null) totalAchats = 0.0;
+
+        var ventesExistantes = venteRepository.findByNomProduitAndTenant(nomProduit, tenantActuel);
+        Double totalVentes = ventesExistantes.stream()
+                .mapToDouble(v -> v.getQuantite() != null ? v.getQuantite() : 0.0)
+                .sum();
+
+        Double stockApresSupp = (totalAchats - quantiteAchatSupprime) - totalVentes;
+
+        if (stockApresSupp < 0) {
             throw new ConflictException(
-                    "Impossible de supprimer cet achat : le produit \"" + achatExistant.getNomProduit() + "\" " +
-                    "est lié à " + ventesExistantes.size() + " vente(s) enregistrée(s). " +
-                    "Supprimez d'abord les ventes de ce produit avant de pouvoir supprimer l'achat.");
+                    "Impossible de supprimer cet achat : le stock de \"" + nomProduit + "\" " +
+                    "deviendrait négatif (" + String.format("%.0f", stockApresSupp) + "). " +
+                    "Il y a " + String.format("%.0f", totalVentes) + " vente(s) pour ce produit.");
         }
+
+        // 3bis. Bloquer si CE lot précis a déjà été consommé par le FIFO (vente_lot_consommation).
+        // Le calcul agrégé ci-dessus porte sur le produit dans son ensemble ; il ne suffit pas à
+        // garantir que ce lot spécifique est libre — sans ce garde-fou, la suppression finit en
+        // violation de contrainte FK (vente_lot_consommation.achat_id est en ON DELETE RESTRICT).
+        if (venteLotConsommationRepository.existsByAchatId(id)) {
+            throw new ConflictException(
+                    "Impossible de supprimer cet achat : il a déjà été (au moins partiellement) vendu. " +
+                    "Annulez d'abord les ventes concernées.");
+        }
+
+        // 3ter. Si ce lot vient d'une production, supprimer d'abord l'enregistrement de
+        // production (+ ses ingrédients, via cascade JPA orphanRemoval) — NE PAS compter sur
+        // la cascade SQL de la contrainte FK : spring.jpa.hibernate.ddl-auto=update peut avoir
+        // recréé la contrainte sans respecter le ON DELETE CASCADE défini dans la migration,
+        // ce qui ferait échouer la suppression de l'achat avec une violation de contrainte.
+        productionRepository.findByAchat_IdAndTenant(id, tenantActuel)
+                .ifPresent(productionRepository::delete);
 
         // 4. Supprimer + invalider le cache tenant
         achatRepository.deleteById(id);
@@ -287,6 +417,15 @@ public class AchatService {
     @Transactional(readOnly = true)
     public List<AchatEntity> obtenirProduitsAvecPrixVente() {
         return achatRepository.findAllByTenant(tenantService.getCurrentTenant());
+    }
+
+    /**
+     * Retourne la liste des fournisseurs distincts pour le tenant courant.
+     * Alimente l'autocomplétion côté frontend dans le formulaire d'achat.
+     */
+    @Transactional(readOnly = true)
+    public List<String> obtenirFournisseursDistincts() {
+        return achatRepository.findDistinctFournisseursByTenant(tenantService.getCurrentTenant());
     }
 
 }

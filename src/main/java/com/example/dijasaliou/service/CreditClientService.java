@@ -3,11 +3,13 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.CreditClientDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.PaiementCreditDto;
+import com.example.dijasaliou.dto.SeuilMontantConfig;
 import com.example.dijasaliou.entity.*;
 import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
 import com.example.dijasaliou.repository.ClientRepository;
 import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
+import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import java.math.RoundingMode;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +36,6 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class CreditClientService {
 
     private final CreditClientRepository creditClientRepository;
@@ -43,6 +44,33 @@ public class CreditClientService {
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
     private final DeviseService deviseService;
+    // @Lazy : VenteService injecte déjà CreditClientService en @Lazy → on évite la cycle
+    private final VenteService venteService;
+    private final UserPushNotificationService userPushService;
+    private final UserNotificationPreferenceService prefService;
+    private final UserRepository userRepository;
+
+    public CreditClientService(CreditClientRepository creditClientRepository,
+                                PaiementCreditRepository paiementCreditRepository,
+                                ClientRepository clientRepository,
+                                VenteRepository venteRepository,
+                                TenantService tenantService,
+                                DeviseService deviseService,
+                                @org.springframework.context.annotation.Lazy VenteService venteService,
+                                UserPushNotificationService userPushService,
+                                UserNotificationPreferenceService prefService,
+                                UserRepository userRepository) {
+        this.creditClientRepository = creditClientRepository;
+        this.paiementCreditRepository = paiementCreditRepository;
+        this.clientRepository = clientRepository;
+        this.venteRepository = venteRepository;
+        this.tenantService = tenantService;
+        this.deviseService = deviseService;
+        this.venteService = venteService;
+        this.userPushService = userPushService;
+        this.prefService = prefService;
+        this.userRepository = userRepository;
+    }
 
     /**
      * Appelé par VenteService quand mode_paiement = CREDIT
@@ -86,7 +114,54 @@ public class CreditClientService {
                 vente.getPrixTotal(), client.getNom(), vente.getId(),
                 vente.getTenant().getTenantUuid());
 
+        // NOTIFICATION PUSH — NOUVEAU_CREDIT (avec seuil configurable par admin)
+        try {
+            envoyerNotifNouveauCredit(saved, employe);
+        } catch (Exception e) {
+            log.warn("[CREDIT_NOTIF] Echec envoi notif NOUVEAU_CREDIT pour credit {} : {}",
+                    saved.getId(), e.getMessage());
+        }
+
         return saved;
+    }
+
+    private void envoyerNotifNouveauCredit(CreditClientEntity credit, UserEntity auteur) {
+        TenantEntity tenant = credit.getTenant();
+        if (tenant == null) return;
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        BigDecimal montant = credit.getMontantInitial() != null ? credit.getMontantInitial() : BigDecimal.ZERO;
+        SeuilMontantConfig cfg = prefService.getSeuilMontantConfig(admin, UserNotificationType.NOUVEAU_CREDIT);
+        if (montant.compareTo(cfg.seuilMontant()) < 0) return;
+
+        String clientNom = credit.getClient() != null ? credit.getClient().getNom() : "Client";
+        String parQui = (auteur != null && !auteur.getId().equals(admin.getId()))
+                ? " par " + auteur.getPrenom() : "";
+        String title = "Nouveau crédit accordé" + parQui;
+        String body = clientNom + " · " + fmt(montant) + " CFA"
+                + (credit.getDateEcheance() != null ? " (échéance " + credit.getDateEcheance() + ")." : ".");
+        userPushService.notifyUser(admin, UserNotificationType.NOUVEAU_CREDIT, title, body, "/credits");
+    }
+
+    private void envoyerNotifCreditRembourse(CreditClientEntity credit, UserEntity encaisseur) {
+        TenantEntity tenant = credit.getTenant();
+        if (tenant == null) return;
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        String clientNom = credit.getClient() != null ? credit.getClient().getNom() : "Client";
+        BigDecimal totalInitial = credit.getMontantInitial() != null ? credit.getMontantInitial() : BigDecimal.ZERO;
+        String parQui = (encaisseur != null && !encaisseur.getId().equals(admin.getId()))
+                ? " (encaissé par " + encaisseur.getPrenom() + ")" : "";
+        String title = "Crédit remboursé";
+        String body = clientNom + " a soldé son crédit de " + fmt(totalInitial) + " CFA" + parQui + ".";
+        userPushService.notifyUser(admin, UserNotificationType.CREDIT_REMBOURSE, title, body, "/credits");
+    }
+
+    private static String fmt(BigDecimal montant) {
+        if (montant == null) return "0";
+        return String.format("%,d", montant.longValue()).replace(',', ' ');
     }
 
     /**
@@ -128,6 +203,14 @@ public class CreditClientService {
     public CreditClientDto enregistrerPaiement(String creditId, BigDecimal montant,
                                                 PaiementCreditEntity.ModePaiement modePaiement,
                                                 String note, UserEntity employe) {
+        return enregistrerPaiement(creditId, montant, modePaiement, note, null, employe);
+    }
+
+    /** Variante avec date de paiement explicite (permet l'antédatage). */
+    @Transactional
+    public CreditClientDto enregistrerPaiement(String creditId, BigDecimal montant,
+                                                PaiementCreditEntity.ModePaiement modePaiement,
+                                                String note, LocalDate datePaiement, UserEntity employe) {
         // 1. Récupérer le crédit avec verrou pessimiste (empêche les paiements simultanés)
         CreditClientEntity credit = creditClientRepository.findByIdForUpdate(creditId)
                 .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
@@ -152,14 +235,15 @@ public class CreditClientService {
                     "Le montant (" + montant + ") dépasse le restant dû (" + credit.getMontantRestant() + ")");
         }
 
-        // 5. Créer le paiement (hérite de la devise du crédit)
+        // 5. Créer le paiement (hérite de la devise du crédit ; date du payload ou today dans la TZ du tenant)
+        LocalDate dateEffective = datePaiement != null ? datePaiement : tenantService.todayInTenantTz();
         PaiementCreditEntity paiement = PaiementCreditEntity.builder()
                 .credit(credit)
                 .montantPaye(montant)
                 .deviseCode(credit.getDeviseCode() != null ? credit.getDeviseCode() : "XOF")
                 .tauxChangeApplique(credit.getTauxChangeApplique() != null ? credit.getTauxChangeApplique() : 1.0)
                 .modePaiement(modePaiement)
-                .datePaiement(LocalDate.now())
+                .datePaiement(dateEffective)
                 .employe(employe)
                 .employeNom(employe != null ? employe.getPrenom() + " " + employe.getNom() : "Inconnu")
                 .note(note)
@@ -180,20 +264,25 @@ public class CreditClientService {
             credit.setStatut(StatutCredit.SOLDE);
             BigDecimal nouvelleDette = client.getDetteTotale().subtract(montant);
             client.setDetteTotale(nouvelleDette.max(BigDecimal.ZERO));
-            // Marquer la vente comme soldée et mettre à jour le mode de paiement
+            // Marquer la vente comme soldée — on GARDE modePaiement=CREDIT pour éviter
+            // un double comptage dans la caisse (vente CREDIT + paiements crédit additionnés).
+            // La vente reste historiquement une vente "à crédit", soldée par les paiements
+            // enregistrés dans paiements_credit.
             if (credit.getVente() != null) {
                 VenteEntity vente = credit.getVente();
                 vente.setEstSoldee(true);
-                // Mettre à jour le modePaiement de la vente avec celui du dernier paiement
-                VenteEntity.ModePaiementVente modePaiementVente =
-                        VenteEntity.ModePaiementVente.valueOf(modePaiement.name());
-                vente.setModePaiement(modePaiementVente);
                 venteRepository.save(vente);
-                log.info("Vente #{} : modePaiement mis à jour → {} (crédit soldé)",
-                        vente.getId(), modePaiementVente);
             }
             log.info("Crédit #{} soldé pour {} (tenant: {})",
                     creditId, client.getNom(), currentTenant.getTenantUuid());
+
+            // NOTIFICATION PUSH — CREDIT_REMBOURSE (bonne nouvelle, pas de seuil)
+            try {
+                envoyerNotifCreditRembourse(credit, employe);
+            } catch (Exception e) {
+                log.warn("[CREDIT_NOTIF] Echec envoi notif CREDIT_REMBOURSE pour credit {} : {}",
+                        creditId, e.getMessage());
+            }
         } else {
             // Paiement partiel
             credit.setStatut(StatutCredit.PARTIEL);
@@ -211,7 +300,8 @@ public class CreditClientService {
 
     @Transactional(readOnly = true)
     public PagedResponse<CreditClientDto> obtenirCredits(int page, int size, String search,
-                                                          String statut, LocalDate dateDebut, LocalDate dateFin) {
+                                                          String statut, LocalDate dateDebut, LocalDate dateFin,
+                                                          Integer joursRetardMin) {
         Pageable pageable = PageRequest.of(page, size,
                 org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdDate"));
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
@@ -249,6 +339,15 @@ public class CreditClientService {
                         dateFin.atTime(23, 59, 59)));
             }
 
+            // Filtre "en retard depuis plus de X jours" — basé sur dateEcheance,
+            // appliqué AVANT la pagination pour que "size" reste exact page par page.
+            if (joursRetardMin != null) {
+                predicates.add(cb.and(
+                        cb.isNotNull(root.get("dateEcheance")),
+                        cb.lessThan(root.get("dateEcheance"), LocalDate.now().minusDays(joursRetardMin))
+                ));
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
@@ -268,6 +367,99 @@ public class CreditClientService {
         return paiementCreditRepository.findByCreditOrderByCreatedDateDesc(credit).stream()
                 .map(PaiementCreditDto::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Passe un crédit en perte (le client ne paiera jamais).
+     *
+     * Effet :
+     *   - Le statut du crédit devient PERTE
+     *   - datePassageEnPerte = aujourd'hui (sert à attribuer la perte FIFO à la bonne période)
+     *   - Le montant restant est marqué comme perdu (resterDu × prorata FIFO côté stats)
+     *   - Les paiements déjà reçus restent dans le CA / caisse (intacts)
+     *   - Le crédit disparaît de la liste "actifs" (en_attente / partiel)
+     *   - Pas de mouvement de stock (la marchandise est déjà partie)
+     *
+     * Validation :
+     *   - Crédit doit être EN_ATTENTE ou PARTIEL (pas SOLDE ni déjà PERTE)
+     *   - Reste dû doit être > 0
+     */
+    @Transactional
+    public CreditClientDto passerEnPerte(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findByIdForUpdate(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(currentTenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+
+        if (credit.getStatut() == StatutCredit.SOLDE) {
+            throw new IllegalStateException("Ce crédit est déjà entièrement payé — on ne peut pas le passer en perte");
+        }
+        if (credit.getStatut() == StatutCredit.PERTE) {
+            throw new IllegalStateException("Ce crédit est déjà passé en perte");
+        }
+        if (credit.getMontantRestant() == null || credit.getMontantRestant().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Aucun reste dû sur ce crédit");
+        }
+
+        credit.setStatut(StatutCredit.PERTE);
+        credit.setDatePassageEnPerte(tenantService.todayInTenantTz());
+        creditClientRepository.save(credit);
+
+        return CreditClientDto.fromEntity(credit);
+    }
+
+    /**
+     * Aperçu de l'impact d'une suppression depuis le crédit.
+     * Délègue au VenteService — le crédit n'a de sens qu'avec sa vente.
+     */
+    @Transactional(readOnly = true)
+    public com.example.dijasaliou.dto.ImpactSuppressionVenteDto calculerImpactSuppressionDepuisCredit(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findById(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(tenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+        if (credit.getVente() == null) {
+            throw new IllegalStateException("Ce crédit n'a pas de vente associée — suppression impossible");
+        }
+        return venteService.calculerImpactSuppression(credit.getVente().getId());
+    }
+
+    /**
+     * Supprime un crédit en cascade — c'est-à-dire supprime la vente associée
+     * (qui à son tour supprime paiements + crédit + restaure stock).
+     *
+     * À utiliser après confirmation utilisateur (modale d'impact).
+     */
+    @Transactional
+    public void supprimerCreditEtVenteEnCascade(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findById(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(tenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+        if (credit.getVente() == null) {
+            throw new IllegalStateException("Ce crédit n'a pas de vente associée — suppression impossible");
+        }
+        // Délègue au VenteService qui supprime tout en cascade (paiements + crédit + vente + stock)
+        venteService.supprimerVenteEnCascade(credit.getVente().getId());
+    }
+
+    /** Détail d'un crédit (par id), filtré par tenant. */
+    @Transactional(readOnly = true)
+    public CreditClientDto obtenirCredit(String creditId) {
+        CreditClientEntity credit = creditClientRepository.findById(creditId)
+                .orElseThrow(() -> new RuntimeException("Crédit introuvable : " + creditId));
+        TenantEntity currentTenant = tenantService.getCurrentTenant();
+        if (!credit.getTenant().getTenantUuid().equals(currentTenant.getTenantUuid())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+        return CreditClientDto.fromEntity(credit);
     }
 
     @Transactional(readOnly = true)
@@ -290,6 +482,11 @@ public class CreditClientService {
      */
     @Transactional
     public void mettreAJourCreditDeLaVente(String venteId, BigDecimal newPrixTotal) {
+        mettreAJourCreditDeLaVente(venteId, newPrixTotal, null);
+    }
+
+    @Transactional
+    public void mettreAJourCreditDeLaVente(String venteId, BigDecimal newPrixTotal, LocalDate newDateEcheance) {
         List<CreditClientEntity> credits = creditClientRepository.findByVenteId(venteId);
         for (CreditClientEntity credit : credits) {
             if (credit.getStatut() != StatutCredit.SOLDE) {
@@ -306,6 +503,9 @@ public class CreditClientService {
 
                 credit.setMontantInitial(newPrixTotal);
                 credit.setMontantRestant(newMontantRestant);
+                if (newDateEcheance != null) {
+                    credit.setDateEcheance(newDateEcheance);
+                }
                 if (newMontantRestant.compareTo(BigDecimal.ZERO) == 0) {
                     credit.setStatut(StatutCredit.SOLDE);
                 }
@@ -428,7 +628,7 @@ public class CreditClientService {
         stats.put("montantInitialTotal", montantInitialTotal);
         stats.put("nombreCreditsActifs", creditClientRepository.countCreditsActifs(StatutCredit.SOLDE, tenantUuid));
         stats.put("nombreClientsCrediteurs", creditClientRepository.countClientsCrediteurs(StatutCredit.SOLDE, tenantUuid));
-        stats.put("creditsEnRetard", creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, LocalDate.now(), tenantUuid));
+        stats.put("creditsEnRetard", creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, tenantService.todayInTenantTz(), tenantUuid));
         stats.put("tauxRecouvrement", tauxRecouvrement);
         return stats;
     }

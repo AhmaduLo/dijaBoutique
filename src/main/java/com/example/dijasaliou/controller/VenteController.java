@@ -1,11 +1,14 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.dto.BeneficeStatistiquesDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.VenteDto;
+import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
+import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.service.DeviseService;
 import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.UserService;
@@ -36,13 +39,16 @@ public class VenteController {
 
     private final VenteService venteService;
     private final UserService userService;
+    private final AchatRepository achatRepository;
     private final TenantService tenantService;
     private final DeviseService deviseService;
 
     public VenteController(VenteService venteService, UserService userService,
-                           TenantService tenantService, DeviseService deviseService) {
+                           AchatRepository achatRepository, TenantService tenantService,
+                           DeviseService deviseService) {
         this.venteService = venteService;
         this.userService = userService;
+        this.achatRepository = achatRepository;
         this.tenantService = tenantService;
         this.deviseService = deviseService;
     }
@@ -66,8 +72,7 @@ public class VenteController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<VenteDto> obtenirParId(@PathVariable String id) {
-        VenteEntity vente = venteService.obtenirVenteParId(id);
-        return ResponseEntity.ok(VenteDto.fromEntity(vente));
+        return ResponseEntity.ok(venteService.obtenirVenteDtoParId(id));
     }
 
     /**
@@ -76,14 +81,36 @@ public class VenteController {
      * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PostMapping
-    public ResponseEntity<VenteDto> creer(
+    public ResponseEntity<Map<String, Object>> creer(
             @Valid @RequestBody VenteEntity vente,
             Authentication authentication) {
 
         UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
         VenteEntity venteCree = venteService.creerVente(vente, utilisateur);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(VenteDto.fromEntity(venteCree));
+        Map<String, Object> response = new HashMap<>();
+        response.put("vente", VenteDto.fromEntity(venteCree));
+
+        // Vérifier si la date de vente est avant le premier achat du produit
+        if (venteCree.getDateVente() != null) {
+            try {
+                TenantEntity tenant = tenantService.getCurrentTenant();
+                List<AchatEntity> achats = achatRepository.findByNomProduitAndTenant(
+                        venteCree.getNomProduit(), tenant);
+                if (!achats.isEmpty()) {
+                    AchatEntity premierAchat = achats.stream()
+                            .min((a, b) -> a.getDateAchat().compareTo(b.getDateAchat()))
+                            .orElse(null);
+                    if (premierAchat != null && venteCree.getDateVente().isBefore(premierAchat.getDateAchat())) {
+                        response.put("warning", "Attention : vous vendez ce produit avant sa date d'achat ("
+                                + premierAchat.getDateAchat().toLocalDate() + "). Cela peut affecter vos rapports.");
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -120,12 +147,42 @@ public class VenteController {
     }
 
     /**
-     * DELETE /api/ventes/{id}
+     * DELETE /api/ventes/{id}[?cascade=true]
+     *
+     * Sans cascade (par défaut) : suppression "safe" — bloque si crédit non soldé
+     * a des paiements en cours, sinon détache le crédit (laisse historique).
+     *
+     * Avec cascade=true : suppression COMPLÈTE — annule paiements crédit, supprime
+     * crédit, restaure stock, supprime vente. À utiliser après confirmation
+     * utilisateur (voir endpoint /impact-suppression pour l'aperçu).
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> supprimer(@PathVariable String id) {
-        venteService.supprimerVente(id);
+    public ResponseEntity<Void> supprimer(
+            @PathVariable String id,
+            @RequestParam(name = "cascade", defaultValue = "false") boolean cascade) {
+        if (cascade) {
+            venteService.supprimerVenteEnCascade(id);
+        } else {
+            venteService.supprimerVente(id);
+        }
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/ventes/{id}/impact-suppression
+     *
+     * Aperçu de ce qui se passera si le commerçant supprime cette vente en cascade :
+     *   - quantité à restaurer au stock
+     *   - paiements crédit à annuler (avec mode + montant)
+     *   - impact sur CA mensuel (mois actuel + mois passés affectés)
+     *
+     * Utilisé par le frontend pour afficher une modale claire AVANT confirmation.
+     */
+    @GetMapping("/{id}/impact-suppression")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    public ResponseEntity<com.example.dijasaliou.dto.ImpactSuppressionVenteDto> impactSuppression(
+            @PathVariable String id) {
+        return ResponseEntity.ok(venteService.calculerImpactSuppression(id));
     }
 
     /**
@@ -235,5 +292,37 @@ public class VenteController {
         stats.put("ventes", ventesDto);
 
         return ResponseEntity.ok(stats);
+    }
+
+    /**
+     * GET /api/ventes/sorties?debut=2026-06-01&fin=2026-06-30
+     *
+     * Liste détaillée des sorties hors vente (perte, vol, casse, don, crédit impayé)
+     * sur une période. Utilisée par la modale "Pertes" du frontend.
+     */
+    @GetMapping("/sorties")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    public ResponseEntity<List<VenteDto>> obtenirSorties(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        return ResponseEntity.ok(venteService.obtenirSortiesPeriode(debut, fin));
+    }
+
+    /**
+     * GET /api/ventes/benefice?debut=2026-06-01&fin=2026-06-07
+     *
+     * Statistiques de bénéfice net FIFO sur une période :
+     *   - chiffreAffaires, totalCoutAchat, beneficeNet, margePourcentage
+     *   - nbVentes, nbVentesAvecBenefice, nbVentesSansBenefice
+     *
+     * Utilisé par la carte "Bénéfice du jour / mois" dans l'UI Ventes.
+     */
+    @GetMapping("/benefice")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    public ResponseEntity<BeneficeStatistiquesDto> obtenirBenefice(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+
+        return ResponseEntity.ok(venteService.calculerStatistiquesBenefice(debut, fin));
     }
 }

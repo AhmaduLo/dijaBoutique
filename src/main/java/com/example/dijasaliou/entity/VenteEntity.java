@@ -50,7 +50,7 @@ public class VenteEntity  extends BaseEntity{
     private String nomProduit;
 
     @NotNull(message = "Le prix unitaire est obligatoire")
-    @DecimalMin(value = "0.01", message = "Le prix unitaire doit être supérieur à 0")
+    @DecimalMin(value = "0.00", message = "Le prix unitaire ne peut être négatif")
     @Column(name = "prix_unitaire", nullable = false, precision = 10, scale = 2)
     private BigDecimal prixUnitaire;
 
@@ -89,6 +89,10 @@ public class VenteEntity  extends BaseEntity{
     @Size(max = 500, message = "L'URL de la photo ne peut dépasser 500 caractères")
     @Column(name = "photo_url", length = 500)
     private String photoUrl;
+
+    @Size(max = 50, message = "Le code-barre ne peut dépasser 50 caractères")
+    @Column(name = "code_barre", length = 50)
+    private String codeBarre;
 
     @Size(max = 20, message = "L'unité ne peut dépasser 20 caractères")
     @Column(name = "unite", length = 20)
@@ -152,7 +156,7 @@ public class VenteEntity  extends BaseEntity{
     private LocalDate dateEcheance;  // reste LocalDate : l'échéance est une date, pas un instant
 
     public enum ModePaiementVente {
-        ESPECES, WAVE, ORANGE_MONEY, CREDIT;
+        ESPECES, WAVE, ORANGE_MONEY, VIREMENT, CREDIT;
 
         @com.fasterxml.jackson.annotation.JsonCreator
         public static ModePaiementVente fromString(String value) {
@@ -177,6 +181,42 @@ public class VenteEntity  extends BaseEntity{
     @Size(max = 36, message = "Le groupeVenteId ne peut dépasser 36 caractères")
     @Column(name = "groupe_vente_id", length = 36)
     private String groupeVenteId;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SORTIE HORS VENTE — perte, vol, casse, don, etc.
+    // Quand typeSortie != null, la ligne n'est PAS une vente commerciale :
+    //   - prixUnitaire = 0 (ou faible, ex. valeur symbolique d'un don)
+    //   - Le stock FIFO sort normalement (le bien quitte la boutique)
+    //   - Le CA et le bénéfice commercial ignorent cette ligne
+    //   - Le coût FIFO est comptabilisé séparément comme "pertes" dans les stats
+    // ─────────────────────────────────────────────────────────────────────────
+    public enum TypeSortie {
+        PERTE_CASSE,   // produit cassé, périmé, abîmé
+        VOL,           // disparu, volé
+        OFFERT,        // don / cadeau / échantillon
+        CREDIT_IMPAYE, // créance abandonnée (alimenté par le bouton "Passer en perte" sur un crédit)
+        AUTRE;         // motif libre — voir motifSortie
+
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public static TypeSortie fromString(String value) {
+            if (value == null || value.isBlank()) return null;
+            return TypeSortie.valueOf(value.toUpperCase());
+        }
+    }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_sortie", length = 30)
+    private TypeSortie typeSortie;
+
+    @Size(max = 255, message = "Le motif de sortie ne peut dépasser 255 caractères")
+    @Column(name = "motif_sortie", length = 255)
+    private String motifSortie;
+
+    /** true si cette ligne est une sortie hors vente (pas un CA). */
+    @Transient
+    public boolean estSortieHorsVente() {
+        return typeSortie != null;
+    }
 
 
 

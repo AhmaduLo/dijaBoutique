@@ -46,6 +46,13 @@ public class VenteDto {
     private String modePaiement;
     private Boolean estSoldee;
 
+    /**
+     * Date d'échéance du crédit associé (null si pas de crédit, ou crédit soldé).
+     * Vient de credits_clients.date_echeance — jamais de VenteEntity.dateEcheance
+     * qui est @Transient et n'est jamais persisté sur la vente elle-même.
+     */
+    private java.time.LocalDate dateEcheance;
+
     // Informations sur l'utilisateur qui a créé la vente
     private UserDto utilisateur;
 
@@ -54,6 +61,19 @@ public class VenteDto {
     private Integer mois;
     private Integer annee;
     private Boolean aUnClient;
+
+    // Sortie hors vente (perte, vol, casse, don, crédit impayé)
+    // null quand c'est une vente commerciale classique
+    private String typeSortie;
+    private String motifSortie;
+
+    /**
+     * Statut du crédit associé (null si pas de crédit ou crédit dénormalisé).
+     * Valeurs possibles : EN_ATTENTE, PARTIEL, SOLDE, PERTE.
+     * Sert au frontend pour afficher "Crédit perdu" plutôt que "CREDIT" sur les ventes
+     * dont le crédit a été passé en perte.
+     */
+    private String creditStatut;
 
     /**
      * Convertit une entité Vente en DTO
@@ -93,6 +113,44 @@ public class VenteDto {
                 .mois(vente.getMois())
                 .annee(vente.getAnnee())
                 .aUnClient(vente.aUnClient())
+                .typeSortie(vente.getTypeSortie() != null ? vente.getTypeSortie().name() : null)
+                .motifSortie(vente.getMotifSortie())
+                .build();
+    }
+
+    /**
+     * Construit un VenteDto "virtuel" à partir d'un crédit passé en perte.
+     * Utilisé par la modale Pertes pour afficher les créances irrécouvrables
+     * à côté des vraies sorties hors vente, avec la même structure.
+     *
+     * - typeSortie = CREDIT_IMPAYE
+     * - motifSortie = nom client + montant restant non payé
+     * - dateVente = datePassageEnPerte (pas la date de la vente originale)
+     * - id = id du crédit
+     * - quantite/produit : repris de la vente originale pour traçabilité
+     */
+    public static VenteDto fromCreditPerdu(com.example.dijasaliou.entity.CreditClientEntity credit) {
+        if (credit == null) return null;
+        VenteEntity vente = credit.getVente();
+        String nomClient = credit.getClient() != null ? credit.getClient().getNom() : "Client inconnu";
+        java.math.BigDecimal restantDu = credit.getMontantRestant() != null ? credit.getMontantRestant() : java.math.BigDecimal.ZERO;
+
+        return VenteDto.builder()
+                .id(credit.getId())
+                .quantite(vente != null ? vente.getQuantite() : 0.0)
+                .nomProduit(vente != null ? vente.getNomProduit() : "—")
+                .prixUnitaire(java.math.BigDecimal.ZERO)
+                .prixTotal(java.math.BigDecimal.ZERO)
+                .dateVente(credit.getDatePassageEnPerte() != null
+                        ? credit.getDatePassageEnPerte().atStartOfDay()
+                        : null)
+                .client(nomClient)
+                .unite(vente != null ? vente.getUnite() : "pièce")
+                .typeSortie("CREDIT_IMPAYE")
+                .motifSortie(String.format("%s — reste dû %s CFA",
+                        nomClient,
+                        restantDu.setScale(0, java.math.RoundingMode.HALF_UP)))
+                .creditStatut("PERTE")
                 .build();
     }
 
@@ -130,6 +188,8 @@ public class VenteDto {
                 .mois(vente.getMois())
                 .annee(vente.getAnnee())
                 .aUnClient(vente.aUnClient())
+                .typeSortie(vente.getTypeSortie() != null ? vente.getTypeSortie().name() : null)
+                .motifSortie(vente.getMotifSortie())
                 .build();
     }
 }

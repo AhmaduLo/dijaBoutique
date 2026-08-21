@@ -69,7 +69,6 @@ public class PaymentController {
     @GetMapping("/subscription")
     public ResponseEntity<SubscriptionStatusResponse> getSubscriptionStatus(Authentication authentication) {
         String email = authentication.getName();
-        log.info("Utilisateur {} consulte son abonnement", email);
 
         // SUPER_ADMIN n'a pas de tenant - retourner un statut actif permanent
         boolean isSuperAdmin = authentication.getAuthorities().stream()
@@ -92,7 +91,7 @@ public class PaymentController {
         Boolean essaiGratuit = tenant.essaiGratuitValide();
 
         if (essaiGratuit) {
-            dateExpirationAffichee = tenant.getDateDebutEssai().plusDays(14);
+            dateExpirationAffichee = tenant.getDateDebutEssai().plusDays(TenantEntity.DUREE_ESSAI_JOURS);
             LocalDateTime now = LocalDateTime.now();
             Duration duration = Duration.between(now, dateExpirationAffichee);
             joursRestants = duration.toDays();
@@ -118,6 +117,8 @@ public class PaymentController {
             message = String.format("Abonnement %s actif - %d jours restants", tenant.getPlan().getLibelle(), joursRestants);
         }
 
+        // Date de début de l'abonnement = dateDebutEssai (mis à jour par SuperAdminService
+        // à chaque activation via changerPlan ou validerPaiement)
         SubscriptionStatusResponse response = SubscriptionStatusResponse.builder()
                 .plan(tenant.getPlan().name())
                 .actif(tenant.getActif())
@@ -126,6 +127,9 @@ public class PaymentController {
                 .essaiGratuit(essaiGratuit)
                 .estExpire(estExpire)
                 .message(message)
+                .dateCreation(tenant.getDateCreation())
+                .dateDebutEssai(tenant.getDateDebutEssai())
+                .dateDebutAbonnement(tenant.getDateDebutEssai())
                 .build();
 
         return ResponseEntity.ok(response);
@@ -171,6 +175,12 @@ public class PaymentController {
         log.info("Réception webhook Wave");
 
         try {
+            // Rejeter si aucune signature et que le secret est configuré (production)
+            if ((signature == null || signature.isEmpty()) && waveService.isSignatureRequired()) {
+                log.error("❌ SÉCURITÉ: Webhook Wave reçu SANS signature en production !");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Signature manquante");
+            }
+
             boolean isSignatureValid = waveService.verifyWebhookSignature(payload, signature);
 
             if (!isSignatureValid) {

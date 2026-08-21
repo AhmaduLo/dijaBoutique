@@ -32,9 +32,21 @@ public class StockDto {
     private String photoUrl;
 
     /**
+     * Code-barre du produit (EAN-13, EAN-8, UPC-A, etc.)
+     */
+    private String codeBarre;
+
+    /**
      * Unité de mesure du produit (pièce, kg, litre, mètre, etc.)
      */
     private String unite;
+
+    /**
+     * Catégorie du produit — remontée depuis le dernier achat non vide.
+     * Utilisée par l'autocomplétion nom-produit en multi-achat pour
+     * pré-remplir la catégorie du nouvel achat.
+     */
+    private String categorie;
 
     /**
      * Quantité totale achetée
@@ -70,6 +82,19 @@ public class StockDto {
      * Marge moyenne par unité (prix vente - prix achat)
      */
     private BigDecimal margeUnitaire;
+
+    /**
+     * Bénéfice net total réalisé sur ce produit (FIFO).
+     * Somme des benefice_total_ligne des lignes vente_lot_consommation.
+     * Inclut UNIQUEMENT les ventes qui ont eu un calcul FIFO valide.
+     */
+    private BigDecimal beneficeTotal;
+
+    /**
+     * Quantité vendue avec un bénéfice calculé (peut être < quantiteVendue
+     * si certaines ventes n'ont pas trouvé de lot d'achat).
+     */
+    private Double quantiteVendueAvecBenefice;
 
     /**
      * Statut du stock

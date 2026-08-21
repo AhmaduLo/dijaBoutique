@@ -39,6 +39,14 @@ import java.util.UUID;
 @EqualsAndHashCode(exclude = {"utilisateurs", "notes"})
 public class TenantEntity {
 
+    /**
+     * Durée de l'essai gratuit BUSINESS offert à l'inscription, en jours.
+     * Source unique de vérité — utilisée par essaiGratuitValide(), par
+     * AuthService (set dateExpiration), par CleanupService (rétrogradation),
+     * et par PaymentController (affichage des jours restants).
+     */
+    public static final int DUREE_ESSAI_JOURS = 30;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -83,10 +91,37 @@ public class TenantEntity {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
+    /**
+     * Texte libre "Conditions et garanties" imprimé en bas de la facture A4.
+     * Vide ou null → le bloc n'apparaît pas sur la facture.
+     * Édité depuis Paramètres → Entreprise, persiste pour toutes les ventes futures.
+     */
+    @Column(name = "conditions_garanties", columnDefinition = "TEXT")
+    private String conditionsGaranties;
+
+    /**
+     * Texte libre "Mentions légales" imprimé en bas de la facture A4, sous les conditions.
+     * Pénalités de retard, juridiction compétente, TVA, escompte, etc.
+     * Vide ou null → le bloc n'apparaît pas sur la facture.
+     */
+    @Column(name = "mentions_legales", columnDefinition = "TEXT")
+    private String mentionsLegales;
+
     /** Devise préférée de cette boutique (code ISO ex: XOF, EUR, USD). Chaque boutique a la sienne. */
     @Column(name = "devise_preferee", length = 10)
     @Builder.Default
     private String devisePreferee = "XOF";
+
+    /**
+     * Fuseau horaire IANA du tenant (ex: "Africa/Dakar", "Europe/Paris").
+     * Utilisé pour toutes les dates métier server-side : activation caisse,
+     * transferts, mouvements manuels, paiements crédit.
+     *
+     * Défaut : "Africa/Dakar" (Sénégal UTC+0, couvre toute l'Afrique de l'Ouest).
+     */
+    @Column(name = "timezone", nullable = false, length = 64)
+    @Builder.Default
+    private String timezone = "Africa/Dakar";
 
     /**
      * Permet de désactiver un tenant temporairement (suspension réversible)
@@ -112,7 +147,7 @@ public class TenantEntity {
     private LocalDateTime dateCreation;
 
     /**
-     * ESSAI GRATUIT : Date de début de l'essai gratuit de 14 jours
+     * ESSAI GRATUIT : Date de début de l'essai gratuit (durée = DUREE_ESSAI_JOURS)
      * Automatiquement définie lors de l'inscription
      */
     @Column(name = "date_debut_essai")
@@ -167,8 +202,8 @@ public class TenantEntity {
     public enum Plan {
         GRATUIT("Plan Gratuit", "Paiement requis - Aucun accès aux fonctionnalités", 0, 0, 0, false),
         STARTER("Plan Starter", "Gestion complète boutique - 3 utilisateurs", 9.99, 5000, 3, true),
-        PRO("Plan Pro", "Pour moyennes entreprises", 29.99, 15000, 10, true),
-        BUSINESS("Plan Business", "Pour grandes entreprises", 99.99, 25000, Integer.MAX_VALUE, true);
+        PRO("Plan Pro", "Pour moyennes entreprises", 29.99, 10000, 10, true),
+        BUSINESS("Plan Business", "Pour grandes entreprises", 99.99, 15000, 20, true);
 
         private final String libelle;
         private final String description;
@@ -252,7 +287,7 @@ public class TenantEntity {
     }
 
     /**
-     * Vérifie si l'essai gratuit de 14 jours est encore valide
+     * Vérifie si l'essai gratuit (durée = {@link #DUREE_ESSAI_JOURS}) est encore valide
      *
      * @return true si l'essai est encore valide, false sinon
      */
@@ -267,8 +302,8 @@ public class TenantEntity {
             return false;
         }
 
-        // Calculer la date de fin de l'essai (14 jours après le début)
-        LocalDateTime dateFinEssai = dateDebutEssai.plusDays(14);
+        // Date de fin = début + DUREE_ESSAI_JOURS
+        LocalDateTime dateFinEssai = dateDebutEssai.plusDays(DUREE_ESSAI_JOURS);
 
         // Vérifier si on est encore dans la période d'essai
         return LocalDateTime.now().isBefore(dateFinEssai);

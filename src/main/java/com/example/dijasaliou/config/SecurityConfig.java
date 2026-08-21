@@ -111,7 +111,7 @@ public class SecurityConfig {
 
 
                         // Routes de gestion des fichiers
-                        .requestMatchers("/files/upload").hasAuthority("ADMIN") // Upload réservé aux ADMIN
+                        .requestMatchers("/files/upload").hasAnyAuthority("USER", "GERANT", "ADMIN") // Upload photos pour tous les utilisateurs
                         .requestMatchers("/files/photos/**").authenticated() // Récupération des photos pour tous les utilisateurs authentifiés
                         .requestMatchers("/files/health").permitAll() // Health check public
 
@@ -124,12 +124,23 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/tenant/info").authenticated() // Info entreprise pour factures (lecture)
                         .requestMatchers("/contact").authenticated() // Formulaire de contact
                         .requestMatchers("/config/**").authenticated() // Config publique (WhatsApp support, etc.)
+                        .requestMatchers("/categories-reference").authenticated() // Liste catégories pour menu déroulant
+                        .requestMatchers("/notifications/**").authenticated() // Notifications in-app pour tous les utilisateurs
 
                         // Routes accessibles aux GERANT et ADMIN : achats (lecture accessible à USER pour voir les produits)
                         .requestMatchers(HttpMethod.GET, "/achats/**").hasAnyAuthority("USER", "GERANT", "ADMIN") // USER peut lire les achats
                         .requestMatchers(HttpMethod.POST, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent créer
                         .requestMatchers(HttpMethod.PUT, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent modifier
                         .requestMatchers(HttpMethod.DELETE, "/achats/**").hasAnyAuthority("GERANT", "ADMIN") // Seuls GERANT/ADMIN peuvent supprimer
+
+                        // Routes production (produits fabriqués) : mêmes règles que les achats classiques,
+                        // puisqu'une production crée/modifie un lot d'achat en interne.
+                        .requestMatchers(HttpMethod.GET, "/productions/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/productions/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/productions/**").hasAnyAuthority("GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/produits-fabriques/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/produits-fabriques/**").hasAnyAuthority("GERANT", "ADMIN")
+
                         .requestMatchers("/depenses/**").hasAnyAuthority("GERANT", "ADMIN")
                         .requestMatchers("/tenant/**").hasAnyAuthority("GERANT", "ADMIN")
 
@@ -147,6 +158,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/clients/**").hasAnyAuthority("GERANT", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/clients/**").hasAnyAuthority("ADMIN")
                         .requestMatchers("/credits/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
+
+                        // Routes code-barre : scan accessible à tous les utilisateurs authentifiés
+                        .requestMatchers("/codebarre/**").hasAnyAuthority("USER", "GERANT", "ADMIN")
 
                         // Routes devises : lecture accessible à tous, modification ADMIN uniquement
                         .requestMatchers("/devises/**").authenticated()

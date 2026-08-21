@@ -1,7 +1,10 @@
 package com.example.dijasaliou.exception;
 
 import com.example.dijasaliou.aspect.PlanRestrictionAspect;
+import com.example.dijasaliou.service.SystemNotificationsService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +12,8 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -25,6 +30,10 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    /** Injection facultative : ne casse pas le démarrage si le service n'est pas dispo. */
+    @Autowired(required = false)
+    private SystemNotificationsService systemNotificationsService;
 
     /**
      * Gestion des restrictions de plan d'abonnement (@RequiresPlan)
@@ -194,6 +203,59 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Gestion des uploads dont la partie multipart attendue (ex: "file") est absente.
+     * Cas typique : formulaire d'upload de photo. Le message reste actionnable pour
+     * le client (retenter), mais surtout on logge les infos de la requête entrante
+     * (Content-Type, Content-Length) — normalement absentes des logs par défaut de
+     * Spring pour cette exception — pour pouvoir diagnostiquer les cas où le fichier
+     * semble valide côté client mais n'arrive jamais entier côté serveur.
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingServletRequestPart(
+            MissingServletRequestPartException ex, HttpServletRequest request) {
+        long contentLength = request.getContentLengthLong();
+        log.error("[UPLOAD] Partie multipart '{}' manquante — URI={}, Content-Type={}, Content-Length={}",
+                ex.getRequestPartName(), request.getRequestURI(),
+                request.getContentType(), contentLength);
+
+        // Content-Length à 0 avec un Content-Type multipart valide (boundary présent) veut dire
+        // que le navigateur a bien entamé la requête mais n'a jamais pu y attacher les octets du
+        // fichier. Cas observé en pratique : stockage de l'appareil (iPhone) presque plein, qui
+        // empêche iOS/Safari d'écrire les fichiers temporaires nécessaires à l'envoi (notamment la
+        // conversion HEIC → JPEG). Un vrai souci réseau tronque la requête en cours de route et
+        // laisse un Content-Length positif mais incomplet, d'où le message différent ci-dessous.
+        String message = contentLength == 0
+                ? "Le fichier n'a pas pu être envoyé (il semble vide). Si vous êtes sur téléphone, vérifiez l'espace de stockage disponible sur l'appareil, puis réessayez."
+                : "Le fichier n'a pas été reçu correctement. Vérifiez votre connexion et réessayez.";
+
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
+        errorResponse.put("error", "Fichier manquant");
+        errorResponse.put("message", message);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    /**
+     * Fichier trop volumineux (dépasse spring.servlet.multipart.max-file-size/max-request-size).
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        log.warn("[UPLOAD] Taille maximale dépassée — URI={}, Content-Length={}",
+                request.getRequestURI(), request.getContentLengthLong());
+
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
+        errorResponse.put("error", "Fichier trop volumineux");
+        errorResponse.put("message", "Le fichier dépasse la taille maximale autorisée (5 MB).");
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    /**
      * Gestion de toutes les autres exceptions
      * SÉCURITÉ : Message générique au client, détails complets loggés serveur uniquement
      */
@@ -201,6 +263,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {
         // Logger l'exception complète côté serveur (visible seulement dans les logs)
         log.error("Exception non gérée: {}", ex.getMessage(), ex);
+
+        if (systemNotificationsService != null) {
+            systemNotificationsService.recordError();
+        }
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());

@@ -69,6 +69,18 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
     Page<TenantEntity> findByDeletedFalse(Pageable pageable);
 
     /**
+     * Recherche paginée par nom d'entreprise ou email admin — pour SuperAdmin
+     */
+    @Query("SELECT DISTINCT t FROM TenantEntity t LEFT JOIN UserEntity u ON u.tenant = t AND u.role = 'ADMIN' AND u.deleted = false " +
+           "WHERE t.deleted = false AND " +
+           "(:search IS NULL OR LOWER(t.nomEntreprise) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.nom) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.prenom) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR t.numeroTelephone LIKE CONCAT('%', :search, '%'))")
+    Page<TenantEntity> findByDeletedFalseWithSearch(@Param("search") String search, Pageable pageable);
+
+    /**
      * Liste complète sans pagination — pour les stats (exclut les tenants supprimés)
      */
     List<TenantEntity> findByDeletedFalse();
@@ -80,10 +92,64 @@ public interface TenantRepository extends JpaRepository<TenantEntity, Long> {
     long countByEssaiUtiliseTrueAndPlanNot(TenantEntity.Plan plan);
 
     /**
-     * Trouve les tenants dont l'essai BUSINESS est expiré (> 14 jours)
+     * Trouve les tenants dont l'essai BUSINESS est expiré (> DUREE_ESSAI_JOURS)
      * et qui n'ont pas encore payé (essaiUtilise=false, pas supprimés)
      * Utilisé par CleanupService pour rétrograder vers GRATUIT chaque nuit.
      */
     @Query("SELECT t FROM TenantEntity t WHERE t.plan = :plan AND t.essaiUtilise = false AND t.deleted = false AND t.dateDebutEssai < :cutoff")
     List<TenantEntity> findExpiredTrials(@Param("plan") TenantEntity.Plan plan, @Param("cutoff") LocalDateTime cutoff);
+
+    /**
+     * Tenants actifs (non supprimés, non suspendus) dont l'abonnement expire
+     * dans une fenêtre de temps donnée. Utilisé pour notifier le super admin
+     * X jours avant l'expiration.
+     */
+    @Query("SELECT t FROM TenantEntity t WHERE t.deleted = false AND t.actif = true " +
+           "AND t.dateExpiration IS NOT NULL " +
+           "AND t.dateExpiration BETWEEN :debut AND :fin")
+    List<TenantEntity> findExpiringBetween(@Param("debut") LocalDateTime debut,
+                                            @Param("fin") LocalDateTime fin);
+
+    /**
+     * Tenants dont AU MOINS UN utilisateur s'est connecté après :seuil.
+     * Utilisé pour les filtres d'activité (aujourd'hui / semaine / mois).
+     */
+    @Query("SELECT DISTINCT t FROM TenantEntity t " +
+           "JOIN UserEntity u ON u.tenant = t AND u.deleted = false " +
+           "WHERE t.deleted = false AND u.derniereConnexion >= :seuil")
+    List<TenantEntity> findActiveSince(@Param("seuil") LocalDateTime seuil);
+
+    /**
+     * Tenants dont AUCUN utilisateur ne s'est connecté depuis :seuil
+     * (ou jamais connecté du tout). Filtre "inactifs depuis X jours".
+     */
+    @Query("SELECT t FROM TenantEntity t WHERE t.deleted = false AND t.id NOT IN (" +
+           "  SELECT DISTINCT t2.id FROM TenantEntity t2 " +
+           "  JOIN UserEntity u ON u.tenant = t2 AND u.deleted = false " +
+           "  WHERE u.derniereConnexion >= :seuil" +
+           ")")
+    List<TenantEntity> findInactiveSince(@Param("seuil") LocalDateTime seuil);
+
+    /**
+     * Comptes "fantômes" : créés AVANT :seuilCreation et dont AUCUN utilisateur
+     * ne s'est JAMAIS connecté (derniereConnexion = null pour tous les users).
+     */
+    @Query("SELECT t FROM TenantEntity t WHERE t.deleted = false " +
+           "AND t.dateCreation < :seuilCreation " +
+           "AND NOT EXISTS (" +
+           "  SELECT 1 FROM UserEntity u WHERE u.tenant = t AND u.deleted = false " +
+           "  AND u.derniereConnexion IS NOT NULL" +
+           ")")
+    List<TenantEntity> findFantomes(@Param("seuilCreation") LocalDateTime seuilCreation);
+
+    /**
+     * IDs des tenants dont l'admin propriétaire a vérifié son adresse email.
+     * Utilisé par le super admin pour filtrer la liste.
+     */
+    @Query("SELECT DISTINCT t.id FROM TenantEntity t " +
+           "JOIN UserEntity u ON u.tenant = t " +
+           "WHERE t.deleted = false AND u.deleted = false " +
+           "AND u.role = com.example.dijasaliou.entity.UserEntity.Role.ADMIN " +
+           "AND u.emailVerifie = true")
+    List<Long> findTenantIdsWithVerifiedEmail();
 }

@@ -84,7 +84,7 @@ public class SubscriptionExpirationFilter extends OncePerRequestFilter {
      * Vérifie si l'abonnement est expiré
      *
      * NOUVELLE LOGIQUE AVEC ESSAI GRATUIT :
-     * - Si le tenant a un essai gratuit valide (14 jours), l'accès est autorisé
+     * - Si le tenant a un essai gratuit valide, l'accès est autorisé
      * - Sinon, on vérifie la date d'expiration de l'abonnement payant
      */
     private boolean isSubscriptionExpired(TenantEntity tenant) {

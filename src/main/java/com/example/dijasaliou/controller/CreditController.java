@@ -65,9 +65,10 @@ public class CreditController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String statut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+            @RequestParam(required = false) Integer joursRetardMin) {
         if (size > 100) size = 100;
-        return ResponseEntity.ok(creditClientService.obtenirCredits(page, size, search, statut, dateDebut, dateFin));
+        return ResponseEntity.ok(creditClientService.obtenirCredits(page, size, search, statut, dateDebut, dateFin, joursRetardMin));
     }
 
     @GetMapping("/client/{id}")
@@ -94,6 +95,7 @@ public class CreditController {
                 request.getMontant(),
                 request.getModePaiement(),
                 request.getNote(),
+                request.getDatePaiement(),
                 employe);
         return ResponseEntity.ok(result);
     }
@@ -103,6 +105,59 @@ public class CreditController {
     @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
     public ResponseEntity<List<PaiementCreditDto>> obtenirPaiements(@PathVariable String id) {
         return ResponseEntity.ok(creditClientService.obtenirPaiements(id));
+    }
+
+    /**
+     * POST /api/credits/{id}/passer-en-perte
+     *
+     * Le commerçant indique qu'il abandonne ce crédit (le client ne paiera jamais).
+     * Le reste dû devient une perte FIFO de catégorie CREDIT_IMPAYE dans les stats,
+     * mais les paiements déjà reçus restent dans le CA / la caisse.
+     */
+    @PostMapping("/{id}/passer-en-perte")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<CreditClientDto> passerEnPerte(@PathVariable String id, Authentication auth) {
+        log.info("Crédit #{} passé en perte par {}", id, auth.getName());
+        return ResponseEntity.ok(creditClientService.passerEnPerte(id));
+    }
+
+    /** GET /api/credits/{id} — détail d'un crédit (utilisé par certains refresh frontend). */
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<CreditClientDto> obtenirCredit(@PathVariable String id) {
+        return ResponseEntity.ok(creditClientService.obtenirCredit(id));
+    }
+
+    /**
+     * GET /api/credits/{id}/impact-suppression
+     *
+     * Aperçu de l'impact d'une suppression du crédit (= suppression de la vente liée).
+     * Délègue au VenteService car le crédit n'a de sens que dans le contexte de sa vente.
+     */
+    @GetMapping("/{id}/impact-suppression")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<com.example.dijasaliou.dto.ImpactSuppressionVenteDto> impactSuppressionDepuisCredit(
+            @PathVariable String id) {
+        return ResponseEntity.ok(creditClientService.calculerImpactSuppressionDepuisCredit(id));
+    }
+
+    /**
+     * DELETE /api/credits/{id}
+     *
+     * Supprime le crédit ET la vente associée en cascade (paiements + crédit +
+     * vente + restauration stock). Le frontend doit afficher la modale de
+     * confirmation avant d'appeler cet endpoint.
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'GERANT')")
+    @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS})
+    public ResponseEntity<Void> supprimerCredit(@PathVariable String id, Authentication auth) {
+        log.info("Suppression cascade du crédit #{} (et vente associée) par {}", id, auth.getName());
+        creditClientService.supprimerCreditEtVenteEnCascade(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/stats")

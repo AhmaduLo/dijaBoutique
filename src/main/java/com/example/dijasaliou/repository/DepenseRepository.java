@@ -26,7 +26,8 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
     // Recherche par date
     List<DepenseEntity> findByDateDepense(LocalDateTime date);
 
-    List<DepenseEntity> findByDateDepenseBetween(LocalDateTime debut, LocalDateTime fin);
+    @Query("SELECT d FROM DepenseEntity d JOIN FETCH d.utilisateur JOIN FETCH d.tenant WHERE d.dateDepense BETWEEN :debut AND :fin ORDER BY d.dateDepense DESC, d.id DESC")
+    List<DepenseEntity> findByDateDepenseBetween(@Param("debut") LocalDateTime debut, @Param("fin") LocalDateTime fin);
 
     // Recherche par récurrence
     List<DepenseEntity> findByEstRecurrente(Boolean estRecurrente);
@@ -54,7 +55,7 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
     /**
      * Recherche paginée avec filtre tenant EXPLICITE.
      */
-    @Query(value = "SELECT d FROM DepenseEntity d WHERE " +
+    @Query(value = "SELECT d FROM DepenseEntity d JOIN FETCH d.utilisateur JOIN FETCH d.tenant WHERE " +
            "d.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(d.libelle) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:categorie IS NULL OR d.categorie = :categorie) " +
@@ -67,4 +68,38 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
                                           @Param("search") String search,
                                           @Param("categorie") DepenseEntity.CategorieDepense categorie,
                                           Pageable pageable);
+
+    /**
+     * Somme des dépenses pour un mode de paiement, entre deux dates.
+     * Utilisé par le module Caisse pour calculer les sorties par compte
+     * (avec borne supérieure pour les snapshots).
+     */
+    @Query("""
+            SELECT COALESCE(SUM(d.montant), 0)
+            FROM DepenseEntity d
+            WHERE d.tenant = :tenant
+              AND d.modePaiement = :modePaiement
+              AND d.dateDepense >= :debut
+              AND d.dateDepense <= :fin
+            """)
+    BigDecimal sumByModePaiementBetween(
+            @Param("tenant") TenantEntity tenant,
+            @Param("modePaiement") com.example.dijasaliou.entity.ModePaiementCaisse modePaiement,
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
+
+    /** Optimisation caisse : total dépenses GROUPÉ par mode en une seule query. */
+    @Query("""
+            SELECT d.modePaiement, COALESCE(SUM(d.montant), 0)
+            FROM DepenseEntity d
+            WHERE d.tenant = :tenant
+              AND d.dateDepense >= :debut
+              AND d.dateDepense <= :fin
+              AND d.modePaiement IS NOT NULL
+            GROUP BY d.modePaiement
+            """)
+    java.util.List<Object[]> sumByModePaiementGrouped(
+            @Param("tenant") TenantEntity tenant,
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
 }

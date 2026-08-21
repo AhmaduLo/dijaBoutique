@@ -821,6 +821,7 @@ public class RapportService {
             case "ESPECES"      -> "Espèces";
             case "WAVE"         -> "Wave";
             case "ORANGE_MONEY" -> "Orange Money";
+            case "VIREMENT"     -> "Virement";
             case "CREDIT"       -> "Crédit";
             default             -> mode;
         };

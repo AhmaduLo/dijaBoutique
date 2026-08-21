@@ -14,11 +14,13 @@ import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.PlatformConfigService;
 import com.example.dijasaliou.service.SuperAdminService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -57,8 +59,16 @@ public class SuperAdminController {
      */
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStats(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les stats globales", auth.getName());
         return ResponseEntity.ok(superAdminService.getGlobalStats());
+    }
+
+    /**
+     * GET /superadmin/stats/monitoring
+     * Monitoring : utilisateurs connectés, dernières connexions, taille BDD, connexions actives
+     */
+    @GetMapping("/stats/monitoring")
+    public ResponseEntity<Map<String, Object>> getMonitoring(Authentication auth) {
+        return ResponseEntity.ok(superAdminService.getMonitoringStats());
     }
 
     /**
@@ -69,10 +79,65 @@ public class SuperAdminController {
     public ResponseEntity<PagedResponse<TenantAdminDto>> getAllTenants(
             Authentication auth,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        log.info("[SUPER_ADMIN] {} consulte tous les tenants", auth.getName());
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String activite,
+            @RequestParam(required = false) String emailVerifie,
+            @RequestParam(required = false) String aVendu,
+            @RequestParam(required = false) String statut,
+            @RequestParam(required = false) String plan,
+            @RequestParam(defaultValue = "false") boolean expiringSoon) {
         if (size > 100) size = 100;
-        return ResponseEntity.ok(superAdminService.getAllTenants(page, size));
+        return ResponseEntity.ok(superAdminService.getAllTenants(
+                page, size, search, activite, emailVerifie, aVendu, statut, plan, expiringSoon));
+    }
+
+    /**
+     * GET /superadmin/tenants/stats
+     * Compteurs pour les filtres : total, vérifiés/non vérifiés, ont vendu/pas vendu.
+     * Léger, à appeler au chargement de la liste pour afficher les compteurs dans les sélecteurs.
+     */
+    @GetMapping("/tenants/stats")
+    public ResponseEntity<Map<String, Long>> getTenantsStats() {
+        return ResponseEntity.ok(superAdminService.getTenantsStats());
+    }
+
+    /**
+     * GET /superadmin/stats/activity
+     * Stats d'activité d'usage : combien d'utilisateurs uniques connectés
+     * aujourd'hui / semaine / mois, nombre de comptes fantômes, etc.
+     */
+    @GetMapping("/stats/activity")
+    public ResponseEntity<Map<String, Object>> getActivityStats() {
+        return ResponseEntity.ok(superAdminService.getActivityStats());
+    }
+
+    /**
+     * GET /superadmin/tenants/fantomes
+     * Liste des comptes "fantômes" : créés > 5 mois, jamais connectés.
+     */
+    @GetMapping("/tenants/fantomes")
+    public ResponseEntity<List<TenantAdminDto>> getFantomes() {
+        return ResponseEntity.ok(superAdminService.getFantomes());
+    }
+
+    /**
+     * POST /superadmin/tenants/batch-delete
+     * Suppression en masse de tenants (soft-delete).
+     * Body : { "ids": [1, 2, 3, ...] }
+     */
+    @PostMapping("/tenants/batch-delete")
+    public ResponseEntity<Map<String, Object>> batchDeleteTenants(
+            @RequestBody Map<String, List<Long>> body,
+            Authentication auth) {
+        List<Long> ids = body.get("ids");
+        log.info("[SUPER_ADMIN] {} supprime en masse {} tenant(s)", auth.getName(), ids != null ? ids.size() : 0);
+        int supprimes = superAdminService.supprimerTenantsBatch(ids);
+        return ResponseEntity.ok(Map.of(
+                "supprimes", supprimes,
+                "demandes", ids != null ? ids.size() : 0,
+                "message", supprimes + " tenant(s) supprimé(s) sur " + (ids != null ? ids.size() : 0)
+        ));
     }
 
     /**
@@ -81,7 +146,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/supprimes")
     public ResponseEntity<List<TenantAdminDto>> getTenantsSupprimés(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les tenants supprimés", auth.getName());
         return ResponseEntity.ok(superAdminService.getSupprimesTenants());
     }
 
@@ -91,7 +155,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}")
     public ResponseEntity<TenantAdminDto> getTenant(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte le tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getTenantById(id));
     }
 
@@ -181,8 +244,35 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}/utilisateurs")
     public ResponseEntity<List<UtilisateurTenantDto>> getUtilisateurs(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les utilisateurs du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getUtilisateursByTenant(id));
+    }
+
+    /**
+     * POST /superadmin/tenants/{tenantId}/utilisateurs/{userId}/resend-verification
+     * Renvoie l'email de vérification à un utilisateur (support super admin)
+     */
+    @PostMapping("/tenants/{tenantId}/utilisateurs/{userId}/resend-verification")
+    public ResponseEntity<Map<String, String>> resendVerification(
+            @PathVariable Long tenantId,
+            @PathVariable Long userId,
+            Authentication auth) {
+        log.info("[SUPER_ADMIN] {} renvoie l'email de vérification à userId={} (tenant={})",
+                auth.getName(), userId, tenantId);
+        superAdminService.resendVerificationEmailForUser(tenantId, userId);
+        return ResponseEntity.ok(Map.of("message", "Email de vérification renvoyé avec succès."));
+    }
+
+    /**
+     * POST /superadmin/users/resend-verification-bulk?since=YYYY-MM-DD
+     * Renvoie en masse l'email de vérification à tous les comptes non-vérifiés inscrits depuis `since`.
+     */
+    @PostMapping("/users/resend-verification-bulk")
+    public ResponseEntity<Map<String, Object>> resendVerificationBulk(
+            @RequestParam("since") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate since,
+            Authentication auth) {
+        log.info("[SUPER_ADMIN] {} déclenche le renvoi en masse des emails de vérification depuis {}",
+                auth.getName(), since);
+        return ResponseEntity.ok(superAdminService.resendVerificationEmailToAllUnverified(since.atStartOfDay()));
     }
 
     /**
@@ -191,7 +281,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}/notes")
     public ResponseEntity<List<NoteInterne>> getNotes(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les notes du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getNotesByTenant(id));
     }
 
@@ -245,7 +334,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}/audit")
     public ResponseEntity<List<AuditLogDto>> getAuditLogs(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte l'audit du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getAuditLogs(id));
     }
 
@@ -255,7 +343,6 @@ public class SuperAdminController {
      */
     @GetMapping("/tenants/{id}/factures")
     public ResponseEntity<List<FactureDto>> getFactures(@PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les factures du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getFacturesByTenant(id));
     }
 
@@ -295,7 +382,6 @@ public class SuperAdminController {
     @GetMapping("/tenants/{id}/paiements")
     public ResponseEntity<List<PaiementSuperAdminDto>> getPaiements(
             @PathVariable Long id, Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les paiements du tenant {}", auth.getName(), id);
         return ResponseEntity.ok(superAdminService.getPaiementsByTenant(id));
     }
 
@@ -334,7 +420,6 @@ public class SuperAdminController {
      */
     @GetMapping("/stats/revenus-mensuels")
     public ResponseEntity<List<Map<String, Object>>> getRevenusMenuels(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte les revenus mensuels", auth.getName());
         return ResponseEntity.ok(superAdminService.getRevenusMenuels());
     }
 
@@ -342,7 +427,6 @@ public class SuperAdminController {
 
     @GetMapping("/config")
     public ResponseEntity<List<PlatformConfigEntity>> getConfigs(Authentication auth) {
-        log.info("[SUPER_ADMIN] {} consulte la configuration plateforme", auth.getName());
         return ResponseEntity.ok(platformConfigService.obtenirToutes());
     }
 

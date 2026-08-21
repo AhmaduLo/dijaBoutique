@@ -1,11 +1,17 @@
 package com.example.dijasaliou.controller;
 
+import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.dto.StockDto;
+import com.example.dijasaliou.dto.StockExportDto;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.StockService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +34,15 @@ public class StockController {
     }
 
     /**
+     * GET /api/stock/archives
+     * Produits archivés (en rupture depuis 30+ jours)
+     */
+    @GetMapping("/archives")
+    public ResponseEntity<List<StockDto>> obtenirStocksArchives() {
+        return ResponseEntity.ok(stockService.obtenirStocksArchives());
+    }
+
+    /**
      * GET /api/stock
      * Obtenir le stock de tous les produits
      *
@@ -46,6 +61,31 @@ public class StockController {
             @RequestParam(required = false) String devise) {
         List<StockDto> stocks = stockService.obtenirTousLesStocks(devise);
         return ResponseEntity.ok(stocks);
+    }
+
+    /**
+     * GET /api/stock/export-data?debut=2026-03-01&fin=2026-03-31
+     *
+     * Données de stock enrichies pour export :
+     *   - État actuel de chaque produit (stock, valeur, bénéfice)
+     *   - + Activité (quantités achetées/vendues) sur la période optionnelle
+     *
+     * Si debut ET fin sont absents → tous les produits.
+     * Si une période est précisée → seulement les produits avec activité dans la période.
+     *
+     * Le filtre par statut (rupture / stock_bas / en_stock) est appliqué côté frontend
+     * pour permettre des combinaisons rapides sans relancer la requête.
+     */
+    @GetMapping("/export-data")
+    @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
+    @RequiresPlan(
+            plans = {TenantEntity.Plan.PRO, TenantEntity.Plan.BUSINESS},
+            message = "L'export et l'inventaire du stock sont réservés aux plans PRO et BUSINESS"
+    )
+    public ResponseEntity<List<StockExportDto>> obtenirStocksPourExport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+        return ResponseEntity.ok(stockService.obtenirStocksPourExport(debut, fin));
     }
 
     /**

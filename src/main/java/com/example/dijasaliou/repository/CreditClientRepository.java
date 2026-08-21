@@ -80,6 +80,29 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
     long countCreditsActifsByClientId(@Param("clientId") String clientId, @Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
     /**
+     * Récupère les statuts de crédit (+ échéance) indexés par venteId pour une liste de ventes.
+     * Bulk query qui évite le N+1 dans l'enrichissement des VenteDto paginés.
+     * Retourne Object[] : [venteId, statut, dateEcheance].
+     */
+    @Query("SELECT c.vente.id, c.statut, c.dateEcheance FROM CreditClientEntity c " +
+           "WHERE c.vente.id IN :venteIds AND c.tenant.tenantUuid = :tenantUuid")
+    List<Object[]> findStatutByVenteIds(@Param("venteIds") List<String> venteIds,
+                                        @Param("tenantUuid") String tenantUuid);
+
+    /**
+     * Crédits passés en perte sur une période (date de passage en perte dans [debut, fin]).
+     * Charge la vente en FETCH pour permettre le calcul prorata FIFO côté service.
+     */
+    @Query("SELECT c FROM CreditClientEntity c " +
+           "LEFT JOIN FETCH c.vente v " +
+           "WHERE c.statut = com.example.dijasaliou.entity.CreditClientEntity.StatutCredit.PERTE " +
+           "AND c.tenant.tenantUuid = :tenantUuid " +
+           "AND c.datePassageEnPerte BETWEEN :debut AND :fin")
+    List<CreditClientEntity> findCreditsPassesEnPerteBetween(@Param("debut") LocalDate debut,
+                                                             @Param("fin") LocalDate fin,
+                                                             @Param("tenantUuid") String tenantUuid);
+
+    /**
      * Compte les crédits actifs pour une liste de clients en une seule requête.
      * Évite le problème N+1 de ClientService (1 requête au lieu de 1 par client).
      * Retourne Object[] : [clientId, count]

@@ -41,6 +41,14 @@ public class AchatEntity extends BaseEntity{
     @Column(name = "quantite", nullable = false)
     private Double quantite;
 
+    /**
+     * Quantité restante dans ce lot d'achat (FIFO).
+     * Décrémentée à chaque vente qui puise dans ce lot.
+     * Initialisée à quantite lors de la création de l'achat.
+     */
+    @Column(name = "quantite_restante")
+    private Double quantiteRestante;
+
     @NotBlank(message = "Le nom du produit est obligatoire")
     @Size(min = 2, max = 100, message = "Le nom doit faire entre 2 et 100 caractères")
     @Column(name = "nom_produit", nullable = false, length = 100)
@@ -86,20 +94,45 @@ public class AchatEntity extends BaseEntity{
     @Column(name = "photo_url", length = 500)
     private String photoUrl;
 
+    @Size(max = 50, message = "Le code-barre ne peut dépasser 50 caractères")
+    @Column(name = "code_barre", length = 50)
+    private String codeBarre;
+
+    /**
+     * Catégorie du produit (Alimentaire, Boisson, etc. ou libre via "Autre").
+     * Stockée depuis V31 — aussi transmise à produit_reference pour la base partagée.
+     */
+    @Size(max = 100, message = "La catégorie ne peut dépasser 100 caractères")
+    @Column(name = "categorie", length = 100)
+    private String categorie;
+
+    /**
+     * Description libre de l'achat (lot, conditions de livraison, etc.) — optionnelle.
+     */
+    @Size(max = 200, message = "La description ne peut dépasser 200 caractères")
+    @Column(name = "description", length = 200)
+    private String description;
+
+    @Column(name = "devise_code", length = 10, nullable = false)
+    @Builder.Default
+    private String deviseCode = "XOF";
+
+    @Column(name = "taux_change_applique", nullable = false)
+    @Builder.Default
+    private Double tauxChangeApplique = 1.0;
+
     @Size(max = 20, message = "L'unité ne peut dépasser 20 caractères")
     @Column(name = "unite", length = 20)
     @Builder.Default
     private String unite = "pièce";
 
-    /** Devise dans laquelle cet achat a été saisi (code ISO ex: XOF, EUR, USD) */
-    @Column(name = "devise_code", length = 10, nullable = false)
-    @Builder.Default
-    private String deviseCode = "XOF";
-
-    /** Taux de change appliqué au moment de la saisie (1 unité devise → XOF) */
-    @Column(name = "taux_change_applique", nullable = false)
-    @Builder.Default
-    private Double tauxChangeApplique = 1.0;
+    /**
+     * Mode de paiement utilisé pour cet achat (caisse multi-comptes BUSINESS).
+     * NULL pour les anciens achats (avant activation caisse) — ils ne sont pas pris en compte.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_paiement", length = 20)
+    private ModePaiementCaisse modePaiement;
 
 
     /**
@@ -192,6 +225,11 @@ public class AchatEntity extends BaseEntity{
         // Nettoyer le nom du produit
         if (this.nomProduit != null) {
             this.nomProduit = this.nomProduit.trim();
+        }
+
+        // FIFO : initialiser quantiteRestante avec quantite
+        if (this.quantiteRestante == null) {
+            this.quantiteRestante = this.quantite;
         }
     }
 

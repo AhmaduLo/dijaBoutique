@@ -1,11 +1,14 @@
 package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.StockDto;
+import com.example.dijasaliou.dto.StockExportDto;
 import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.repository.ProduitArchiveRepository;
+import com.example.dijasaliou.repository.VenteLotConsommationRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -14,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -32,13 +38,129 @@ public class StockService {
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
     private final DeviseService deviseService;
+    private final ProduitArchiveRepository produitArchiveRepository;
+    private final VenteLotConsommationRepository venteLotConsommationRepository;
 
     public StockService(AchatRepository achatRepository, VenteRepository venteRepository,
-                        TenantService tenantService, DeviseService deviseService) {
+                        TenantService tenantService, DeviseService deviseService,
+                        ProduitArchiveRepository produitArchiveRepository,
+                        VenteLotConsommationRepository venteLotConsommationRepository) {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
         this.tenantService = tenantService;
         this.deviseService = deviseService;
+        this.produitArchiveRepository = produitArchiveRepository;
+        this.venteLotConsommationRepository = venteLotConsommationRepository;
+    }
+
+    /**
+     * Pré-charge un Map nomProduit (lowercase) → [beneficeTotal, quantiteVendueAvecBenefice]
+     * pour éviter les requêtes N+1 lors du calcul des stocks.
+     */
+    private Map<String, BigDecimal[]> chargerBeneficesParProduit(TenantEntity tenant) {
+        Map<String, BigDecimal[]> resultat = new java.util.HashMap<>();
+        List<Object[]> rows = venteLotConsommationRepository.sumBeneficeAndQuantiteByProduit(tenant);
+        for (Object[] row : rows) {
+            String nom = ((String) row[0]).toLowerCase().trim();
+            BigDecimal benefice = (BigDecimal) row[1];
+            Double quantite = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+            resultat.put(nom, new BigDecimal[]{
+                    benefice != null ? benefice : BigDecimal.ZERO,
+                    BigDecimal.valueOf(quantite)
+            });
+        }
+        return resultat;
+    }
+
+    /**
+     * Export enrichi : pour chaque produit, retourne son stock actuel + l'activité
+     * (achats / ventes) sur la période choisie.
+     *
+     * Filtrage :
+     *   - Si une période est précisée (debut/fin non nulles), seuls les produits
+     *     ayant eu de l'activité (achat OU vente) sur la période sont retournés.
+     *   - Si pas de période → tous les produits, avec activité = 0.
+     */
+    @Transactional(readOnly = true)
+    public List<StockExportDto> obtenirStocksPourExport(LocalDate debut, LocalDate fin) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        List<StockDto> stocks = obtenirTousLesStocks();
+
+        // Si pas de période → on retourne tous les stocks sans activité
+        if (debut == null && fin == null) {
+            return stocks.stream()
+                    .map(s -> toExportDto(s, 0.0, 0.0))
+                    .collect(Collectors.toList());
+        }
+
+        LocalDateTime debutDt = (debut != null ? debut.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0));
+        LocalDateTime finDt   = (fin   != null ? fin.atTime(LocalTime.MAX) : LocalDateTime.of(2099, 12, 31, 23, 59));
+
+        // Charger les achats et ventes de la période, grouper par nom_produit (lowercase trim)
+        List<AchatEntity> achatsPeriode = achatRepository.findByDateAchatBetween(debutDt, finDt)
+                .stream()
+                .filter(a -> a.getTenant() != null && a.getTenant().getId().equals(tenant.getId()))
+                .collect(Collectors.toList());
+        List<VenteEntity> ventesPeriode = venteRepository.findByDateVenteBetween(debutDt, finDt)
+                .stream()
+                .filter(v -> v.getTenant() != null && v.getTenant().getId().equals(tenant.getId()))
+                .collect(Collectors.toList());
+
+        Map<String, Double> qteAcheteeParProduit = achatsPeriode.stream()
+                .collect(Collectors.groupingBy(
+                        a -> a.getNomProduit().toLowerCase().trim(),
+                        Collectors.summingDouble(AchatEntity::getQuantite)));
+
+        Map<String, Double> qteVendueParProduit = ventesPeriode.stream()
+                .collect(Collectors.groupingBy(
+                        v -> v.getNomProduit().toLowerCase().trim(),
+                        Collectors.summingDouble(VenteEntity::getQuantite)));
+
+        // Inclure seulement les produits avec activité sur la période
+        return stocks.stream()
+                .map(s -> {
+                    String key = s.getNomProduit().toLowerCase().trim();
+                    Double acheteePeriode = qteAcheteeParProduit.getOrDefault(key, 0.0);
+                    Double venduePeriode  = qteVendueParProduit.getOrDefault(key, 0.0);
+                    return new Object[]{s, acheteePeriode, venduePeriode};
+                })
+                .filter(t -> ((Double) t[1]) > 0 || ((Double) t[2]) > 0)
+                .map(t -> toExportDto((StockDto) t[0], (Double) t[1], (Double) t[2]))
+                .collect(Collectors.toList());
+    }
+
+    private StockExportDto toExportDto(StockDto s, Double acheteePeriode, Double venduePeriode) {
+        return StockExportDto.builder()
+                .nomProduit(s.getNomProduit())
+                .codeBarre(s.getCodeBarre())
+                .unite(s.getUnite())
+                .quantiteAchetee(s.getQuantiteAchetee())
+                .quantiteVendue(s.getQuantiteVendue())
+                .stockDisponible(s.getStockDisponible())
+                .prixMoyenAchat(s.getPrixMoyenAchat())
+                .prixMoyenVente(s.getPrixMoyenVente())
+                .valeurStock(s.getValeurStock())
+                .margeUnitaire(s.getMargeUnitaire())
+                .beneficeTotal(s.getBeneficeTotal())
+                .statut(s.getStatut())
+                .quantiteAcheteePeriode(acheteePeriode)
+                .quantiteVenduePeriode(venduePeriode)
+                .build();
+    }
+
+    /**
+     * Enrichit un StockDto avec le bénéfice FIFO total et la quantité vendue avec bénéfice.
+     */
+    private void enrichirAvecBenefice(StockDto stock, Map<String, BigDecimal[]> beneficesParProduit) {
+        String key = stock.getNomProduit().toLowerCase().trim();
+        BigDecimal[] benef = beneficesParProduit.get(key);
+        if (benef != null) {
+            stock.setBeneficeTotal(benef[0]);
+            stock.setQuantiteVendueAvecBenefice(benef[1].doubleValue());
+        } else {
+            stock.setBeneficeTotal(BigDecimal.ZERO);
+            stock.setQuantiteVendueAvecBenefice(0.0);
+        }
     }
 
     /**
@@ -57,6 +179,8 @@ public class StockService {
         TenantEntity tenant = tenantService.getCurrentTenant();
         List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
         List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+        // Pré-charger les bénéfices FIFO par produit (1 seule requête)
+        Map<String, BigDecimal[]> beneficesParProduit = chargerBeneficesParProduit(tenant);
 
         // Devise de rapport : paramètre explicite ou préférence du tenant
         String codeDevise = (devise != null && !devise.isBlank())
@@ -87,12 +211,78 @@ public class StockService {
             List<AchatEntity> achatsProduitsListe = entry.getValue();
             List<VenteEntity> ventesProduitsListe = ventesParProduit.getOrDefault(nomProduit, new ArrayList<>());
 
-            stocks.add(calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe, tauxRapport, codeDevise));
+            StockDto stock = calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe, tauxRapport, codeDevise);
+            enrichirAvecBenefice(stock, beneficesParProduit);
+            stocks.add(stock);
         }
 
-        // 6. Trier par stock disponible (du plus faible au plus élevé pour voir les alertes)
+        // 6. Filtrer les produits archivés
+        java.util.Set<String> archives = produitArchiveRepository.findNomsArchivesParTenant(tenant);
+        if (!archives.isEmpty()) {
+            stocks.removeIf(s -> archives.contains(s.getNomProduit().toLowerCase().trim()));
+        }
+
+        // 7. Trier par stock disponible (du plus faible au plus élevé pour voir les alertes)
         stocks.sort((s1, s2) -> Double.compare(s1.getStockDisponible(), s2.getStockDisponible()));
 
+        return stocks;
+    }
+
+    /**
+     * Obtenir les stocks des produits archivés du tenant courant.
+     */
+    @Transactional(readOnly = true)
+    public List<StockDto> obtenirStocksArchives() {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        java.util.Set<String> archives = produitArchiveRepository.findNomsArchivesParTenant(tenant);
+
+        if (archives.isEmpty()) return new ArrayList<>();
+
+        List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
+        List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+        Map<String, BigDecimal[]> beneficesParProduit = chargerBeneficesParProduit(tenant);
+
+        Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
+                .collect(Collectors.groupingBy(a -> a.getNomProduit().toLowerCase().trim()));
+        Map<String, List<VenteEntity>> ventesParProduit = ventes.stream()
+                .collect(Collectors.groupingBy(v -> v.getNomProduit().toLowerCase().trim()));
+
+        List<StockDto> stocksArchives = new ArrayList<>();
+        for (String nomArchive : archives) {
+            List<AchatEntity> achatsP = achatsParProduit.getOrDefault(nomArchive, new ArrayList<>());
+            List<VenteEntity> ventesP = ventesParProduit.getOrDefault(nomArchive, new ArrayList<>());
+            if (!achatsP.isEmpty()) {
+                StockDto stock = calculerStock(nomArchive, achatsP, ventesP);
+                enrichirAvecBenefice(stock, beneficesParProduit);
+                stocksArchives.add(stock);
+            }
+        }
+
+        return stocksArchives;
+    }
+
+    /**
+     * Obtenir les stocks d'un tenant spécifique (sans contexte tenant).
+     * Utilisé par le job d'archivage automatique.
+     */
+    @Transactional(readOnly = true)
+    public List<StockDto> obtenirTousLesStocksParTenant(TenantEntity tenant) {
+        List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
+        List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
+        Map<String, BigDecimal[]> beneficesParProduit = chargerBeneficesParProduit(tenant);
+
+        Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
+                .collect(Collectors.groupingBy(a -> a.getNomProduit().toLowerCase().trim()));
+        Map<String, List<VenteEntity>> ventesParProduit = ventes.stream()
+                .collect(Collectors.groupingBy(v -> v.getNomProduit().toLowerCase().trim()));
+
+        List<StockDto> stocks = new ArrayList<>();
+        for (Map.Entry<String, List<AchatEntity>> entry : achatsParProduit.entrySet()) {
+            StockDto stock = calculerStock(entry.getKey(), entry.getValue(),
+                    ventesParProduit.getOrDefault(entry.getKey(), new ArrayList<>()));
+            enrichirAvecBenefice(stock, beneficesParProduit);
+            stocks.add(stock);
+        }
         return stocks;
     }
 
@@ -130,7 +320,9 @@ public class StockService {
         double tauxRapport = (deviseRapport != null && deviseRapport.getTauxChange() != null)
                 ? deviseRapport.getTauxChange() : 1.0;
 
-        return calculerStock(nomProduit, achats, ventes, tauxRapport, codeDevise);
+        StockDto stock = calculerStock(nomProduit, achats, ventes, tauxRapport, codeDevise);
+        enrichirAvecBenefice(stock, chargerBeneficesParProduit(tenant));
+        return stock;
     }
 
     /**
@@ -208,11 +400,21 @@ public class StockService {
     }
 
     /**
+     * Surcharge sans conversion de devise (valeurs en XOF, la devise de base) —
+     * utilisée là où la devise de rapport n'a pas de sens (archives, job cross-tenant).
+     */
+    private StockDto calculerStock(String nomProduit, List<AchatEntity> achats, List<VenteEntity> ventes) {
+        return calculerStock(nomProduit, achats, ventes, 1.0, "XOF");
+    }
+
+    /**
      * Méthode privée pour calculer le stock d'un produit
      *
      * @param nomProduit Nom du produit
      * @param achats Liste des achats
      * @param ventes Liste des ventes
+     * @param tauxDeviceTenant Taux de conversion vers la devise de rapport (1.0 = pas de conversion)
+     * @param deviseCode Code de la devise de rapport (étiquette sur le StockDto résultant)
      * @return StockDto calculé
      */
     private StockDto calculerStock(String nomProduit, List<AchatEntity> achats, List<VenteEntity> ventes,
@@ -313,10 +515,27 @@ public class StockService {
         // Récupérer l'unité depuis le dernier achat
         String unite = dernierAchat != null ? dernierAchat.getUnite() : "pièce";
 
+        // Récupérer le code-barre depuis le dernier achat qui en a un
+        String codeBarre = achats.stream()
+                .filter(a -> a.getCodeBarre() != null && !a.getCodeBarre().isEmpty())
+                .max(Comparator.comparing(AchatEntity::getDateAchat))
+                .map(AchatEntity::getCodeBarre)
+                .orElse(null);
+
+        // Récupérer la catégorie depuis le dernier achat qui en a une non-vide.
+        // Sert au pré-remplissage automatique en multi-achat côté front.
+        String categorie = achats.stream()
+                .filter(a -> a.getCategorie() != null && !a.getCategorie().isBlank())
+                .max(Comparator.comparing(AchatEntity::getDateAchat))
+                .map(AchatEntity::getCategorie)
+                .orElse(null);
+
         return StockDto.builder()
                 .nomProduit(nomProduit)
                 .photoUrl(photoUrl)
+                .codeBarre(codeBarre)
                 .unite(unite)
+                .categorie(categorie)
                 .quantiteAchetee(quantiteAchetee)
                 .quantiteVendue(quantiteVendue)
                 .stockDisponible(stockDisponible)

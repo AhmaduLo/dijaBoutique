@@ -394,13 +394,15 @@ class VenteServiceTest {
     // =========================================================
 
     @Test
-    @DisplayName("calculerChiffreAffaires() — délègue le calcul au repository via SQL SUM")
+    @DisplayName("calculerChiffreAffaires() — cash basis : ventes non-crédit + paiements crédit reçus")
     void calculerChiffreAffaires_sommeListe() {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(venteRepository.sumChiffreAffairesPeriode(any(LocalDateTime.class), any(LocalDateTime.class), eq(tenantTest.getTenantUuid())))
-                .thenReturn(new BigDecimal("1500.00"));
+        when(venteRepository.sumChiffreAffairesNonCreditPeriode(any(LocalDateTime.class), any(LocalDateTime.class), eq(tenantTest.getTenantUuid())))
+                .thenReturn(new BigDecimal("1000.00"));
+        when(paiementCreditRepository.sumMontantPayeBetweenAndTenant(eq(debut), eq(fin), eq(tenantTest.getTenantUuid())))
+                .thenReturn(new BigDecimal("500.00"));
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
 
@@ -408,12 +410,14 @@ class VenteServiceTest {
     }
 
     @Test
-    @DisplayName("calculerChiffreAffaires() — retourne zéro si aucune vente")
+    @DisplayName("calculerChiffreAffaires() — retourne zéro si aucune vente ni paiement crédit")
     void calculerChiffreAffaires_retourneZeroSiVide() {
         LocalDate debut = LocalDate.of(2025, 1, 1);
         LocalDate fin = LocalDate.of(2025, 12, 31);
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(venteRepository.sumChiffreAffairesPeriode(any(LocalDateTime.class), any(LocalDateTime.class), eq(tenantTest.getTenantUuid())))
+        when(venteRepository.sumChiffreAffairesNonCreditPeriode(any(LocalDateTime.class), any(LocalDateTime.class), eq(tenantTest.getTenantUuid())))
+                .thenReturn(BigDecimal.ZERO);
+        when(paiementCreditRepository.sumMontantPayeBetweenAndTenant(eq(debut), eq(fin), eq(tenantTest.getTenantUuid())))
                 .thenReturn(BigDecimal.ZERO);
 
         BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);

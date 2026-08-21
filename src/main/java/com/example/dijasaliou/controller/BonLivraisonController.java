@@ -50,7 +50,6 @@ public class BonLivraisonController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
             Authentication auth) {
-        log.info("[BL] {} consulte les bons de livraison", auth.getName());
         if (size > 100) size = 100;
         return ResponseEntity.ok(bonLivraisonService.getTousPagines(page, size, search, statut, dateDebut, dateFin));
     }
@@ -58,7 +57,6 @@ public class BonLivraisonController {
     @GetMapping("/{id}")
     @RequiresPlan(plans = {TenantEntity.Plan.BUSINESS}, message = "Les bons de livraison sont réservés au plan BUSINESS")
     public ResponseEntity<BonLivraisonDto> getParId(@PathVariable String id, Authentication auth) {
-        log.info("[BL] {} consulte le BL {}", auth.getName(), id);
         return ResponseEntity.ok(bonLivraisonService.getParId(id));
     }
 

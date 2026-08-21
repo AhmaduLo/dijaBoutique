@@ -51,7 +51,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Trouver les achats entre deux dates
      */
-    @Query("SELECT a FROM AchatEntity a WHERE a.dateAchat BETWEEN :debut AND :fin ORDER BY a.dateAchat DESC, a.id DESC")
+    @Query("SELECT a FROM AchatEntity a JOIN FETCH a.utilisateur JOIN FETCH a.tenant WHERE a.dateAchat BETWEEN :debut AND :fin ORDER BY a.dateAchat DESC, a.id DESC")
     List<AchatEntity> findByDateAchatBetween(@Param("debut") LocalDateTime debut, @Param("fin") LocalDateTime fin);
 
     /**
@@ -78,9 +78,15 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     List<AchatEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
+     * Trouver les achats par code-barre pour un tenant donné
+     */
+    @Query("SELECT a FROM AchatEntity a WHERE a.codeBarre = :codeBarre AND a.tenant = :tenant ORDER BY a.dateAchat DESC, a.id DESC")
+    List<AchatEntity> findByCodeBarreAndTenant(@Param("codeBarre") String codeBarre, @Param("tenant") TenantEntity tenant);
+
+    /**
      * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_achat_tenant_date.
      */
-    @Query(value = "SELECT a FROM AchatEntity a WHERE " +
+    @Query(value = "SELECT a FROM AchatEntity a JOIN FETCH a.utilisateur JOIN FETCH a.tenant WHERE " +
            "a.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(a.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
@@ -98,4 +104,73 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
                                         @Param("dateDebut") LocalDateTime dateDebut,
                                         @Param("dateFin") LocalDateTime dateFin,
                                         Pageable pageable);
+
+    /**
+     * FIFO : lots d'achat disponibles pour un produit (quantité restante > 0),
+     * triés par date d'achat croissante (le plus ancien d'abord).
+     * Filtre tenant EXPLICITE pour sécurité multi-tenant.
+     */
+    @Query("""
+            SELECT a FROM AchatEntity a
+            WHERE a.tenant = :tenant
+              AND a.nomProduit = :nomProduit
+              AND a.quantiteRestante IS NOT NULL
+              AND a.quantiteRestante > 0
+            ORDER BY a.dateAchat ASC, a.id ASC
+            """)
+    List<AchatEntity> findLotsDisponiblesFifo(@Param("nomProduit") String nomProduit,
+                                              @Param("tenant") TenantEntity tenant);
+
+    /**
+     * Tous les achats d'un tenant triés par date d'achat ASC (pour le backfill FIFO).
+     */
+    @Query("SELECT a FROM AchatEntity a WHERE a.tenant = :tenant ORDER BY a.dateAchat ASC, a.id ASC")
+    List<AchatEntity> findAllByTenantOrderByDateAsc(@Param("tenant") TenantEntity tenant);
+
+    /**
+     * Somme des achats d'un tenant pour un mode de paiement, entre deux dates.
+     * Utilisé par le module Caisse pour calculer les sorties par compte
+     * (avec borne supérieure pour les snapshots).
+     */
+    @Query("""
+            SELECT COALESCE(SUM(a.prixTotal), 0)
+            FROM AchatEntity a
+            WHERE a.tenant = :tenant
+              AND a.modePaiement = :modePaiement
+              AND a.dateAchat >= :debut
+              AND a.dateAchat <= :fin
+            """)
+    java.math.BigDecimal sumByModePaiementBetween(
+            @Param("tenant") TenantEntity tenant,
+            @Param("modePaiement") com.example.dijasaliou.entity.ModePaiementCaisse modePaiement,
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
+
+    /** Optimisation caisse : total achats GROUPÉ par mode en une seule query. */
+    @Query("""
+            SELECT a.modePaiement, COALESCE(SUM(a.prixTotal), 0)
+            FROM AchatEntity a
+            WHERE a.tenant = :tenant
+              AND a.dateAchat >= :debut
+              AND a.dateAchat <= :fin
+              AND a.modePaiement IS NOT NULL
+            GROUP BY a.modePaiement
+            """)
+    java.util.List<Object[]> sumByModePaiementGrouped(
+            @Param("tenant") TenantEntity tenant,
+            @Param("debut") LocalDateTime debut,
+            @Param("fin") LocalDateTime fin);
+
+    /**
+     * Noms de fournisseurs distincts pour un tenant, triés alphabétiquement.
+     * Alimente l'autocomplétion du champ fournisseur dans le formulaire d'achat.
+     * Exclut la valeur fallback "Fournisseur" (utilisée quand l'utilisateur n'a rien saisi).
+     */
+    @Query("SELECT DISTINCT a.fournisseur FROM AchatEntity a " +
+           "WHERE a.tenant = :tenant " +
+           "AND a.fournisseur IS NOT NULL " +
+           "AND a.fournisseur <> '' " +
+           "AND a.fournisseur <> 'Fournisseur' " +
+           "ORDER BY a.fournisseur ASC")
+    List<String> findDistinctFournisseursByTenant(@Param("tenant") TenantEntity tenant);
 }

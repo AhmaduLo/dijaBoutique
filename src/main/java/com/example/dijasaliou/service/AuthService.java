@@ -11,6 +11,7 @@ import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.jwt.JwtService;
 import com.example.dijasaliou.repository.PasswordResetTokenRepository;
 import com.example.dijasaliou.repository.TenantRepository;
+import com.example.dijasaliou.repository.UserPushSubscriptionRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,19 +37,25 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+    private final PushNotificationService pushService;
+    private final UserPushSubscriptionRepository pushSubscriptionRepository;
 
     public AuthService(UserRepository userRepository,
                        TenantRepository tenantRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        PasswordResetTokenRepository passwordResetTokenRepository,
-                       EmailService emailService) {
+                       EmailService emailService,
+                       PushNotificationService pushService,
+                       UserPushSubscriptionRepository pushSubscriptionRepository) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.emailService = emailService;
+        this.pushService = pushService;
+        this.pushSubscriptionRepository = pushSubscriptionRepository;
     }
 
     /**
@@ -105,7 +112,7 @@ public class AuthService {
             }
         }
 
-        // 3. Créer le TENANT (entreprise) - ESSAI GRATUIT DE 14 JOURS
+        // 3. Créer le TENANT (entreprise) - ESSAI GRATUIT (durée = TenantEntity.DUREE_ESSAI_JOURS)
         if (request.getNomEntreprise() == null || request.getNomEntreprise().isBlank()) {
             throw new RuntimeException("Nom de l'entreprise obligatoire");
         }
@@ -120,10 +127,10 @@ public class AuthService {
                 .pays(request.getPays())
                 .nineaSiret(request.getNineaSiret()) // OPTIONNEL - peut être null
                 .actif(true)
-                .plan(TenantEntity.Plan.BUSINESS) // Essai BUSINESS complet pendant 14 jours
+                .plan(TenantEntity.Plan.BUSINESS) // Essai BUSINESS complet
                 .dateDebutEssai(now) // Début de l'essai
                 .essaiUtilise(false) // L'essai n'a pas encore été utilisé
-                .dateExpiration(now.plusDays(14)) // Expire dans 14 jours → rétrograde vers GRATUIT
+                .dateExpiration(now.plusDays(TenantEntity.DUREE_ESSAI_JOURS)) // Rétrograde vers GRATUIT à l'expiration
                 .build();
 
         TenantEntity savedTenant = tenantRepository.save(tenant);
@@ -160,7 +167,17 @@ public class AuthService {
         passwordResetTokenRepository.save(verificationToken);
         emailService.sendVerificationEmail(savedUser.getEmail(), verificationToken.getToken(), savedUser.getPrenom());
 
-        // 8. Retourner la réponse - L'utilisateur a 14 jours d'essai gratuit
+        // 8. Notifier les super admins (push) — fire & forget
+        String villePays = (savedTenant.getVille() != null ? savedTenant.getVille() : "")
+                + (savedTenant.getPays() != null ? " " + savedTenant.getPays() : "");
+        pushService.notify(
+                com.example.dijasaliou.entity.NotificationType.NOUVEAU_CLIENT,
+                "🆕 Nouveau client EasyStock",
+                savedTenant.getNomEntreprise() + (villePays.isBlank() ? "" : " — " + villePays.trim()),
+                "/superadmin/tenants/" + savedTenant.getId()
+        );
+
+        // 9. Retourner la réponse - L'utilisateur a TenantEntity.DUREE_ESSAI_JOURS jours d'essai gratuit
         return AuthResponse.builder()
                 .token(token)
                 .user(savedUser)
@@ -499,6 +516,9 @@ public class AuthService {
             utilisateur.setDeleted(true);
             utilisateur.setDateSuppression(maintenant);
             passwordResetTokenRepository.deleteByUser(utilisateur);
+            // Sans ça, les crons de résumé (quotidien/hebdo/mensuel) continuent
+            // de notifier ce compte indéfiniment malgré la suppression.
+            pushSubscriptionRepository.deleteByUser(utilisateur);
         }
         userRepository.saveAll(utilisateurs);
 

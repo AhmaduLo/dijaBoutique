@@ -319,7 +319,7 @@ class CreditClientServiceTest {
         when(creditClientRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(pageMock);
 
-        var resultat = creditClientService.obtenirCredits(0, 10, null, "TOUS", null, null);
+        var resultat = creditClientService.obtenirCredits(0, 10, null, "TOUS", null, null, null);
 
         assertThat(resultat).isNotNull();
         assertThat(resultat.getContent()).isEmpty();
@@ -333,7 +333,7 @@ class CreditClientServiceTest {
         when(creditClientRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(pageMock);
 
-        var resultat = creditClientService.obtenirCredits(0, 10, null, "EN_ATTENTE", null, null);
+        var resultat = creditClientService.obtenirCredits(0, 10, null, "EN_ATTENTE", null, null, null);
 
         assertThat(resultat).isNotNull();
         verify(creditClientRepository).findAll(any(Specification.class), any(Pageable.class));
