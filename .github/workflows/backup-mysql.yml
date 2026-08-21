@@ -1,24 +1,22 @@
-name: Backup MySQL → Google Drive
+name: Backup MySQL → Backblaze B2
 
-# Backup automatique de la BDD MySQL Railway vers Google Drive.
+# Backup automatique de la BDD MySQL Railway vers Backblaze B2 (stockage
+# compatible S3 — clé d'accès stable, pas d'expiration comme un token OAuth).
 #
 # Déclenchement :
 #   - Automatique : tous les jours à 03:00 UTC (04:00 ou 05:00 heure Sénégal selon DST)
-#   - Manuel : onglet "Actions" du repo → "Backup MySQL → Google Drive" → "Run workflow"
+#   - Manuel : onglet "Actions" du repo → "Backup MySQL → Backblaze B2" → "Run workflow"
 #
 # Secrets requis (Settings → Secrets and variables → Actions) :
-#   MYSQL_PUBLIC_URL       → URL complète depuis Railway → MySQL → Variables
-#                            (format mysql://USER:PASS@HOST:PORT/DATABASE — la PUBLIQUE,
-#                            pas l'INTERNE qui n'est pas accessible depuis GitHub)
-#   GDRIVE_FOLDER_ID       → ID du dossier Drive (sur le compte easystock@gmail.com)
-#   GDRIVE_CLIENT_ID       → OAuth Client ID (depuis Google Cloud Console)
-#   GDRIVE_CLIENT_SECRET   → OAuth Client Secret
-#   GDRIVE_REFRESH_TOKEN   → Refresh token obtenu via oauth-setup/get_refresh_token.py
+#   MYSQL_PUBLIC_URL     → URL complète depuis Railway → MySQL → Variables
+#                          (format mysql://USER:PASS@HOST:PORT/DATABASE — la PUBLIQUE,
+#                          pas l'INTERNE qui n'est pas accessible depuis GitHub)
+#   B2_KEY_ID            → keyID de la clé d'application Backblaze
+#   B2_APPLICATION_KEY   → applicationKey de la clé d'application Backblaze
+#   B2_ENDPOINT          → endpoint régional (ex: s3.eu-central-003.backblazeb2.com)
+#   B2_BUCKET            → nom du bucket (ex: easystock-backups)
 #
-# L'upload se fait au nom du compte propriétaire (easystock@gmail.com) — utilise
-# son quota Drive (100 Go Google One), pas celui d'un Service Account.
-#
-# Rétention : 30 backups les plus récents (les plus anciens sont supprimés du Drive).
+# Rétention : 30 backups les plus récents (les plus anciens sont supprimés du bucket).
 
 on:
   schedule:
@@ -94,76 +92,52 @@ jobs:
 
           echo "✅ Dump créé : ${FILENAME} (${SIZE})"
 
-      - name: Installer Python + libs Google Drive
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: pip install --quiet google-api-python-client google-auth
-
-      - name: Uploader sur Google Drive + rotation (OAuth)
+      - name: Uploader sur Backblaze B2 + rotation
         env:
-          GDRIVE_FOLDER_ID:      ${{ secrets.GDRIVE_FOLDER_ID }}
-          GDRIVE_CLIENT_ID:      ${{ secrets.GDRIVE_CLIENT_ID }}
-          GDRIVE_CLIENT_SECRET:  ${{ secrets.GDRIVE_CLIENT_SECRET }}
-          GDRIVE_REFRESH_TOKEN:  ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.B2_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+          B2_ENDPOINT:           ${{ secrets.B2_ENDPOINT }}
+          B2_BUCKET:             ${{ secrets.B2_BUCKET }}
           BACKUP_FILE:           ${{ env.BACKUP_FILE }}
         run: |
-          python <<'PYTHON'
-          import os
-          from google.oauth2.credentials import Credentials
-          from googleapiclient.discovery import build
-          from googleapiclient.http import MediaFileUpload
+          set -eo pipefail
+          MAX_BACKUPS=30  # rotation : garde les 30 plus récents
 
-          MAX_BACKUPS = 30  # rotation : garde les 30 plus récents
+          if [ -z "$B2_BUCKET" ] || [ -z "$B2_ENDPOINT" ]; then
+            echo "::error::B2_BUCKET ou B2_ENDPOINT manquant(s) dans les secrets."
+            exit 1
+          fi
 
-          folder_id = os.environ['GDRIVE_FOLDER_ID']
-          filename  = os.environ['BACKUP_FILE']
-
-          # Credentials OAuth utilisateur (utilise le quota Drive du compte easystock@gmail.com)
-          creds = Credentials(
-              token=None,
-              refresh_token=os.environ['GDRIVE_REFRESH_TOKEN'],
-              token_uri='https://oauth2.googleapis.com/token',
-              client_id=os.environ['GDRIVE_CLIENT_ID'],
-              client_secret=os.environ['GDRIVE_CLIENT_SECRET'],
-              scopes=['https://www.googleapis.com/auth/drive']
-          )
-          drive = build('drive', 'v3', credentials=creds, cache_discovery=False)
+          ENDPOINT_URL="https://${B2_ENDPOINT}"
+          # Le CLI AWS exige une région même pour un endpoint tiers — on extrait
+          # celle de B2 depuis l'endpoint (ex: s3.eu-central-003.backblazeb2.com → eu-central-003).
+          export AWS_DEFAULT_REGION="${B2_ENDPOINT#s3.}"
+          AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION%.backblazeb2.com}"
+          export AWS_DEFAULT_REGION
 
           # 1) Upload
-          file_metadata = {'name': filename, 'parents': [folder_id]}
-          media = MediaFileUpload(filename, mimetype='application/gzip', resumable=True)
-          uploaded = drive.files().create(
-              body=file_metadata,
-              media_body=media,
-              fields='id, name, size'
-          ).execute()
-          size_mb = int(uploaded.get('size', 0)) / (1024 * 1024)
-          print(f"✅ Upload OK : {uploaded['name']} ({size_mb:.2f} MB) — id {uploaded['id']}")
+          aws s3 cp "${BACKUP_FILE}" "s3://${B2_BUCKET}/${BACKUP_FILE}" --endpoint-url "${ENDPOINT_URL}"
+          echo "✅ Upload OK : ${BACKUP_FILE}"
 
-          # 2) Rotation : lister tous les backups du dossier, garder les MAX_BACKUPS plus récents
-          query = (
-              f"'{folder_id}' in parents and trashed = false "
-              f"and name contains 'easystock-backup-'"
-          )
-          results = drive.files().list(
-              q=query,
-              fields='files(id, name, createdTime)',
-              orderBy='createdTime desc',
-              pageSize=200
-          ).execute()
-          backups = results.get('files', [])
-          print(f"📦 {len(backups)} backup(s) dans le dossier Drive")
+          # 2) Rotation : le nom de fichier contient un timestamp ISO-triable
+          # (easystock-backup-YYYY-MM-DD_HHhMMm.sql.gz), donc trier les noms =
+          # trier chronologiquement, pas besoin d'interroger les métadonnées.
+          ALL_BACKUPS=$(aws s3 ls "s3://${B2_BUCKET}/" --endpoint-url "${ENDPOINT_URL}" \
+            | awk '{print $4}' | grep '^easystock-backup-' | sort)
+          TOTAL=$(echo "$ALL_BACKUPS" | grep -c . || true)
+          echo "📦 ${TOTAL} backup(s) dans le bucket"
 
-          if len(backups) > MAX_BACKUPS:
-              to_delete = backups[MAX_BACKUPS:]
-              for b in to_delete:
-                  drive.files().delete(fileId=b['id']).execute()
-                  print(f"🗑️  Supprimé : {b['name']}")
-              print(f"✅ Rotation : {len(to_delete)} ancien(s) backup(s) supprimé(s)")
-          else:
-              print(f"ℹ️  Rotation non nécessaire (< {MAX_BACKUPS} backups)")
-          PYTHON
+          if [ "$TOTAL" -gt "$MAX_BACKUPS" ]; then
+            TO_DELETE_COUNT=$((TOTAL - MAX_BACKUPS))
+            TO_DELETE=$(echo "$ALL_BACKUPS" | head -n "$TO_DELETE_COUNT")
+            for f in $TO_DELETE; do
+              aws s3 rm "s3://${B2_BUCKET}/${f}" --endpoint-url "${ENDPOINT_URL}"
+              echo "🗑️  Supprimé : ${f}"
+            done
+            echo "✅ Rotation : ${TO_DELETE_COUNT} ancien(s) backup(s) supprimé(s)"
+          else
+            echo "ℹ️  Rotation non nécessaire (< ${MAX_BACKUPS} backups)"
+          fi
 
       - name: Nettoyer les fichiers temporaires
         if: always()
