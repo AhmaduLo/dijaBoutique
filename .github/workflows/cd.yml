@@ -1,8 +1,12 @@
 name: CD — Build & Package
 
+# DÉSACTIVÉ (déclenchement automatique retiré) : Railway construit et déploie
+# directement depuis le Dockerfile du dépôt, sans jamais utiliser l'image
+# poussée ici sur Docker Hub. Ce workflow échouait à chaque push
+# (DOCKER_USERNAME/DOCKER_PASSWORD absents) sans impact réel sur le déploiement.
+# Reste déclenchable manuellement si besoin (onglet Actions → Run workflow).
 on:
-  push:
-    branches: [ master, main ]
+  workflow_dispatch:
 
 jobs:
   build:
