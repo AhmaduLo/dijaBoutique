@@ -125,7 +125,10 @@ public class TenantController {
                 tenantMisAJour.getLogoUrl(),
                 admin != null ? admin.getNom() : null,
                 admin != null ? admin.getPrenom() : null,
-                admin != null ? admin.getEmail() : null
+                admin != null ? admin.getEmail() : null,
+                tenantMisAJour.getTimezone(),
+                tenantMisAJour.getConditionsGaranties(),
+                tenantMisAJour.getMentionsLegales()
         );
 
         return ResponseEntity.ok(response);

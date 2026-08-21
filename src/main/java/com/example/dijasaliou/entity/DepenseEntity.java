@@ -75,18 +75,6 @@ public class DepenseEntity  extends BaseEntity{
     private Boolean estRecurrente = false;
 
     /**
-     * Champs devise — existent en BDD (NOT NULL) mais étaient absents de l'entité.
-     * Valeurs par défaut pour ne pas casser les insertions.
-     */
-    @Column(name = "devise_code", length = 10, nullable = false)
-    @Builder.Default
-    private String deviseCode = "XOF";
-
-    @Column(name = "taux_change_applique", nullable = false)
-    @Builder.Default
-    private Double tauxChangeApplique = 1.0;
-
-    /**
      * Mode de paiement utilisé pour cette dépense (caisse multi-comptes BUSINESS).
      * NULL pour les anciennes dépenses (avant activation caisse) — ignorées.
      */

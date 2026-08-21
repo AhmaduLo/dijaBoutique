@@ -350,7 +350,7 @@ class CreditControllerTest {
                 "tauxRecouvrement", 50.0
         );
 
-        when(creditClientService.obtenirStats()).thenReturn(stats);
+        when(creditClientService.obtenirStats(null)).thenReturn(stats);
 
         mockMvc.perform(get("/credits/stats")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -359,7 +359,7 @@ class CreditControllerTest {
                 .andExpect(jsonPath("$.nombreClientsCrediteurs", is(3)))
                 .andExpect(jsonPath("$.tauxRecouvrement", is(50.0)));
 
-        verify(creditClientService).obtenirStats();
+        verify(creditClientService).obtenirStats(null);
     }
 
     @Test
@@ -372,7 +372,7 @@ class CreditControllerTest {
                 "tauxRecouvrement", 0.0
         );
 
-        when(creditClientService.obtenirStats()).thenReturn(stats);
+        when(creditClientService.obtenirStats(null)).thenReturn(stats);
 
         mockMvc.perform(get("/credits/stats"))
                 .andExpect(status().isOk())

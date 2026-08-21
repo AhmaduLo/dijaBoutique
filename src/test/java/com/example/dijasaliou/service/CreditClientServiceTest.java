@@ -284,7 +284,7 @@ class CreditClientServiceTest {
         when(creditClientRepository.countCreditsEnRetard(eq(StatutCredit.SOLDE), any(LocalDate.class), eq("uuid-tenant-test")))
                 .thenReturn(1L);
 
-        var stats = creditClientService.obtenirStats();
+        var stats = creditClientService.obtenirStats(null);
 
         assertThat(stats).containsKeys("totalEnAttente", "montantTotalDu",
                 "nombreCreditsActifs", "nombreClientsCrediteurs",
@@ -302,7 +302,7 @@ class CreditClientServiceTest {
         when(creditClientRepository.countClientsCrediteurs(any(), any())).thenReturn(0L);
         when(creditClientRepository.countCreditsEnRetard(any(), any(), any())).thenReturn(0L);
 
-        var stats = creditClientService.obtenirStats();
+        var stats = creditClientService.obtenirStats(null);
 
         assertThat((double) stats.get("tauxRecouvrement")).isEqualTo(0.0);
     }

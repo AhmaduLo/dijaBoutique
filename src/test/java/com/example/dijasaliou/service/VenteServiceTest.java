@@ -478,7 +478,7 @@ class VenteServiceTest {
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> rapport = venteService.calculerRapportModePaiement(
-                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), null);
 
         assertThat(rapport).containsKeys("ESPECES", "WAVE", "ORANGE_MONEY", "CREDIT");
     }
@@ -498,7 +498,7 @@ class VenteServiceTest {
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> rapport = venteService.calculerRapportModePaiement(
-                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), null);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> especes = (Map<String, Object>) rapport.get("ESPECES");
@@ -521,7 +521,7 @@ class VenteServiceTest {
                 .thenReturn(Collections.emptyList());
 
         Map<String, Object> rapport = venteService.calculerRapportModePaiement(
-                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), null);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> credit = (Map<String, Object>) rapport.get("CREDIT");
@@ -547,7 +547,7 @@ class VenteServiceTest {
                 .thenReturn(remboursements);
 
         Map<String, Object> rapport = venteService.calculerRapportModePaiement(
-                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), null);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> especes = (Map<String, Object>) rapport.get("ESPECES");

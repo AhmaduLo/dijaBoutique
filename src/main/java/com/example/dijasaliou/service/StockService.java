@@ -84,7 +84,7 @@ public class StockService {
     @Transactional(readOnly = true)
     public List<StockExportDto> obtenirStocksPourExport(LocalDate debut, LocalDate fin) {
         TenantEntity tenant = tenantService.getCurrentTenant();
-        List<StockDto> stocks = obtenirTousLesStocks();
+        List<StockDto> stocks = obtenirTousLesStocks(null);
 
         // Si pas de période → on retourne tous les stocks sans activité
         if (debut == null && fin == null) {
