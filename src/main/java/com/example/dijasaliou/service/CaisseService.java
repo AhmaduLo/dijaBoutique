@@ -204,10 +204,16 @@ public class CaisseService {
         // la requête SQL (chacune multiplie par le taux propre de sa transaction).
         SoldesAgreges agg = chargerAgregats(tenant, debut, fin, tauxTenant);
 
-        BigDecimal soldeInitialEspecesXof  = nz(config.getSoldeInitialEspeces()).multiply(BigDecimal.valueOf(tauxTenant));
-        BigDecimal soldeInitialWaveXof     = nz(config.getSoldeInitialWave()).multiply(BigDecimal.valueOf(tauxTenant));
-        BigDecimal soldeInitialOmXof       = nz(config.getSoldeInitialOm()).multiply(BigDecimal.valueOf(tauxTenant));
-        BigDecimal soldeInitialVirementXof = nz(config.getSoldeInitialVirement()).multiply(BigDecimal.valueOf(tauxTenant));
+        // IMPORTANT : soldeInitial* est saisi et stocké directement en XOF (référence fixe),
+        // PAS dans la devise courante du tenant. Le formulaire "Modifier les soldes initiaux"
+        // (frontend) travaille toujours en XOF pour ces mêmes champs, quelle que soit la
+        // devise d'affichage active — sinon rouvrir/ré-enregistrer ce formulaire pendant
+        // qu'une devise ≠ XOF est affichée réécrirait la valeur brute avec un nombre déjà
+        // converti, ce qui gonfle ou réduit le solde initial à chaque aller-retour.
+        BigDecimal soldeInitialEspecesXof  = nz(config.getSoldeInitialEspeces());
+        BigDecimal soldeInitialWaveXof     = nz(config.getSoldeInitialWave());
+        BigDecimal soldeInitialOmXof       = nz(config.getSoldeInitialOm());
+        BigDecimal soldeInitialVirementXof = nz(config.getSoldeInitialVirement());
 
         BigDecimal soldeEspeces  = soldeFromAgg(CompteCaisse.ESPECES,      soldeInitialEspecesXof,  agg);
         BigDecimal soldeWave     = soldeFromAgg(CompteCaisse.WAVE,         soldeInitialWaveXof,     agg);
