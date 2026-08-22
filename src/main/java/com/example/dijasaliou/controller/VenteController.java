@@ -322,8 +322,9 @@ public class VenteController {
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<BeneficeStatistiquesDto> obtenirBenefice(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
-        return ResponseEntity.ok(venteService.calculerStatistiquesBenefice(debut, fin));
+        return ResponseEntity.ok(venteService.calculerStatistiquesBenefice(debut, fin, devise));
     }
 }

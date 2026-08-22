@@ -63,6 +63,7 @@ public class CaisseService {
     private final UserRepository                      userRepository;
     private final UserPushNotificationService         userPushService;
     private final UserNotificationPreferenceService   prefService;
+    private final DeviseService                       deviseService;
 
     /**
      * Borne supérieure utilisée pour la vue "temps réel" (asOfDate non fourni).
@@ -128,7 +129,7 @@ public class CaisseService {
                 request.getSoldeInitialVirement());
 
         // Futur lointain pour fin : inclut tous les flux (évite tout problème de TZ)
-        return calculerSolde(tenant, config, FUTUR_LOINTAIN);
+        return calculerSolde(tenant, config, FUTUR_LOINTAIN, null);
     }
 
     // ── CALCUL DU SOLDE ──────────────────────────────────────────────────────
@@ -139,7 +140,7 @@ public class CaisseService {
      */
     @Transactional(readOnly = true)
     public CaisseSoldeDto getSoldeActuel() {
-        return getSoldeAt(null);
+        return getSoldeAt(null, null);
     }
 
     /**
@@ -152,17 +153,26 @@ public class CaisseService {
      */
     @Transactional(readOnly = true)
     public CaisseSoldeDto getSoldeAt(LocalDate asOfDate) {
+        return getSoldeAt(asOfDate, null);
+    }
+
+    /**
+     * Variante avec devise cible explicite — utilisée par les rapports, où l'utilisateur
+     * choisit dans quelle devise afficher l'évolution de caisse.
+     */
+    @Transactional(readOnly = true)
+    public CaisseSoldeDto getSoldeAt(LocalDate asOfDate, String devise) {
         TenantEntity tenant = tenantService.getCurrentTenant();
         LocalDateTime fin = toFinJournee(asOfDate);
 
         return caisseConfigRepository.findByTenant(tenant)
-                .map(config -> calculerSolde(tenant, config, fin))
+                .map(config -> calculerSolde(tenant, config, fin, devise))
                 .orElseGet(() -> CaisseSoldeDto.builder()
                         .active(false)
                         .build());
     }
 
-    private CaisseSoldeDto calculerSolde(TenantEntity tenant, CaisseConfigEntity config, LocalDateTime fin) {
+    private CaisseSoldeDto calculerSolde(TenantEntity tenant, CaisseConfigEntity config, LocalDateTime fin, String devise) {
         LocalDateTime debut = config.getDateActivation();
 
         // Si la période se termine avant l'activation, la caisse n'existait pas
@@ -195,6 +205,25 @@ public class CaisseService {
 
         BigDecimal soldeTotal = soldeEspeces.add(soldeWave).add(soldeOm).add(soldeVirement);
 
+        BigDecimal soldeInitialEspeces  = config.getSoldeInitialEspeces();
+        BigDecimal soldeInitialWave     = config.getSoldeInitialWave();
+        BigDecimal soldeInitialOm       = config.getSoldeInitialOm();
+        BigDecimal soldeInitialVirement = nz(config.getSoldeInitialVirement());
+
+        // Conversion devise : les mouvements sommés ci-dessus reprennent les montants
+        // des achats/ventes/dépenses tels que stockés, dans la devise actuellement
+        // utilisée par le tenant. Même pivot que calculerStatistiquesBenefice/fromCreditPerdu.
+        java.util.function.UnaryOperator<BigDecimal> convertir = construireConvertisseur(tenant, devise);
+        soldeEspeces  = convertir.apply(soldeEspeces);
+        soldeWave     = convertir.apply(soldeWave);
+        soldeOm       = convertir.apply(soldeOm);
+        soldeVirement = convertir.apply(soldeVirement);
+        soldeTotal    = convertir.apply(soldeTotal);
+        soldeInitialEspeces  = convertir.apply(soldeInitialEspeces);
+        soldeInitialWave     = convertir.apply(soldeInitialWave);
+        soldeInitialOm       = convertir.apply(soldeInitialOm);
+        soldeInitialVirement = convertir.apply(soldeInitialVirement);
+
         return CaisseSoldeDto.builder()
                 .active(true)
                 .dateActivation(debut)
@@ -203,11 +232,47 @@ public class CaisseService {
                 .soldeOm(soldeOm)
                 .soldeVirement(soldeVirement)
                 .soldeTotal(soldeTotal)
-                .soldeInitialEspeces(config.getSoldeInitialEspeces())
-                .soldeInitialWave(config.getSoldeInitialWave())
-                .soldeInitialOm(config.getSoldeInitialOm())
-                .soldeInitialVirement(nz(config.getSoldeInitialVirement()))
+                .soldeInitialEspeces(soldeInitialEspeces)
+                .soldeInitialWave(soldeInitialWave)
+                .soldeInitialOm(soldeInitialOm)
+                .soldeInitialVirement(soldeInitialVirement)
                 .build();
+    }
+
+    /**
+     * Construit un convertisseur devise-courante-du-tenant → devise cible (pivot XOF),
+     * réutilisé par tous les montants de {@link #calculerSolde}.
+     */
+    private java.util.function.UnaryOperator<BigDecimal> construireConvertisseur(TenantEntity tenant, String devise) {
+        String codeDeviseOrigine = tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF";
+        double tauxOrigine = 1.0;
+        try {
+            DeviseEntity deviseOrigine = deviseService.obtenirDeviseParCode(codeDeviseOrigine);
+            if (deviseOrigine != null && deviseOrigine.getTauxChange() != null) {
+                tauxOrigine = deviseOrigine.getTauxChange();
+            }
+        } catch (RuntimeException e) {
+            tauxOrigine = 1.0;
+        }
+
+        String codeDeviseCible = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim() : codeDeviseOrigine;
+        double tauxCible = tauxOrigine;
+        if (!codeDeviseCible.equals(codeDeviseOrigine)) {
+            try {
+                DeviseEntity deviseCible = deviseService.obtenirDeviseParCode(codeDeviseCible);
+                tauxCible = (deviseCible != null && deviseCible.getTauxChange() != null)
+                        ? deviseCible.getTauxChange() : tauxOrigine;
+            } catch (RuntimeException e) {
+                tauxCible = tauxOrigine;
+            }
+        }
+        final double tauxOrigineFinal = tauxOrigine > 0 ? tauxOrigine : 1.0;
+        final double tauxCibleFinal = tauxCible > 0 ? tauxCible : 1.0;
+
+        return montant -> (montant != null ? montant : BigDecimal.ZERO)
+                .multiply(BigDecimal.valueOf(tauxOrigineFinal))
+                .divide(BigDecimal.valueOf(tauxCibleFinal), 2, java.math.RoundingMode.HALF_UP);
     }
 
     /**

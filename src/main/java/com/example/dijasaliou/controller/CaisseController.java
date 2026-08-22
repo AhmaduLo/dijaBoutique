@@ -54,8 +54,9 @@ public class CaisseController {
             message = "Le module Caisse est réservé au plan BUSINESS"
     )
     public ResponseEntity<CaisseSoldeDto> getSolde(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
-        return ResponseEntity.ok(caisseService.getSoldeAt(asOfDate));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate,
+            @RequestParam(required = false) String devise) {
+        return ResponseEntity.ok(caisseService.getSoldeAt(asOfDate, devise));
     }
 
     /**

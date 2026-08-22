@@ -816,7 +816,7 @@ public class VenteService {
      * sont comptées dans nbVentesSansBenefice.
      */
     @Transactional(readOnly = true)
-    public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin) {
+    public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin, String devise) {
         TenantEntity tenant = tenantService.getCurrentTenant();
         LocalDateTime debutDt = debut.atStartOfDay();
         LocalDateTime finDt   = fin.atTime(LocalTime.MAX);
@@ -930,6 +930,49 @@ public class VenteService {
                     .multiply(new BigDecimal("100"))
                     .divide(ca, 2, java.math.RoundingMode.HALF_UP);
         }
+
+        // 6. Conversion devise : tous les montants ci-dessus sont exprimés dans la devise
+        // actuellement utilisée par le tenant pour ses saisies (les coûts FIFO reprennent
+        // les prix des achats/ventes tels que stockés). On pivote vers la devise demandée
+        // pour le rapport, même logique que calculerRapportModePaiement/fromCreditPerdu.
+        String codeDeviseOrigine = tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF";
+        double tauxOrigine = 1.0;
+        try {
+            DeviseEntity deviseOrigine = deviseService.obtenirDeviseParCode(codeDeviseOrigine);
+            if (deviseOrigine != null && deviseOrigine.getTauxChange() != null) {
+                tauxOrigine = deviseOrigine.getTauxChange();
+            }
+        } catch (RuntimeException e) {
+            tauxOrigine = 1.0;
+        }
+
+        String codeDeviseCible = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim() : codeDeviseOrigine;
+        double tauxCible = tauxOrigine;
+        if (!codeDeviseCible.equals(codeDeviseOrigine)) {
+            try {
+                DeviseEntity deviseCible = deviseService.obtenirDeviseParCode(codeDeviseCible);
+                tauxCible = (deviseCible != null && deviseCible.getTauxChange() != null)
+                        ? deviseCible.getTauxChange() : tauxOrigine;
+            } catch (RuntimeException e) {
+                tauxCible = tauxOrigine;
+            }
+        }
+        final double tauxOrigineFinal = tauxOrigine > 0 ? tauxOrigine : 1.0;
+        final double tauxCibleFinal = tauxCible > 0 ? tauxCible : 1.0;
+        java.util.function.UnaryOperator<BigDecimal> convertir = montant -> montant
+                .multiply(BigDecimal.valueOf(tauxOrigineFinal))
+                .divide(BigDecimal.valueOf(tauxCibleFinal), 2, java.math.RoundingMode.HALF_UP);
+
+        ca = convertir.apply(ca);
+        coutTotal = convertir.apply(coutTotal);
+        beneficeTotal = convertir.apply(beneficeTotal);
+        totalPertes = convertir.apply(totalPertes);
+        java.util.Map<String, BigDecimal> pertesParTypeConverties = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, BigDecimal> entry : pertesParType.entrySet()) {
+            pertesParTypeConverties.put(entry.getKey(), convertir.apply(entry.getValue()));
+        }
+        pertesParType = pertesParTypeConverties;
 
         return BeneficeStatistiquesDto.builder()
                 .dateDebut(debut)
