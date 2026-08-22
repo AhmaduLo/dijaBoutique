@@ -359,6 +359,29 @@ public class StockService {
     }
 
     /**
+     * Calcule ruptures + stock bas en un seul appel à {@link #obtenirTousLesStocks}, au lieu
+     * d'appeler {@link #obtenirProduitsEnRupture} et {@link #obtenirProduitsStockBas} séparément
+     * (chacun recalculerait tout le stock depuis zéro — et l'auto-appel interne empêcherait
+     * de toute façon le cache Spring de s'appliquer sur ces deux méthodes).
+     * Utilisé par GET /stock/alertes, qui a besoin des deux listes en même temps.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, List<StockDto>> obtenirAlertesStock() {
+        List<StockDto> tousLesStocks = obtenirTousLesStocks(null);
+        List<StockDto> ruptures = tousLesStocks.stream()
+                .filter(stock -> stock.getStockDisponible() <= 0)
+                .collect(Collectors.toList());
+        List<StockDto> stocksBas = tousLesStocks.stream()
+                .filter(stock -> stock.getStockDisponible() > 0 && stock.getStockDisponible() < 10)
+                .collect(Collectors.toList());
+
+        Map<String, List<StockDto>> resultat = new java.util.LinkedHashMap<>();
+        resultat.put("ruptures", ruptures);
+        resultat.put("stocksBas", stocksBas);
+        return resultat;
+    }
+
+    /**
      * Vérifier si un produit a un stock suffisant pour une vente
      *
      * @param nomProduit Nom du produit

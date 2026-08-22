@@ -140,8 +140,9 @@ public class StockController {
      */
     @GetMapping("/alertes")
     public ResponseEntity<Map<String, Object>> obtenirAlertes() {
-        List<StockDto> ruptures = stockService.obtenirProduitsEnRupture();
-        List<StockDto> stocksBas = stockService.obtenirProduitsStockBas();
+        Map<String, List<StockDto>> alertesStock = stockService.obtenirAlertesStock();
+        List<StockDto> ruptures = alertesStock.get("ruptures");
+        List<StockDto> stocksBas = alertesStock.get("stocksBas");
 
         Map<String, Object> alertes = new HashMap<>();
         alertes.put("ruptures", ruptures);
