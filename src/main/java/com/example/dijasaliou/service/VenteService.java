@@ -904,8 +904,11 @@ public class VenteService {
             VenteEntity vente = credit.getVente();
             if (vente == null || vente.getPrixTotal() == null
                     || vente.getPrixTotal().compareTo(BigDecimal.ZERO) <= 0) {
-                // Sans vente associée, on prend la perte = montant restant (pas de coût FIFO calculable)
-                pertesCreditImpaye = pertesCreditImpaye.add(montantRestant);
+                // Sans vente associée, on prend la perte = montant restant (pas de coût FIFO calculable),
+                // ramené en XOF via le taux propre du crédit (même devise que le montant restant).
+                double tauxCredit = (credit.getTauxChangeApplique() != null && credit.getTauxChangeApplique() > 0)
+                        ? credit.getTauxChangeApplique() : 1.0;
+                pertesCreditImpaye = pertesCreditImpaye.add(montantRestant.multiply(BigDecimal.valueOf(tauxCredit)));
                 nbCreditsEnPerte++;
                 continue;
             }
@@ -931,46 +934,60 @@ public class VenteService {
                     .divide(ca, 2, java.math.RoundingMode.HALF_UP);
         }
 
-        // 6. Conversion devise : tous les montants ci-dessus sont exprimés dans la devise
-        // actuellement utilisée par le tenant pour ses saisies (les coûts FIFO reprennent
-        // les prix des achats/ventes tels que stockés). On pivote vers la devise demandée
-        // pour le rapport, même logique que calculerRapportModePaiement/fromCreditPerdu.
-        String codeDeviseOrigine = tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF";
-        double tauxOrigine = 1.0;
+        // 6. Conversion devise vers la devise demandée pour le rapport.
+        //
+        // coutTotal / beneficeTotal / totalPertes / pertesParType sont désormais
+        // exprimés en XOF : les requêtes SQL qui les alimentent (sumCoutAchatByVenteId,
+        // sumBeneficeByVenteId, sumCoutAchatNonCreditBetween, sumBeneficeNonCreditBetween,
+        // sumPertesFifoParTypeBetween) multiplient chaque ligne par le taux de change de
+        // SON propre achat/vente avant de sommer — indispensable car deux lots consommés
+        // sur une même période peuvent avoir été achetés dans des devises différentes.
+        // On divise donc simplement par le taux de la devise cible.
+        //
+        // ca reste, lui, une somme brute non normalisée (voir calculerChiffreAffaires) —
+        // on le pivote depuis la devise courante du tenant comme avant, en l'absence
+        // d'affichage testé qui en dépende actuellement.
+        String codeDeviseTenant = tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF";
+        double tauxTenant = 1.0;
         try {
-            DeviseEntity deviseOrigine = deviseService.obtenirDeviseParCode(codeDeviseOrigine);
-            if (deviseOrigine != null && deviseOrigine.getTauxChange() != null) {
-                tauxOrigine = deviseOrigine.getTauxChange();
+            DeviseEntity deviseTenant = deviseService.obtenirDeviseParCode(codeDeviseTenant);
+            if (deviseTenant != null && deviseTenant.getTauxChange() != null) {
+                tauxTenant = deviseTenant.getTauxChange();
             }
         } catch (RuntimeException e) {
-            tauxOrigine = 1.0;
+            tauxTenant = 1.0;
         }
 
         String codeDeviseCible = (devise != null && !devise.isBlank())
-                ? devise.toUpperCase().trim() : codeDeviseOrigine;
-        double tauxCible = tauxOrigine;
-        if (!codeDeviseCible.equals(codeDeviseOrigine)) {
+                ? devise.toUpperCase().trim() : codeDeviseTenant;
+        double tauxCible = tauxTenant;
+        if (!codeDeviseCible.equals(codeDeviseTenant)) {
             try {
                 DeviseEntity deviseCible = deviseService.obtenirDeviseParCode(codeDeviseCible);
                 tauxCible = (deviseCible != null && deviseCible.getTauxChange() != null)
-                        ? deviseCible.getTauxChange() : tauxOrigine;
+                        ? deviseCible.getTauxChange() : tauxTenant;
             } catch (RuntimeException e) {
-                tauxCible = tauxOrigine;
+                tauxCible = tauxTenant;
             }
         }
-        final double tauxOrigineFinal = tauxOrigine > 0 ? tauxOrigine : 1.0;
+        final double tauxTenantFinal = tauxTenant > 0 ? tauxTenant : 1.0;
         final double tauxCibleFinal = tauxCible > 0 ? tauxCible : 1.0;
-        java.util.function.UnaryOperator<BigDecimal> convertir = montant -> montant
-                .multiply(BigDecimal.valueOf(tauxOrigineFinal))
+
+        // ca : pivot depuis la devise courante du tenant (comportement pré-existant)
+        java.util.function.UnaryOperator<BigDecimal> convertirDepuisDeviseTenant = montant -> montant
+                .multiply(BigDecimal.valueOf(tauxTenantFinal))
+                .divide(BigDecimal.valueOf(tauxCibleFinal), 2, java.math.RoundingMode.HALF_UP);
+        // coutTotal / beneficeTotal / totalPertes / pertesParType : déjà en XOF, pivot direct
+        java.util.function.UnaryOperator<BigDecimal> convertirDepuisXof = montant -> montant
                 .divide(BigDecimal.valueOf(tauxCibleFinal), 2, java.math.RoundingMode.HALF_UP);
 
-        ca = convertir.apply(ca);
-        coutTotal = convertir.apply(coutTotal);
-        beneficeTotal = convertir.apply(beneficeTotal);
-        totalPertes = convertir.apply(totalPertes);
+        ca = convertirDepuisDeviseTenant.apply(ca);
+        coutTotal = convertirDepuisXof.apply(coutTotal);
+        beneficeTotal = convertirDepuisXof.apply(beneficeTotal);
+        totalPertes = convertirDepuisXof.apply(totalPertes);
         java.util.Map<String, BigDecimal> pertesParTypeConverties = new java.util.LinkedHashMap<>();
         for (java.util.Map.Entry<String, BigDecimal> entry : pertesParType.entrySet()) {
-            pertesParTypeConverties.put(entry.getKey(), convertir.apply(entry.getValue()));
+            pertesParTypeConverties.put(entry.getKey(), convertirDepuisXof.apply(entry.getValue()));
         }
         pertesParType = pertesParTypeConverties;
 
