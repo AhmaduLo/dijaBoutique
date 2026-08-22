@@ -194,85 +194,77 @@ public class CaisseService {
                     .build();
         }
 
+        // Taux de la devise courante du tenant (référence pour tout ce qui n'a pas de
+        // devise propre stockée : transferts internes, mouvements manuels, soldes initiaux).
+        double tauxTenant = resoudreTauxTenant(tenant);
+
         // OPTIMISATION : 7 queries groupées au lieu de 28 (7 × 4 comptes avant)
         // Chaque query GROUP BY compte/mode retourne tous les comptes d'un coup.
-        SoldesAgreges agg = chargerAgregats(tenant, debut, fin);
+        // Ventes/achats/dépenses/paiements crédit sont déjà normalisés en XOF par
+        // la requête SQL (chacune multiplie par le taux propre de sa transaction).
+        SoldesAgreges agg = chargerAgregats(tenant, debut, fin, tauxTenant);
 
-        BigDecimal soldeEspeces  = soldeFromAgg(CompteCaisse.ESPECES,      config.getSoldeInitialEspeces(),  agg);
-        BigDecimal soldeWave     = soldeFromAgg(CompteCaisse.WAVE,         config.getSoldeInitialWave(),     agg);
-        BigDecimal soldeOm       = soldeFromAgg(CompteCaisse.ORANGE_MONEY, config.getSoldeInitialOm(),       agg);
-        BigDecimal soldeVirement = soldeFromAgg(CompteCaisse.VIREMENT,     nz(config.getSoldeInitialVirement()), agg);
+        BigDecimal soldeInitialEspecesXof  = nz(config.getSoldeInitialEspeces()).multiply(BigDecimal.valueOf(tauxTenant));
+        BigDecimal soldeInitialWaveXof     = nz(config.getSoldeInitialWave()).multiply(BigDecimal.valueOf(tauxTenant));
+        BigDecimal soldeInitialOmXof       = nz(config.getSoldeInitialOm()).multiply(BigDecimal.valueOf(tauxTenant));
+        BigDecimal soldeInitialVirementXof = nz(config.getSoldeInitialVirement()).multiply(BigDecimal.valueOf(tauxTenant));
+
+        BigDecimal soldeEspeces  = soldeFromAgg(CompteCaisse.ESPECES,      soldeInitialEspecesXof,  agg);
+        BigDecimal soldeWave     = soldeFromAgg(CompteCaisse.WAVE,         soldeInitialWaveXof,     agg);
+        BigDecimal soldeOm       = soldeFromAgg(CompteCaisse.ORANGE_MONEY, soldeInitialOmXof,       agg);
+        BigDecimal soldeVirement = soldeFromAgg(CompteCaisse.VIREMENT,     soldeInitialVirementXof, agg);
 
         BigDecimal soldeTotal = soldeEspeces.add(soldeWave).add(soldeOm).add(soldeVirement);
 
-        BigDecimal soldeInitialEspeces  = config.getSoldeInitialEspeces();
-        BigDecimal soldeInitialWave     = config.getSoldeInitialWave();
-        BigDecimal soldeInitialOm       = config.getSoldeInitialOm();
-        BigDecimal soldeInitialVirement = nz(config.getSoldeInitialVirement());
-
-        // Conversion devise : les mouvements sommés ci-dessus reprennent les montants
-        // des achats/ventes/dépenses tels que stockés, dans la devise actuellement
-        // utilisée par le tenant. Même pivot que calculerStatistiquesBenefice/fromCreditPerdu.
-        java.util.function.UnaryOperator<BigDecimal> convertir = construireConvertisseur(tenant, devise);
-        soldeEspeces  = convertir.apply(soldeEspeces);
-        soldeWave     = convertir.apply(soldeWave);
-        soldeOm       = convertir.apply(soldeOm);
-        soldeVirement = convertir.apply(soldeVirement);
-        soldeTotal    = convertir.apply(soldeTotal);
-        soldeInitialEspeces  = convertir.apply(soldeInitialEspeces);
-        soldeInitialWave     = convertir.apply(soldeInitialWave);
-        soldeInitialOm       = convertir.apply(soldeInitialOm);
-        soldeInitialVirement = convertir.apply(soldeInitialVirement);
+        // Tout ce qui précède est désormais en XOF — il ne reste qu'à diviser par le
+        // taux de la devise cible demandée pour le rapport (ou la devise du tenant si absente).
+        double tauxCible = resoudreTauxCible(devise, tauxTenant);
+        java.util.function.UnaryOperator<BigDecimal> convertirDepuisXof = montant -> (montant != null ? montant : BigDecimal.ZERO)
+                .divide(BigDecimal.valueOf(tauxCible), 2, java.math.RoundingMode.HALF_UP);
 
         return CaisseSoldeDto.builder()
                 .active(true)
                 .dateActivation(debut)
-                .soldeEspeces(soldeEspeces)
-                .soldeWave(soldeWave)
-                .soldeOm(soldeOm)
-                .soldeVirement(soldeVirement)
-                .soldeTotal(soldeTotal)
-                .soldeInitialEspeces(soldeInitialEspeces)
-                .soldeInitialWave(soldeInitialWave)
-                .soldeInitialOm(soldeInitialOm)
-                .soldeInitialVirement(soldeInitialVirement)
+                .soldeEspeces(convertirDepuisXof.apply(soldeEspeces))
+                .soldeWave(convertirDepuisXof.apply(soldeWave))
+                .soldeOm(convertirDepuisXof.apply(soldeOm))
+                .soldeVirement(convertirDepuisXof.apply(soldeVirement))
+                .soldeTotal(convertirDepuisXof.apply(soldeTotal))
+                .soldeInitialEspeces(convertirDepuisXof.apply(soldeInitialEspecesXof))
+                .soldeInitialWave(convertirDepuisXof.apply(soldeInitialWaveXof))
+                .soldeInitialOm(convertirDepuisXof.apply(soldeInitialOmXof))
+                .soldeInitialVirement(convertirDepuisXof.apply(soldeInitialVirementXof))
                 .build();
     }
 
-    /**
-     * Construit un convertisseur devise-courante-du-tenant → devise cible (pivot XOF),
-     * réutilisé par tous les montants de {@link #calculerSolde}.
-     */
-    private java.util.function.UnaryOperator<BigDecimal> construireConvertisseur(TenantEntity tenant, String devise) {
-        String codeDeviseOrigine = tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF";
-        double tauxOrigine = 1.0;
+    /** Taux de change (1 unité devise → XOF) de la devise actuellement utilisée par le tenant. */
+    private double resoudreTauxTenant(TenantEntity tenant) {
+        String codeDeviseTenant = tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF";
         try {
-            DeviseEntity deviseOrigine = deviseService.obtenirDeviseParCode(codeDeviseOrigine);
-            if (deviseOrigine != null && deviseOrigine.getTauxChange() != null) {
-                tauxOrigine = deviseOrigine.getTauxChange();
+            DeviseEntity deviseTenant = deviseService.obtenirDeviseParCode(codeDeviseTenant);
+            if (deviseTenant != null && deviseTenant.getTauxChange() != null && deviseTenant.getTauxChange() > 0) {
+                return deviseTenant.getTauxChange();
             }
         } catch (RuntimeException e) {
-            tauxOrigine = 1.0;
+            // fallback ci-dessous
         }
+        return 1.0;
+    }
 
-        String codeDeviseCible = (devise != null && !devise.isBlank())
-                ? devise.toUpperCase().trim() : codeDeviseOrigine;
-        double tauxCible = tauxOrigine;
-        if (!codeDeviseCible.equals(codeDeviseOrigine)) {
-            try {
-                DeviseEntity deviseCible = deviseService.obtenirDeviseParCode(codeDeviseCible);
-                tauxCible = (deviseCible != null && deviseCible.getTauxChange() != null)
-                        ? deviseCible.getTauxChange() : tauxOrigine;
-            } catch (RuntimeException e) {
-                tauxCible = tauxOrigine;
+    /** Taux de change de la devise cible demandée (fallback : devise du tenant). */
+    private double resoudreTauxCible(String devise, double tauxTenant) {
+        if (devise == null || devise.isBlank()) {
+            return tauxTenant > 0 ? tauxTenant : 1.0;
+        }
+        try {
+            DeviseEntity deviseCible = deviseService.obtenirDeviseParCode(devise.toUpperCase().trim());
+            if (deviseCible != null && deviseCible.getTauxChange() != null && deviseCible.getTauxChange() > 0) {
+                return deviseCible.getTauxChange();
             }
+        } catch (RuntimeException e) {
+            // fallback ci-dessous
         }
-        final double tauxOrigineFinal = tauxOrigine > 0 ? tauxOrigine : 1.0;
-        final double tauxCibleFinal = tauxCible > 0 ? tauxCible : 1.0;
-
-        return montant -> (montant != null ? montant : BigDecimal.ZERO)
-                .multiply(BigDecimal.valueOf(tauxOrigineFinal))
-                .divide(BigDecimal.valueOf(tauxCibleFinal), 2, java.math.RoundingMode.HALF_UP);
+        return tauxTenant > 0 ? tauxTenant : 1.0;
     }
 
     /**
@@ -290,11 +282,20 @@ public class CaisseService {
         final Map<CompteCaisse, BigDecimal> sortiesManuelles   = new EnumMap<>(CompteCaisse.class);
     }
 
-    /** Charge tous les agrégats nécessaires au calcul du solde en 7 queries. */
-    private SoldesAgreges chargerAgregats(TenantEntity tenant, LocalDateTime debut, LocalDateTime fin) {
+    /**
+     * Charge tous les agrégats nécessaires au calcul du solde en 7 queries.
+     *
+     * @param tauxTenant taux de change de la devise courante du tenant → XOF, appliqué
+     *                   aux transferts/mouvements manuels qui n'ont pas de devise propre
+     *                   stockée (contrairement aux ventes/achats/dépenses/paiements crédit,
+     *                   déjà normalisés en XOF au niveau SQL via leur propre taux stocké).
+     */
+    private SoldesAgreges chargerAgregats(TenantEntity tenant, LocalDateTime debut, LocalDateTime fin, double tauxTenant) {
         SoldesAgreges agg = new SoldesAgreges();
+        BigDecimal tauxTenantBd = BigDecimal.valueOf(tauxTenant);
 
         // 1. Ventes par mode → entrées par compte (CREDIT exclu, n'impacte pas la caisse)
+        // Déjà en XOF : la requête multiplie chaque vente par son propre taux de change.
         for (Object[] row : venteRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             VenteEntity.ModePaiementVente mode = (VenteEntity.ModePaiementVente) row[0];
             BigDecimal sum = (BigDecimal) row[1];
@@ -302,46 +303,47 @@ public class CaisseService {
             if (compte != null) agg.entreesVentes.merge(compte, sum, BigDecimal::add);
         }
 
-        // 2. Achats par mode → sorties par compte
+        // 2. Achats par mode → sorties par compte (déjà en XOF)
         for (Object[] row : achatRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             ModePaiementCaisse mode = (ModePaiementCaisse) row[0];
             BigDecimal sum = (BigDecimal) row[1];
             agg.sortiesAchats.merge(mode.toCompteCaisse(), sum, BigDecimal::add);
         }
 
-        // 3. Dépenses par mode → sorties par compte
+        // 3. Dépenses par mode → sorties par compte (déjà en XOF)
         for (Object[] row : depenseRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             ModePaiementCaisse mode = (ModePaiementCaisse) row[0];
             BigDecimal sum = (BigDecimal) row[1];
             agg.sortiesDepenses.merge(mode.toCompteCaisse(), sum, BigDecimal::add);
         }
 
-        // 4. Paiements crédit par mode → entrées par compte
+        // 4. Paiements crédit par mode → entrées par compte (déjà en XOF)
         for (Object[] row : paiementCreditRepository.sumByModeGrouped(tenant, debut.toLocalDate(), fin.toLocalDate())) {
             PaiementCreditEntity.ModePaiement mode = (PaiementCreditEntity.ModePaiement) row[0];
             BigDecimal sum = (BigDecimal) row[1];
             agg.entreesCredits.merge(modeCreditToCompte(mode), sum, BigDecimal::add);
         }
 
-        // 5. Transferts sortants (compte_source)
+        // 5. Transferts sortants (compte_source) — pas de devise propre stockée,
+        // on suppose la devise courante du tenant et on convertit en XOF ici.
         for (Object[] row : transfertRepository.sumSortiesGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = ((BigDecimal) row[1]).multiply(tauxTenantBd);
             agg.transfertsSortants.put(compte, sum);
         }
 
-        // 6. Transferts entrants (compte_destination)
+        // 6. Transferts entrants (compte_destination) — idem
         for (Object[] row : transfertRepository.sumEntreesGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = ((BigDecimal) row[1]).multiply(tauxTenantBd);
             agg.transfertsEntrants.put(compte, sum);
         }
 
-        // 7. Mouvements manuels par (compte, type)
+        // 7. Mouvements manuels par (compte, type) — idem
         for (Object[] row : mouvementManuelRepository.sumByCompteAndTypeGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
             TypeMouvement type  = (TypeMouvement) row[1];
-            BigDecimal sum      = (BigDecimal) row[2];
+            BigDecimal sum      = ((BigDecimal) row[2]).multiply(tauxTenantBd);
             (type == TypeMouvement.ENTREE ? agg.entreesManuelles : agg.sortiesManuelles)
                     .put(compte, sum);
         }

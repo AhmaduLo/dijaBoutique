@@ -90,7 +90,7 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
 
     /** Optimisation caisse : total dépenses GROUPÉ par mode en une seule query. */
     @Query("""
-            SELECT d.modePaiement, COALESCE(SUM(d.montant), 0)
+            SELECT d.modePaiement, COALESCE(SUM(d.montant * d.tauxChangeApplique), 0)
             FROM DepenseEntity d
             WHERE d.tenant = :tenant
               AND d.dateDepense >= :debut

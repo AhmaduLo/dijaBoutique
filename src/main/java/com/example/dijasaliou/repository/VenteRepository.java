@@ -105,7 +105,7 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
      * en une seule query. Résultat : List<[ModePaiementVente, BigDecimal]>.
      */
     @Query("""
-            SELECT v.modePaiement, COALESCE(SUM(v.prixTotal), 0)
+            SELECT v.modePaiement, COALESCE(SUM(v.prixTotal * v.tauxChangeApplique), 0)
             FROM VenteEntity v
             WHERE v.tenant = :tenant
               AND v.dateVente >= :debut

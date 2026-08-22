@@ -148,7 +148,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
 
     /** Optimisation caisse : total achats GROUPÉ par mode en une seule query. */
     @Query("""
-            SELECT a.modePaiement, COALESCE(SUM(a.prixTotal), 0)
+            SELECT a.modePaiement, COALESCE(SUM(a.prixTotal * a.tauxChangeApplique), 0)
             FROM AchatEntity a
             WHERE a.tenant = :tenant
               AND a.dateAchat >= :debut
