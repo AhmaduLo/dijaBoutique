@@ -193,7 +193,7 @@ public interface VenteLotConsommationRepository
      */
     @Query("""
             SELECT v.vente.nomProduit,
-                   SUM(v.beneficeTotalLigne),
+                   SUM(v.beneficeTotalLigne * v.vente.tauxChangeApplique),
                    SUM(v.quantiteConsommee)
             FROM VenteLotConsommationEntity v
             WHERE v.tenant = :tenant

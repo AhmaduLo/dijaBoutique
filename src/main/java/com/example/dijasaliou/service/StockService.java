@@ -62,7 +62,10 @@ public class StockService {
         List<Object[]> rows = venteLotConsommationRepository.sumBeneficeAndQuantiteByProduit(tenant);
         for (Object[] row : rows) {
             String nom = ((String) row[0]).toLowerCase().trim();
-            BigDecimal benefice = (BigDecimal) row[1];
+            // Cast défensif : la multiplication par tauxChangeApplique (Double) dans la requête
+            // fait renvoyer un Double par Hibernate plutôt qu'un BigDecimal.
+            BigDecimal benefice = row[1] instanceof BigDecimal bd ? bd
+                    : (row[1] instanceof Number n ? BigDecimal.valueOf(n.doubleValue()) : null);
             Double quantite = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
             resultat.put(nom, new BigDecimal[]{
                     benefice != null ? benefice : BigDecimal.ZERO,
@@ -150,12 +153,18 @@ public class StockService {
 
     /**
      * Enrichit un StockDto avec le bénéfice FIFO total et la quantité vendue avec bénéfice.
+     *
+     * @param tauxRapport taux de la devise cible (1.0 = XOF, pas de conversion). Le bénéfice
+     *                    FIFO ({@link #chargerBeneficesParProduit}) est déjà normalisé en XOF
+     *                    côté SQL — il ne reste qu'à diviser par ce taux, même logique que
+     *                    {@link #calculerStock} pour les autres montants du stock.
      */
-    private void enrichirAvecBenefice(StockDto stock, Map<String, BigDecimal[]> beneficesParProduit) {
+    private void enrichirAvecBenefice(StockDto stock, Map<String, BigDecimal[]> beneficesParProduit, double tauxRapport) {
         String key = stock.getNomProduit().toLowerCase().trim();
         BigDecimal[] benef = beneficesParProduit.get(key);
+        double taux = tauxRapport > 0 ? tauxRapport : 1.0;
         if (benef != null) {
-            stock.setBeneficeTotal(benef[0]);
+            stock.setBeneficeTotal(benef[0].divide(BigDecimal.valueOf(taux), 2, java.math.RoundingMode.HALF_UP));
             stock.setQuantiteVendueAvecBenefice(benef[1].doubleValue());
         } else {
             stock.setBeneficeTotal(BigDecimal.ZERO);
@@ -212,7 +221,7 @@ public class StockService {
             List<VenteEntity> ventesProduitsListe = ventesParProduit.getOrDefault(nomProduit, new ArrayList<>());
 
             StockDto stock = calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe, tauxRapport, codeDevise);
-            enrichirAvecBenefice(stock, beneficesParProduit);
+            enrichirAvecBenefice(stock, beneficesParProduit, tauxRapport);
             stocks.add(stock);
         }
 
@@ -253,7 +262,7 @@ public class StockService {
             List<VenteEntity> ventesP = ventesParProduit.getOrDefault(nomArchive, new ArrayList<>());
             if (!achatsP.isEmpty()) {
                 StockDto stock = calculerStock(nomArchive, achatsP, ventesP);
-                enrichirAvecBenefice(stock, beneficesParProduit);
+                enrichirAvecBenefice(stock, beneficesParProduit, 1.0);
                 stocksArchives.add(stock);
             }
         }
@@ -280,7 +289,7 @@ public class StockService {
         for (Map.Entry<String, List<AchatEntity>> entry : achatsParProduit.entrySet()) {
             StockDto stock = calculerStock(entry.getKey(), entry.getValue(),
                     ventesParProduit.getOrDefault(entry.getKey(), new ArrayList<>()));
-            enrichirAvecBenefice(stock, beneficesParProduit);
+            enrichirAvecBenefice(stock, beneficesParProduit, 1.0);
             stocks.add(stock);
         }
         return stocks;
@@ -321,7 +330,7 @@ public class StockService {
                 ? deviseRapport.getTauxChange() : 1.0;
 
         StockDto stock = calculerStock(nomProduit, achats, ventes, tauxRapport, codeDevise);
-        enrichirAvecBenefice(stock, chargerBeneficesParProduit(tenant));
+        enrichirAvecBenefice(stock, chargerBeneficesParProduit(tenant), tauxRapport);
         return stock;
     }
 
