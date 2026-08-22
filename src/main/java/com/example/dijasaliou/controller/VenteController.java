@@ -304,8 +304,9 @@ public class VenteController {
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<List<VenteDto>> obtenirSorties(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
-        return ResponseEntity.ok(venteService.obtenirSortiesPeriode(debut, fin));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
+        return ResponseEntity.ok(venteService.obtenirSortiesPeriode(debut, fin, devise));
     }
 
     /**

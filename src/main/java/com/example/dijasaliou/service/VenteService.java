@@ -753,10 +753,28 @@ public class VenteService {
      * de manière unifiée dans le tableau.
      */
     @Transactional(readOnly = true)
-    public List<com.example.dijasaliou.dto.VenteDto> obtenirSortiesPeriode(LocalDate debut, LocalDate fin) {
-        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+    public List<com.example.dijasaliou.dto.VenteDto> obtenirSortiesPeriode(LocalDate debut, LocalDate fin, String devise) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String tenantUuid = tenant.getTenantUuid();
         LocalDateTime debutDt = debut.atStartOfDay();
         LocalDateTime finDt = fin.atTime(LocalTime.MAX);
+
+        // Devise de rapport : paramètre explicite ou préférence du tenant (même logique que calculerRapportModePaiement)
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        String symboleCible = "CFA";
+        double tauxCible = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null) {
+                tauxCible = deviseRapport.getTauxChange() != null ? deviseRapport.getTauxChange() : 1.0;
+                symboleCible = deviseRapport.getSymbole() != null ? deviseRapport.getSymbole() : "CFA";
+            }
+        } catch (RuntimeException e) {
+            symboleCible = "CFA";
+            tauxCible = 1.0;
+        }
 
         List<com.example.dijasaliou.dto.VenteDto> resultat = new java.util.ArrayList<>(
                 venteRepository.findSortiesBetween(debutDt, finDt, tenantUuid).stream()
@@ -767,7 +785,7 @@ public class VenteService {
         // Crédits passés en perte sur la période — virtual sorties
         for (com.example.dijasaliou.entity.CreditClientEntity credit :
                 creditClientRepository.findCreditsPassesEnPerteBetween(debut, fin, tenantUuid)) {
-            resultat.add(com.example.dijasaliou.dto.VenteDto.fromCreditPerdu(credit));
+            resultat.add(com.example.dijasaliou.dto.VenteDto.fromCreditPerdu(credit, symboleCible, tauxCible));
         }
 
         // Tri global par date desc
