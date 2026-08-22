@@ -298,7 +298,7 @@ public class CaisseService {
         // Déjà en XOF : la requête multiplie chaque vente par son propre taux de change.
         for (Object[] row : venteRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             VenteEntity.ModePaiementVente mode = (VenteEntity.ModePaiementVente) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             CompteCaisse compte = modeVenteToCompte(mode);
             if (compte != null) agg.entreesVentes.merge(compte, sum, BigDecimal::add);
         }
@@ -306,21 +306,21 @@ public class CaisseService {
         // 2. Achats par mode → sorties par compte (déjà en XOF)
         for (Object[] row : achatRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             ModePaiementCaisse mode = (ModePaiementCaisse) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.sortiesAchats.merge(mode.toCompteCaisse(), sum, BigDecimal::add);
         }
 
         // 3. Dépenses par mode → sorties par compte (déjà en XOF)
         for (Object[] row : depenseRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             ModePaiementCaisse mode = (ModePaiementCaisse) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.sortiesDepenses.merge(mode.toCompteCaisse(), sum, BigDecimal::add);
         }
 
         // 4. Paiements crédit par mode → entrées par compte (déjà en XOF)
         for (Object[] row : paiementCreditRepository.sumByModeGrouped(tenant, debut.toLocalDate(), fin.toLocalDate())) {
             PaiementCreditEntity.ModePaiement mode = (PaiementCreditEntity.ModePaiement) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.entreesCredits.merge(modeCreditToCompte(mode), sum, BigDecimal::add);
         }
 
@@ -328,14 +328,14 @@ public class CaisseService {
         // on suppose la devise courante du tenant et on convertit en XOF ici.
         for (Object[] row : transfertRepository.sumSortiesGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
-            BigDecimal sum = ((BigDecimal) row[1]).multiply(tauxTenantBd);
+            BigDecimal sum = toBigDecimal(row[1]).multiply(tauxTenantBd);
             agg.transfertsSortants.put(compte, sum);
         }
 
         // 6. Transferts entrants (compte_destination) — idem
         for (Object[] row : transfertRepository.sumEntreesGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
-            BigDecimal sum = ((BigDecimal) row[1]).multiply(tauxTenantBd);
+            BigDecimal sum = toBigDecimal(row[1]).multiply(tauxTenantBd);
             agg.transfertsEntrants.put(compte, sum);
         }
 
@@ -343,12 +343,24 @@ public class CaisseService {
         for (Object[] row : mouvementManuelRepository.sumByCompteAndTypeGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
             TypeMouvement type  = (TypeMouvement) row[1];
-            BigDecimal sum      = ((BigDecimal) row[2]).multiply(tauxTenantBd);
+            BigDecimal sum      = toBigDecimal(row[2]).multiply(tauxTenantBd);
             (type == TypeMouvement.ENTREE ? agg.entreesManuelles : agg.sortiesManuelles)
                     .put(compte, sum);
         }
 
         return agg;
+    }
+
+    /**
+     * Convertit défensivement une valeur de SUM(...) issue d'un Object[] JPQL en BigDecimal.
+     * Nécessaire dès qu'une somme multiplie par un champ Double (ex: tauxChangeApplique) :
+     * Hibernate renvoie alors un Double plutôt qu'un BigDecimal, et un cast direct échoue
+     * avec une ClassCastException.
+     */
+    private static BigDecimal toBigDecimal(Object value) {
+        if (value instanceof BigDecimal bd) return bd;
+        if (value instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        return BigDecimal.ZERO;
     }
 
     /** Assemble le solde d'un compte à partir des agrégats déjà chargés. */
