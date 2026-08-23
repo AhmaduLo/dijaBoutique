@@ -26,6 +26,7 @@ class UserServiceTest {
 
     @Mock private UserRepository userRepository;
     @Mock private TenantService tenantService;
+    @Mock private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UserService userService;
@@ -128,11 +129,11 @@ class UserServiceTest {
     @Test
     @DisplayName("creerUtilisateur() — lève exception si email déjà utilisé")
     void creerUtilisateur_leveExceptionEmailExiste() {
-        when(userRepository.existsByEmailAndDeletedFalse("amadou@example.com")).thenReturn(true);
+        when(userRepository.existsByEmailGlobal("amadou@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> userService.creerUtilisateur(utilisateur))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("email existe déjà");
+                .hasMessageContaining("déjà utilisé");
     }
 
     @Test
@@ -140,7 +141,7 @@ class UserServiceTest {
     void creerUtilisateur_leveExceptionNomVide() {
         UserEntity u = UserEntity.builder().nom("").prenom("Test")
                 .email("test@example.com").build();
-        when(userRepository.existsByEmailAndDeletedFalse("test@example.com")).thenReturn(false);
+        when(userRepository.existsByEmailGlobal("test@example.com")).thenReturn(false);
 
         assertThatThrownBy(() -> userService.creerUtilisateur(u))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -152,7 +153,7 @@ class UserServiceTest {
     void creerUtilisateur_leveExceptionEmailInvalide() {
         UserEntity u = UserEntity.builder().nom("Test").prenom("User")
                 .email("email-invalide").build();
-        when(userRepository.existsByEmailAndDeletedFalse("email-invalide")).thenReturn(false);
+        when(userRepository.existsByEmailGlobal("email-invalide")).thenReturn(false);
 
         assertThatThrownBy(() -> userService.creerUtilisateur(u))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -162,7 +163,8 @@ class UserServiceTest {
     @Test
     @DisplayName("creerUtilisateur() — crée l'utilisateur et assigne le tenant")
     void creerUtilisateur_succes() {
-        when(userRepository.existsByEmailAndDeletedFalse("amadou@example.com")).thenReturn(false);
+        when(userRepository.existsByEmailGlobal("amadou@example.com")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(userRepository.save(any())).thenReturn(utilisateur);
 
