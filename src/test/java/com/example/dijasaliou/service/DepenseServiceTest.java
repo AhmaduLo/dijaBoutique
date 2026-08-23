@@ -340,6 +340,7 @@ class DepenseServiceTest {
     @Test
     @DisplayName("obtenirDepensesPaginees() — retourne une page de dépenses")
     void obtenirDepensesPaginees_retournePage() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         Page<DepenseEntity> pageMock = new PageImpl<>(Collections.emptyList());
         when(depenseRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
                 .thenReturn(pageMock);
@@ -353,6 +354,7 @@ class DepenseServiceTest {
     @Test
     @DisplayName("obtenirDepensesPaginees() — filtre par catégorie valide")
     void obtenirDepensesPaginees_filtreParCategorie() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         Page<DepenseEntity> pageMock = new PageImpl<>(Arrays.asList(depenseValide));
         when(depenseRepository.findAllWithSearch(any(), any(), any(), any(Pageable.class)))
                 .thenReturn(pageMock);
