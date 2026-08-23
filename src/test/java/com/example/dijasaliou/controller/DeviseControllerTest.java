@@ -3,6 +3,7 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.CreateDeviseDto;
 import com.example.dijasaliou.dto.UpdateDeviseDto;
 import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.service.DeviseService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,12 +87,19 @@ class DeviseControllerTest {
     private DeviseEntity deviseUSD;
     private CreateDeviseDto createDeviseDto;
     private UpdateDeviseDto updateDeviseDto;
+    private TenantEntity tenantTest;
 
     /**
      * Initialisation des données de test avant chaque test
      */
     @BeforeEach
     void setUp() {
+        tenantTest = new TenantEntity();
+        tenantTest.setId(1L);
+        tenantTest.setTenantUuid("uuid-tenant-test");
+        tenantTest.setDevisePreferee("XOF");
+        lenient().when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+
         LocalDateTime now = LocalDateTime.now();
 
         // Devise XOF (Franc CFA) - devise de référence par défaut
@@ -235,7 +244,7 @@ class DeviseControllerTest {
     @DisplayName("GET /devises/default - Devrait retourner la devise par défaut")
     void obtenirDeviseParDefaut_DevraitRetournerDeviseParDefaut() throws Exception {
         // Arrange
-        when(deviseService.obtenirDeviseParDefaut()).thenReturn(deviseXOF);
+        when(deviseService.obtenirDeviseParCode("XOF")).thenReturn(deviseXOF);
 
         // Act & Assert
         mockMvc.perform(get("/devises/default")
@@ -247,7 +256,7 @@ class DeviseControllerTest {
                 .andExpect(jsonPath("$.isDefault", is(true)))
                 .andExpect(jsonPath("$.tauxChange", is(1.0)));
 
-        verify(deviseService, times(1)).obtenirDeviseParDefaut();
+        verify(deviseService, times(1)).obtenirDeviseParCode("XOF");
     }
 
     // ==================== Tests pour POST /devises ====================
@@ -422,7 +431,8 @@ class DeviseControllerTest {
                 .dateCreation(LocalDateTime.now())
                 .build();
 
-        when(deviseService.definirDeviseParDefaut(deviseId)).thenReturn(deviseEURDefault);
+        when(deviseService.obtenirDeviseParId(deviseId)).thenReturn(deviseEURDefault);
+        when(tenantRepository.findById(tenantTest.getId())).thenReturn(Optional.of(tenantTest));
 
         // Act & Assert
         mockMvc.perform(put("/devises/{id}/set-default", deviseId)
@@ -432,7 +442,8 @@ class DeviseControllerTest {
                 .andExpect(jsonPath("$.code", is("EUR")))
                 .andExpect(jsonPath("$.isDefault", is(true)));
 
-        verify(deviseService, times(1)).definirDeviseParDefaut(deviseId);
+        verify(deviseService, times(1)).obtenirDeviseParId(deviseId);
+        verify(tenantRepository, times(1)).save(tenantTest);
     }
 
     @Test
@@ -451,7 +462,8 @@ class DeviseControllerTest {
                 .dateCreation(LocalDateTime.now())
                 .build();
 
-        when(deviseService.definirDeviseParDefaut(deviseId)).thenReturn(deviseUSDDefault);
+        when(deviseService.obtenirDeviseParId(deviseId)).thenReturn(deviseUSDDefault);
+        when(tenantRepository.findById(tenantTest.getId())).thenReturn(Optional.of(tenantTest));
 
         // Act & Assert
         mockMvc.perform(put("/devises/{id}/set-default", deviseId)
@@ -459,7 +471,7 @@ class DeviseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isDefault", is(true)));
 
-        verify(deviseService, times(1)).definirDeviseParDefaut(deviseId);
+        verify(deviseService, times(1)).obtenirDeviseParId(deviseId);
     }
 
     // ==================== Tests pour POST /devises/convertir ====================
