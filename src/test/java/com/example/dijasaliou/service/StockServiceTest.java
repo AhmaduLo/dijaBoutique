@@ -32,6 +32,9 @@ class StockServiceTest {
     @Mock private AchatRepository achatRepository;
     @Mock private VenteRepository venteRepository;
     @Mock private TenantService tenantService;
+    @Mock private DeviseService deviseService;
+    @Mock private com.example.dijasaliou.repository.ProduitArchiveRepository produitArchiveRepository;
+    @Mock private com.example.dijasaliou.repository.VenteLotConsommationRepository venteLotConsommationRepository;
 
     @InjectMocks
     private StockService stockService;
@@ -104,8 +107,9 @@ class StockServiceTest {
     @Test
     @DisplayName("obtenirStockParNomProduit() — calcule le stock correct (10-3=7)")
     void obtenirStockParNomProduit_retourneStock() {
-        when(achatRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(achat1));
-        when(venteRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(vente1));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findByNomProduitAndTenant("Ordinateur", tenantTest)).thenReturn(Arrays.asList(achat1));
+        when(venteRepository.findByNomProduitAndTenant("Ordinateur", tenantTest)).thenReturn(Arrays.asList(vente1));
 
         StockDto resultat = stockService.obtenirStockParNomProduit("Ordinateur");
 
@@ -118,11 +122,12 @@ class StockServiceTest {
     @Test
     @DisplayName("obtenirStockParNomProduit() — insensible à la casse via fallback")
     void obtenirStockParNomProduit_insensibleCasse() {
-        // Exact match retourne rien → fallback vers findByNomProduitContaining
-        when(achatRepository.findByNomProduit("ORDINATEUR")).thenReturn(Collections.emptyList());
-        when(venteRepository.findByNomProduit("ORDINATEUR")).thenReturn(Collections.emptyList());
-        when(achatRepository.findByNomProduitContaining("ORDINATEUR")).thenReturn(Arrays.asList(achat1));
-        when(venteRepository.findByNomProduitContaining("ORDINATEUR")).thenReturn(Collections.emptyList());
+        // Exact match retourne rien → fallback vers findByNomProduitContainingAndTenant
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findByNomProduitAndTenant("ORDINATEUR", tenantTest)).thenReturn(Collections.emptyList());
+        when(venteRepository.findByNomProduitAndTenant("ORDINATEUR", tenantTest)).thenReturn(Collections.emptyList());
+        when(achatRepository.findByNomProduitContainingAndTenant("ORDINATEUR", tenantTest)).thenReturn(Arrays.asList(achat1));
+        when(venteRepository.findByNomProduitContainingAndTenant("ORDINATEUR", tenantTest)).thenReturn(Collections.emptyList());
 
         StockDto resultat = stockService.obtenirStockParNomProduit("ORDINATEUR");
 
@@ -133,10 +138,11 @@ class StockServiceTest {
     @Test
     @DisplayName("obtenirStockParNomProduit() — lève RuntimeException si produit inexistant")
     void obtenirStockParNomProduit_leveExceptionSiInexistant() {
-        when(achatRepository.findByNomProduit("Inexistant")).thenReturn(Collections.emptyList());
-        when(venteRepository.findByNomProduit("Inexistant")).thenReturn(Collections.emptyList());
-        when(achatRepository.findByNomProduitContaining("Inexistant")).thenReturn(Collections.emptyList());
-        when(venteRepository.findByNomProduitContaining("Inexistant")).thenReturn(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findByNomProduitAndTenant("Inexistant", tenantTest)).thenReturn(Collections.emptyList());
+        when(venteRepository.findByNomProduitAndTenant("Inexistant", tenantTest)).thenReturn(Collections.emptyList());
+        when(achatRepository.findByNomProduitContainingAndTenant("Inexistant", tenantTest)).thenReturn(Collections.emptyList());
+        when(venteRepository.findByNomProduitContainingAndTenant("Inexistant", tenantTest)).thenReturn(Collections.emptyList());
 
         assertThatThrownBy(() -> stockService.obtenirStockParNomProduit("Inexistant"))
                 .isInstanceOf(RuntimeException.class)
@@ -198,8 +204,9 @@ class StockServiceTest {
     @Test
     @DisplayName("verifierStockDisponible() — retourne true si stock suffisant")
     void verifierStockDisponible_retourneTrue() {
-        when(achatRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(achat1));
-        when(venteRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(vente1));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findByNomProduitAndTenant("Ordinateur", tenantTest)).thenReturn(Arrays.asList(achat1));
+        when(venteRepository.findByNomProduitAndTenant("Ordinateur", tenantTest)).thenReturn(Arrays.asList(vente1));
 
         // Stock = 7, demande = 5
         boolean resultat = stockService.verifierStockDisponible("Ordinateur", 5.0);
@@ -210,8 +217,9 @@ class StockServiceTest {
     @Test
     @DisplayName("verifierStockDisponible() — retourne false si stock insuffisant")
     void verifierStockDisponible_retourneFalse() {
-        when(achatRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(achat1));
-        when(venteRepository.findByNomProduit("Ordinateur")).thenReturn(Arrays.asList(vente1));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findByNomProduitAndTenant("Ordinateur", tenantTest)).thenReturn(Arrays.asList(achat1));
+        when(venteRepository.findByNomProduitAndTenant("Ordinateur", tenantTest)).thenReturn(Arrays.asList(vente1));
 
         // Stock = 7, demande = 20
         boolean resultat = stockService.verifierStockDisponible("Ordinateur", 20.0);
@@ -222,10 +230,11 @@ class StockServiceTest {
     @Test
     @DisplayName("verifierStockDisponible() — retourne false si produit inexistant")
     void verifierStockDisponible_retourneFalseProduitInexistant() {
-        when(achatRepository.findByNomProduit("Inexistant")).thenReturn(Collections.emptyList());
-        when(venteRepository.findByNomProduit("Inexistant")).thenReturn(Collections.emptyList());
-        when(achatRepository.findByNomProduitContaining("Inexistant")).thenReturn(Collections.emptyList());
-        when(venteRepository.findByNomProduitContaining("Inexistant")).thenReturn(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findByNomProduitAndTenant("Inexistant", tenantTest)).thenReturn(Collections.emptyList());
+        when(venteRepository.findByNomProduitAndTenant("Inexistant", tenantTest)).thenReturn(Collections.emptyList());
+        when(achatRepository.findByNomProduitContainingAndTenant("Inexistant", tenantTest)).thenReturn(Collections.emptyList());
+        when(venteRepository.findByNomProduitContainingAndTenant("Inexistant", tenantTest)).thenReturn(Collections.emptyList());
 
         boolean resultat = stockService.verifierStockDisponible("Inexistant", 1.0);
 
