@@ -466,36 +466,42 @@ class VenteServiceTest {
     // calculerRapportModePaiement
     // =========================================================
 
+    private VenteEntity venteModePaiement(VenteEntity.ModePaiementVente mode, String montant) {
+        return VenteEntity.builder()
+                .nomProduit("Produit")
+                .quantite(1.0)
+                .prixUnitaire(new BigDecimal(montant))
+                .prixTotal(new BigDecimal(montant))
+                .modePaiement(mode)
+                .client("Client A")
+                .dateVente(LocalDateTime.now())
+                .utilisateur(utilisateurTest)
+                .tenant(tenantTest)
+                .build();
+    }
+
     @Test
-    @DisplayName("calculerRapportModePaiement() — retourne les 4 modes même si aucune vente")
+    @DisplayName("calculerRapportModePaiement() — retourne les modes même si aucune vente")
     void calculerRapportModePaiement_retourne4ModesSansVentes() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(venteRepository.sumDirectVentesParModeEtPeriode(any(), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
-        when(creditClientRepository.sumCreditsRestantParPeriode(any(), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
-        when(paiementCreditRepository.sumParModeEtPeriode(any(), any(), any()))
-                .thenReturn(Collections.emptyList());
+        when(venteRepository.findByDateVenteBetween(any(), any())).thenReturn(Collections.emptyList());
 
         Map<String, Object> rapport = venteService.calculerRapportModePaiement(
                 LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), null);
 
-        assertThat(rapport).containsKeys("ESPECES", "WAVE", "ORANGE_MONEY", "CREDIT");
+        assertThat(rapport).containsKeys("ESPECES", "WAVE", "ORANGE_MONEY", "VIREMENT", "CREDIT");
     }
 
     @Test
     @DisplayName("calculerRapportModePaiement() — total ESPECES correct avec ventes directes")
     void calculerRapportModePaiement_totalEspecesCorrect() {
-        List<Object[]> directVentes = new java.util.ArrayList<>();
-        directVentes.add(new Object[]{VenteEntity.ModePaiementVente.ESPECES, 3L, new BigDecimal("1500.00")});
+        List<VenteEntity> ventes = List.of(
+                venteModePaiement(VenteEntity.ModePaiementVente.ESPECES, "500.00"),
+                venteModePaiement(VenteEntity.ModePaiementVente.ESPECES, "500.00"),
+                venteModePaiement(VenteEntity.ModePaiementVente.ESPECES, "500.00"));
 
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(venteRepository.sumDirectVentesParModeEtPeriode(any(), any(), any(), any()))
-                .thenReturn(directVentes);
-        when(creditClientRepository.sumCreditsRestantParPeriode(any(), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
-        when(paiementCreditRepository.sumParModeEtPeriode(any(), any(), any()))
-                .thenReturn(Collections.emptyList());
+        when(venteRepository.findByDateVenteBetween(any(), any())).thenReturn(ventes);
 
         Map<String, Object> rapport = venteService.calculerRapportModePaiement(
                 LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), null);
@@ -507,18 +513,14 @@ class VenteServiceTest {
     }
 
     @Test
-    @DisplayName("calculerRapportModePaiement() — total CREDIT depuis les crédits restants")
+    @DisplayName("calculerRapportModePaiement() — total CREDIT regroupe les ventes à crédit")
     void calculerRapportModePaiement_totalCreditCorrect() {
-        List<Object[]> creditRows = new java.util.ArrayList<>();
-        creditRows.add(new Object[]{2L, new BigDecimal("800.00")});
+        List<VenteEntity> ventes = List.of(
+                venteModePaiement(VenteEntity.ModePaiementVente.CREDIT, "500.00"),
+                venteModePaiement(VenteEntity.ModePaiementVente.CREDIT, "300.00"));
 
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(venteRepository.sumDirectVentesParModeEtPeriode(any(), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
-        when(creditClientRepository.sumCreditsRestantParPeriode(any(), any(), any(), any()))
-                .thenReturn(creditRows);
-        when(paiementCreditRepository.sumParModeEtPeriode(any(), any(), any()))
-                .thenReturn(Collections.emptyList());
+        when(venteRepository.findByDateVenteBetween(any(), any())).thenReturn(ventes);
 
         Map<String, Object> rapport = venteService.calculerRapportModePaiement(
                 LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), null);
@@ -530,21 +532,14 @@ class VenteServiceTest {
     }
 
     @Test
-    @DisplayName("calculerRapportModePaiement() — remboursements ajoutés aux totaux directs")
+    @DisplayName("calculerRapportModePaiement() — plusieurs ventes ESPECES cumulées dans le même total")
     void calculerRapportModePaiement_remboursementsAjoutesAuxTotaux() {
-        List<Object[]> directVentes = new java.util.ArrayList<>();
-        directVentes.add(new Object[]{VenteEntity.ModePaiementVente.ESPECES, 2L, new BigDecimal("1000.00")});
-
-        List<Object[]> remboursements = new java.util.ArrayList<>();
-        remboursements.add(new Object[]{ModePaiement.ESPECES, 1L, new BigDecimal("300.00")});
+        List<VenteEntity> ventes = List.of(
+                venteModePaiement(VenteEntity.ModePaiementVente.ESPECES, "1000.00"),
+                venteModePaiement(VenteEntity.ModePaiementVente.ESPECES, "300.00"));
 
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(venteRepository.sumDirectVentesParModeEtPeriode(any(), any(), any(), any()))
-                .thenReturn(directVentes);
-        when(creditClientRepository.sumCreditsRestantParPeriode(any(), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
-        when(paiementCreditRepository.sumParModeEtPeriode(any(), any(), any()))
-                .thenReturn(remboursements);
+        when(venteRepository.findByDateVenteBetween(any(), any())).thenReturn(ventes);
 
         Map<String, Object> rapport = venteService.calculerRapportModePaiement(
                 LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), null);
@@ -553,7 +548,7 @@ class VenteServiceTest {
         Map<String, Object> especes = (Map<String, Object>) rapport.get("ESPECES");
         // 1000 + 300 = 1300
         assertThat((BigDecimal) especes.get("total")).isEqualByComparingTo(new BigDecimal("1300.00"));
-        assertThat(especes.get("nombre")).isEqualTo(3L); // 2 + 1
+        assertThat(especes.get("nombre")).isEqualTo(2L);
     }
 
     // =========================================================
@@ -608,6 +603,7 @@ class VenteServiceTest {
     @DisplayName("obtenirVentesPaginees() — retourne une page de ventes")
     void obtenirVentesPaginees_retournePage() {
         Page<VenteEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(venteRepository.findAllWithSearch(any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(pageMock);
 
@@ -622,6 +618,7 @@ class VenteServiceTest {
     @DisplayName("obtenirVentesParUtilisateurPaginees() — retourne une page filtrée par utilisateur")
     void obtenirVentesParUtilisateurPaginees_retournePage() {
         Page<VenteEntity> pageMock = new PageImpl<>(Collections.emptyList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(venteRepository.findByUtilisateurWithSearch(
                 eq(utilisateurTest), any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(pageMock);
