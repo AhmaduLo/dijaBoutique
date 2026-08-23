@@ -3,6 +3,9 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.ActiverCaisseRequest;
 import com.example.dijasaliou.dto.CaisseSoldeDto;
 import com.example.dijasaliou.entity.CaisseConfigEntity;
+import com.example.dijasaliou.entity.CompteCaisse;
+import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.MouvementCaisseManuelEntity.TypeMouvement;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,14 +19,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Tests unitaires — CaisseService.activerCaisse")
+@DisplayName("Tests unitaires — CaisseService")
 class CaisseServiceTest {
 
     @Mock private CaisseConfigRepository caisseConfigRepository;
@@ -132,5 +137,33 @@ class CaisseServiceTest {
         ArgumentCaptor<CaisseConfigEntity> captor = ArgumentCaptor.forClass(CaisseConfigEntity.class);
         verify(caisseConfigRepository).save(captor.capture());
         assertThat(captor.getValue().getDateActivation()).isEqualTo(nouvelleDate);
+    }
+
+    @Test
+    @DisplayName("getSoldeAt() — un mouvement manuel doit être réellement converti dans la devise du rapport, pas affiché brut")
+    void getSoldeAt_mouvementManuel_convertiCorrectementEnDeviseCible() {
+        tenantTest.setDevisePreferee("EUR");
+        LocalDateTime dateActivation = LocalDateTime.of(2026, 8, 1, 0, 0);
+        CaisseConfigEntity config = CaisseConfigEntity.builder()
+                .tenant(tenantTest)
+                .soldeInitialEspeces(new BigDecimal("200000"))
+                .soldeInitialWave(BigDecimal.ZERO)
+                .soldeInitialOm(BigDecimal.ZERO)
+                .soldeInitialVirement(BigDecimal.ZERO)
+                .dateActivation(dateActivation)
+                .build();
+        when(caisseConfigRepository.findByTenant(tenantTest)).thenReturn(Optional.of(config));
+
+        DeviseEntity eur = DeviseEntity.builder().code("EUR").tauxChange(655.957).build();
+        when(deviseService.obtenirDeviseParCode("EUR")).thenReturn(eur);
+
+        // +50 000 CFA (référence fixe XOF, comme le solde initial — voir le modal "Mouvement manuel")
+        when(mouvementManuelRepository.sumByCompteAndTypeGrouped(eq(tenantTest), any(), any()))
+                .thenReturn(List.<Object[]>of(new Object[]{CompteCaisse.ESPECES, TypeMouvement.ENTREE, new BigDecimal("50000")}));
+
+        CaisseSoldeDto resultat = caisseService.getSoldeAt(null, "EUR");
+
+        // (200 000 + 50 000) / 655.957 ≈ 381.12 € — pas 50 305 € (bug : mouvement affiché brut, non converti)
+        assertThat(resultat.getSoldeEspeces()).isEqualByComparingTo(new BigDecimal("381.12"));
     }
 }

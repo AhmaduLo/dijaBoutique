@@ -209,15 +209,15 @@ public class CaisseService {
                     .build();
         }
 
-        // Taux de la devise courante du tenant (référence pour tout ce qui n'a pas de
-        // devise propre stockée : transferts internes, mouvements manuels, soldes initiaux).
+        // Taux de la devise courante du tenant — sert uniquement à convertir le résultat
+        // final vers la devise cible demandée (resoudreTauxCible ci-dessous).
         double tauxTenant = resoudreTauxTenant(tenant);
 
         // OPTIMISATION : 7 queries groupées au lieu de 28 (7 × 4 comptes avant)
         // Chaque query GROUP BY compte/mode retourne tous les comptes d'un coup.
         // Ventes/achats/dépenses/paiements crédit sont déjà normalisés en XOF par
         // la requête SQL (chacune multiplie par le taux propre de sa transaction).
-        SoldesAgreges agg = chargerAgregats(tenant, debut, fin, tauxTenant);
+        SoldesAgreges agg = chargerAgregats(tenant, debut, fin);
 
         // IMPORTANT : soldeInitial* est saisi et stocké directement en XOF (référence fixe),
         // PAS dans la devise courante du tenant. Le formulaire "Modifier les soldes initiaux"
@@ -306,14 +306,19 @@ public class CaisseService {
     /**
      * Charge tous les agrégats nécessaires au calcul du solde en 7 queries.
      *
-     * @param tauxTenant taux de change de la devise courante du tenant → XOF, appliqué
-     *                   aux transferts/mouvements manuels qui n'ont pas de devise propre
-     *                   stockée (contrairement aux ventes/achats/dépenses/paiements crédit,
-     *                   déjà normalisés en XOF au niveau SQL via leur propre taux stocké).
+     * Transferts et mouvements manuels n'ont pas de devise propre stockée : comme le
+     * solde initial, leur montant est une référence fixe toujours saisie en XOF (voir
+     * les modals frontend correspondants) — ils ne sont donc PAS multipliés par un taux
+     * avant d'être sommés, contrairement aux ventes/achats/dépenses/paiements crédit qui,
+     * eux, stockent leur propre tauxChangeApplique et sont déjà normalisés en XOF au
+     * niveau SQL. Les multiplier par le taux *courant* du tenant serait doublement faux :
+     * ce taux n'a aucun rapport avec la devise réelle du montant saisi, et — comme la vue
+     * caisse par défaut affiche toujours dans la devise du tenant — cette multiplication
+     * s'annulerait avec la division finale, affichant le montant brut tel quel dans
+     * n'importe quelle devise au lieu de le convertir.
      */
-    private SoldesAgreges chargerAgregats(TenantEntity tenant, LocalDateTime debut, LocalDateTime fin, double tauxTenant) {
+    private SoldesAgreges chargerAgregats(TenantEntity tenant, LocalDateTime debut, LocalDateTime fin) {
         SoldesAgreges agg = new SoldesAgreges();
-        BigDecimal tauxTenantBd = BigDecimal.valueOf(tauxTenant);
 
         // 1. Ventes par mode → entrées par compte (CREDIT exclu, n'impacte pas la caisse)
         // Déjà en XOF : la requête multiplie chaque vente par son propre taux de change.
@@ -345,18 +350,17 @@ public class CaisseService {
             agg.entreesCredits.merge(modeCreditToCompte(mode), sum, BigDecimal::add);
         }
 
-        // 5. Transferts sortants (compte_source) — pas de devise propre stockée,
-        // on suppose la devise courante du tenant et on convertit en XOF ici.
+        // 5. Transferts sortants (compte_source) — référence fixe en XOF, comme le solde initial.
         for (Object[] row : transfertRepository.sumSortiesGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
-            BigDecimal sum = toBigDecimal(row[1]).multiply(tauxTenantBd);
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.transfertsSortants.put(compte, sum);
         }
 
         // 6. Transferts entrants (compte_destination) — idem
         for (Object[] row : transfertRepository.sumEntreesGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
-            BigDecimal sum = toBigDecimal(row[1]).multiply(tauxTenantBd);
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.transfertsEntrants.put(compte, sum);
         }
 
@@ -364,7 +368,7 @@ public class CaisseService {
         for (Object[] row : mouvementManuelRepository.sumByCompteAndTypeGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
             TypeMouvement type  = (TypeMouvement) row[1];
-            BigDecimal sum      = toBigDecimal(row[2]).multiply(tauxTenantBd);
+            BigDecimal sum      = toBigDecimal(row[2]);
             (type == TypeMouvement.ENTREE ? agg.entreesManuelles : agg.sortiesManuelles)
                     .put(compte, sum);
         }
