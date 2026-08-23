@@ -99,13 +99,24 @@ public class CaisseService {
     // ── ACTIVATION ───────────────────────────────────────────────────────────
 
     /**
-     * Active la caisse pour le tenant courant. Idempotent : si déjà active,
-     * met à jour les soldes initiaux et la date d'activation (réinitialisation).
+     * Active la caisse pour le tenant courant, ou corrige les soldes initiaux
+     * d'une caisse déjà active.
+     *
+     * IMPORTANT : la date d'activation ne doit être (ré)initialisée qu'à la toute
+     * première activation. La réinitialiser à chaque enregistrement du formulaire
+     * "Modifier les soldes initiaux" couperait la fenêtre d'agrégation de
+     * calculerSolde (bornée par dateActivation) et effacerait silencieusement tout
+     * l'historique de mouvements accumulé depuis la vraie activation — un simple
+     * clic sur "Enregistrer" sans rien changer viderait la caisse au solde initial
+     * seul. Si l'appelant fournit explicitement une dateActivation (vrai cas de
+     * réinitialisation volontaire), elle est respectée ; sinon, sur une caisse déjà
+     * active, la date existante est conservée telle quelle.
      */
     @Transactional
     public CaisseSoldeDto activerCaisse(ActiverCaisseRequest request, String userUuid) {
         TenantEntity tenant = tenantService.getCurrentTenant();
 
+        boolean dejaActive = caisseConfigRepository.findByTenant(tenant).isPresent();
         CaisseConfigEntity config = caisseConfigRepository.findByTenant(tenant)
                 .orElseGet(CaisseConfigEntity::new);
 
@@ -114,10 +125,14 @@ public class CaisseService {
         config.setSoldeInitialWave(request.getSoldeInitialWave());
         config.setSoldeInitialOm(request.getSoldeInitialOm());
         config.setSoldeInitialVirement(request.getSoldeInitialVirement());
-        // Date d'activation : heure locale du navigateur si fournie, sinon serveur
-        config.setDateActivation(request.getDateActivation() != null
-                ? request.getDateActivation()
-                : tenantService.nowInTenantTz());
+        // Date d'activation : fournie explicitement → respectée (ex: 1ère activation
+        // avec l'heure locale du navigateur). Sinon : now() seulement si c'est la
+        // toute première activation, sinon on garde la date déjà stockée.
+        if (request.getDateActivation() != null) {
+            config.setDateActivation(request.getDateActivation());
+        } else if (!dejaActive) {
+            config.setDateActivation(tenantService.nowInTenantTz());
+        }
         config.setActivePar(userUuid);
 
         caisseConfigRepository.save(config);
