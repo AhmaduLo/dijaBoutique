@@ -99,18 +99,23 @@ public class CaisseService {
     // ── ACTIVATION ───────────────────────────────────────────────────────────
 
     /**
-     * Active la caisse pour le tenant courant, ou corrige les soldes initiaux
-     * d'une caisse déjà active.
+     * Active la caisse pour le tenant courant, ou corrige son solde vers une
+     * nouvelle valeur cible (ex: après un comptage physique).
      *
-     * IMPORTANT : la date d'activation ne doit être (ré)initialisée qu'à la toute
-     * première activation. La réinitialiser à chaque enregistrement du formulaire
-     * "Modifier les soldes initiaux" couperait la fenêtre d'agrégation de
-     * calculerSolde (bornée par dateActivation) et effacerait silencieusement tout
-     * l'historique de mouvements accumulé depuis la vraie activation — un simple
-     * clic sur "Enregistrer" sans rien changer viderait la caisse au solde initial
-     * seul. Si l'appelant fournit explicitement une dateActivation (vrai cas de
-     * réinitialisation volontaire), elle est respectée ; sinon, sur une caisse déjà
-     * active, la date existante est conservée telle quelle.
+     * request.soldeInitial* représente le TOTAL ACTUEL VOULU pour chaque compte,
+     * exprimé dans request.devise (pas un "solde initial" technique en XOF) — c'est
+     * ce que l'utilisateur voit et corrige dans le formulaire "Modifier les soldes",
+     * pré-rempli avec le solde actuel dans la devise d'affichage active.
+     *
+     * IMPORTANT : la date d'activation n'est (ré)initialisée qu'à la toute première
+     * activation (ou si l'appelant la fournit explicitement — vraie réinitialisation
+     * volontaire). Sur une caisse déjà active sans date explicite, la date existante
+     * est conservée : on ne recalcule PAS le solde_initial comme la cible saisie,
+     * mais on le retro-calcule pour que solde_initial + mouvements déjà enregistrés
+     * depuis la date d'activation = cible saisie. Ainsi le total affiché devient
+     * exactement ce que l'utilisateur a validé, sans effacer l'historique ni changer
+     * la fenêtre de suivi — contrairement à l'ancien comportement qui réinitialisait
+     * tout à chaque enregistrement (voir commit précédent).
      */
     @Transactional
     public CaisseSoldeDto activerCaisse(ActiverCaisseRequest request, String userUuid) {
@@ -119,29 +124,63 @@ public class CaisseService {
         boolean dejaActive = caisseConfigRepository.findByTenant(tenant).isPresent();
         CaisseConfigEntity config = caisseConfigRepository.findByTenant(tenant)
                 .orElseGet(CaisseConfigEntity::new);
-
         config.setTenant(tenant);
-        config.setSoldeInitialEspeces(request.getSoldeInitialEspeces());
-        config.setSoldeInitialWave(request.getSoldeInitialWave());
-        config.setSoldeInitialOm(request.getSoldeInitialOm());
-        config.setSoldeInitialVirement(request.getSoldeInitialVirement());
-        // Date d'activation : fournie explicitement → respectée (ex: 1ère activation
-        // avec l'heure locale du navigateur). Sinon : now() seulement si c'est la
-        // toute première activation, sinon on garde la date déjà stockée.
+
+        // Date d'activation : fournie explicitement → respectée (réinitialisation
+        // volontaire). Sinon : now() seulement à la toute première activation, sinon
+        // la date déjà stockée est conservée.
+        LocalDateTime dateActivation;
         if (request.getDateActivation() != null) {
-            config.setDateActivation(request.getDateActivation());
+            dateActivation = request.getDateActivation();
         } else if (!dejaActive) {
-            config.setDateActivation(tenantService.nowInTenantTz());
+            dateActivation = tenantService.nowInTenantTz();
+        } else {
+            dateActivation = config.getDateActivation();
         }
+        config.setDateActivation(dateActivation);
         config.setActivePar(userUuid);
 
+        // Convertit les totaux cibles saisis (dans la devise du formulaire) vers XOF —
+        // même logique que resoudreTauxTenant/resoudreTauxCible ailleurs dans ce fichier.
+        String codeDevise = (request.getDevise() != null && !request.getDevise().isBlank())
+                ? request.getDevise().toUpperCase().trim() : "XOF";
+        double tauxSaisie = 1.0;
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            if (devise != null && devise.getTauxChange() != null && devise.getTauxChange() > 0) {
+                tauxSaisie = devise.getTauxChange();
+            }
+        } catch (RuntimeException e) {
+            // fallback : traiter comme XOF
+        }
+        BigDecimal tauxSaisieBd = BigDecimal.valueOf(tauxSaisie);
+        BigDecimal cibleEspecesXof  = nz(request.getSoldeInitialEspeces()).multiply(tauxSaisieBd);
+        BigDecimal cibleWaveXof     = nz(request.getSoldeInitialWave()).multiply(tauxSaisieBd);
+        BigDecimal cibleOmXof       = nz(request.getSoldeInitialOm()).multiply(tauxSaisieBd);
+        BigDecimal cibleVirementXof = nz(request.getSoldeInitialVirement()).multiply(tauxSaisieBd);
+
+        // Contribution des mouvements déjà enregistrés depuis dateActivation (hors solde
+        // initial) : solde_initial = cible - cette_contribution, pour que le total tombe
+        // exactement sur la cible saisie sans toucher à l'historique.
+        SoldesAgreges agg = chargerAgregats(tenant, dateActivation, FUTUR_LOINTAIN);
+        BigDecimal contribEspeces  = soldeFromAgg(CompteCaisse.ESPECES,      BigDecimal.ZERO, agg);
+        BigDecimal contribWave     = soldeFromAgg(CompteCaisse.WAVE,         BigDecimal.ZERO, agg);
+        BigDecimal contribOm       = soldeFromAgg(CompteCaisse.ORANGE_MONEY, BigDecimal.ZERO, agg);
+        BigDecimal contribVirement = soldeFromAgg(CompteCaisse.VIREMENT,     BigDecimal.ZERO, agg);
+
+        config.setSoldeInitialEspeces(cibleEspecesXof.subtract(contribEspeces));
+        config.setSoldeInitialWave(cibleWaveXof.subtract(contribWave));
+        config.setSoldeInitialOm(cibleOmXof.subtract(contribOm));
+        config.setSoldeInitialVirement(cibleVirementXof.subtract(contribVirement));
+
         caisseConfigRepository.save(config);
-        log.info("Caisse activée pour tenant={} : Espèces={}, Wave={}, OM={}, Virement={}",
+        log.info("Caisse activée/corrigée pour tenant={} : cible Espèces={}, Wave={}, OM={}, Virement={} ({})",
                 tenant.getTenantUuid(),
                 request.getSoldeInitialEspeces(),
                 request.getSoldeInitialWave(),
                 request.getSoldeInitialOm(),
-                request.getSoldeInitialVirement());
+                request.getSoldeInitialVirement(),
+                codeDevise);
 
         // Futur lointain pour fin : inclut tous les flux (évite tout problème de TZ)
         return calculerSolde(tenant, config, FUTUR_LOINTAIN, null);

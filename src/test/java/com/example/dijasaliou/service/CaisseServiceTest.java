@@ -110,6 +110,47 @@ class CaisseServiceTest {
     }
 
     @Test
+    @DisplayName("Correction du solde vers une cible actuelle — recalcule le solde initial sans toucher a l'historique")
+    void activerCaisse_correctionVersSoldeActuel_retroCalculeSoldeInitial() {
+        LocalDateTime dateActivationOriginale = LocalDateTime.of(2026, 8, 11, 9, 0);
+        CaisseConfigEntity configExistante = CaisseConfigEntity.builder()
+                .tenant(tenantTest)
+                .soldeInitialEspeces(new BigDecimal("200000"))
+                .soldeInitialWave(BigDecimal.ZERO)
+                .soldeInitialOm(BigDecimal.ZERO)
+                .soldeInitialVirement(BigDecimal.ZERO)
+                .dateActivation(dateActivationOriginale)
+                .build();
+        when(caisseConfigRepository.findByTenant(tenantTest)).thenReturn(Optional.of(configExistante));
+        when(caisseConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Un mouvement manuel de +50 000 CFA a déjà été enregistré depuis l'activation :
+        // solde actuel réel = 200 000 (initial) + 50 000 (mouvement) = 250 000 CFA.
+        when(mouvementManuelRepository.sumByCompteAndTypeGrouped(eq(tenantTest), any(), any()))
+                .thenReturn(List.<Object[]>of(new Object[]{CompteCaisse.ESPECES, TypeMouvement.ENTREE, new BigDecimal("50000")}));
+
+        // L'utilisateur corrige le formulaire (pré-rempli avec 250 000) vers 300 000 CFA
+        // — ex: un comptage physique a trouvé 50 000 CFA de plus que prévu.
+        ActiverCaisseRequest request = new ActiverCaisseRequest();
+        request.setSoldeInitialEspeces(new BigDecimal("300000"));
+        request.setSoldeInitialWave(BigDecimal.ZERO);
+        request.setSoldeInitialOm(BigDecimal.ZERO);
+        request.setSoldeInitialVirement(BigDecimal.ZERO);
+        request.setDevise("XOF");
+
+        CaisseSoldeDto resultat = caisseService.activerCaisse(request, "user-uuid");
+
+        ArgumentCaptor<CaisseConfigEntity> captor = ArgumentCaptor.forClass(CaisseConfigEntity.class);
+        verify(caisseConfigRepository).save(captor.capture());
+        // dateActivation et le mouvement manuel déjà enregistré restent intacts...
+        assertThat(captor.getValue().getDateActivation()).isEqualTo(dateActivationOriginale);
+        // ...mais le solde initial est retro-calculé : 300 000 (cible) - 50 000 (mouvement) = 250 000
+        assertThat(captor.getValue().getSoldeInitialEspeces()).isEqualByComparingTo(new BigDecimal("250000"));
+        // Le total recalculé correspond exactement à la cible saisie par l'utilisateur.
+        assertThat(resultat.getSoldeEspeces()).isEqualByComparingTo(new BigDecimal("300000.00"));
+    }
+
+    @Test
     @DisplayName("dateActivation fournie explicitement — toujours respectée (réinitialisation volontaire)")
     void activerCaisse_dateActivationExplicite_respectee() {
         LocalDateTime dateActivationOriginale = LocalDateTime.of(2026, 8, 11, 9, 0);
