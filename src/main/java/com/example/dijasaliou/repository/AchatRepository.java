@@ -133,7 +133,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
      * (avec borne supérieure pour les snapshots).
      */
     @Query("""
-            SELECT COALESCE(SUM(a.prixTotal), 0)
+            SELECT COALESCE(SUM(a.prixTotal * a.tauxChangeApplique), 0)
             FROM AchatEntity a
             WHERE a.tenant = :tenant
               AND a.modePaiement = :modePaiement

@@ -75,7 +75,7 @@ public interface DepenseRepository extends JpaRepository<DepenseEntity, String> 
      * (avec borne supérieure pour les snapshots).
      */
     @Query("""
-            SELECT COALESCE(SUM(d.montant), 0)
+            SELECT COALESCE(SUM(d.montant * d.tauxChangeApplique), 0)
             FROM DepenseEntity d
             WHERE d.tenant = :tenant
               AND d.modePaiement = :modePaiement

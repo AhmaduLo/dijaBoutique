@@ -40,7 +40,7 @@ public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEn
      * Utilisé par le module Caisse pour intégrer les remboursements aux soldes.
      */
     @Query("""
-            SELECT COALESCE(SUM(p.montantPaye), 0)
+            SELECT COALESCE(SUM(p.montantPaye * p.tauxChangeApplique), 0)
             FROM PaiementCreditEntity p
             WHERE p.credit.tenant = :tenant
               AND p.modePaiement = :mode

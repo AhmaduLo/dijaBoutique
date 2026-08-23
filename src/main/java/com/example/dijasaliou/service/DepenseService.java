@@ -147,8 +147,9 @@ public class DepenseService {
                 : "0";
         String title = "Dépense saisie par " + auteur.getPrenom();
         String categorieLabel = depense.getCategorie() != null ? depense.getCategorie().getLibelle() : null;
+        String devise = depense.getDeviseCode() != null ? depense.getDeviseCode() : "XOF";
         String body = auteur.getPrenom() + " " + auteur.getNom() + " vient d'enregistrer une dépense de "
-                + montantFmt + " CFA"
+                + montantFmt + " " + devise
                 + (categorieLabel != null && !categorieLabel.isBlank()
                     ? " (" + categorieLabel + ")." : ".");
         userPushService.notifyUser(admin, UserNotificationType.DEPENSE_EMPLOYE, title, body, "/depenses");
@@ -225,7 +226,8 @@ public class DepenseService {
         List<DepenseEntity> depenses = obtenirDepensesParPeriode(debut, fin);
 
         return depenses.stream()
-                .map(DepenseEntity::getMontant)
+                .filter(d -> d.getMontant() != null && d.getTauxChangeApplique() != null)
+                .map(d -> d.getMontant().multiply(BigDecimal.valueOf(d.getTauxChangeApplique())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
