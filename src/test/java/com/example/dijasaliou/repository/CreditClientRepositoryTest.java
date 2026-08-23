@@ -302,7 +302,7 @@ class CreditClientRepositoryTest {
 
         assertThat(result).hasSize(1);
         long count = ((Number) result.get(0)[0]).longValue();
-        BigDecimal sum = (BigDecimal) result.get(0)[1];
+        BigDecimal sum = BigDecimal.valueOf(((Number) result.get(0)[1]).doubleValue());
         assertThat(count).isEqualTo(1L);
         assertThat(sum).isEqualByComparingTo(new BigDecimal("3000"));
     }
@@ -319,7 +319,7 @@ class CreditClientRepositoryTest {
         // L'agrégat JPQL sans GROUP BY retourne toujours 1 ligne : [0, 0] si aucun résultat
         assertThat(result).hasSize(1);
         long count = ((Number) result.get(0)[0]).longValue();
-        BigDecimal sum = (BigDecimal) result.get(0)[1];
+        BigDecimal sum = BigDecimal.valueOf(((Number) result.get(0)[1]).doubleValue());
         assertThat(count).isEqualTo(0L);
         assertThat(sum).isEqualByComparingTo(BigDecimal.ZERO);
     }
