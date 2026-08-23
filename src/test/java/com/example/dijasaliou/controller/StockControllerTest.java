@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -134,13 +135,13 @@ class StockControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$[0].stockDisponible", is(20)))
+                .andExpect(jsonPath("$[0].stockDisponible", is(20.0)))
                 .andExpect(jsonPath("$[0].statut", is("EN_STOCK")))
                 .andExpect(jsonPath("$[1].nomProduit", is("Bracelet en argent")))
-                .andExpect(jsonPath("$[1].stockDisponible", is(5)))
+                .andExpect(jsonPath("$[1].stockDisponible", is(5.0)))
                 .andExpect(jsonPath("$[1].statut", is("STOCK_BAS")))
                 .andExpect(jsonPath("$[2].nomProduit", is("Bague en diamant")))
-                .andExpect(jsonPath("$[2].stockDisponible", is(0)))
+                .andExpect(jsonPath("$[2].stockDisponible", is(0.0)))
                 .andExpect(jsonPath("$[2].statut", is("RUPTURE")));
 
         verify(stockService, times(1)).obtenirTousLesStocks(any());
@@ -175,9 +176,9 @@ class StockControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$.quantiteAchetee", is(50)))
-                .andExpect(jsonPath("$.quantiteVendue", is(30)))
-                .andExpect(jsonPath("$.stockDisponible", is(20)))
+                .andExpect(jsonPath("$.quantiteAchetee", is(50.0)))
+                .andExpect(jsonPath("$.quantiteVendue", is(30.0)))
+                .andExpect(jsonPath("$.stockDisponible", is(20.0)))
                 .andExpect(jsonPath("$.prixMoyenAchat", is(100000.00)))
                 .andExpect(jsonPath("$.prixMoyenVente", is(150000.00)))
                 .andExpect(jsonPath("$.valeurStock", is(2000000.00)))
@@ -217,7 +218,7 @@ class StockControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].nomProduit", is("Bague en diamant")))
-                .andExpect(jsonPath("$[0].stockDisponible", is(0)))
+                .andExpect(jsonPath("$[0].stockDisponible", is(0.0)))
                 .andExpect(jsonPath("$[0].statut", is("RUPTURE")));
 
         verify(stockService, times(1)).obtenirProduitsEnRupture();
@@ -253,7 +254,7 @@ class StockControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].nomProduit", is("Bracelet en argent")))
-                .andExpect(jsonPath("$[0].stockDisponible", is(5)))
+                .andExpect(jsonPath("$[0].stockDisponible", is(5.0)))
                 .andExpect(jsonPath("$[0].statut", is("STOCK_BAS")));
 
         verify(stockService, times(1)).obtenirProduitsStockBas();
@@ -282,8 +283,7 @@ class StockControllerTest {
         // Arrange
         List<StockDto> ruptures = Arrays.asList(stockTest3);
         List<StockDto> stocksBas = Arrays.asList(stockTest2);
-        when(stockService.obtenirProduitsEnRupture()).thenReturn(ruptures);
-        when(stockService.obtenirProduitsStockBas()).thenReturn(stocksBas);
+        when(stockService.obtenirAlertesStock()).thenReturn(Map.of("ruptures", ruptures, "stocksBas", stocksBas));
 
         // Act & Assert
         mockMvc.perform(get("/stock/alertes")
@@ -295,16 +295,15 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.nombreStocksBas", is(1)))
                 .andExpect(jsonPath("$.nombreTotalAlertes", is(2)));
 
-        verify(stockService, times(1)).obtenirProduitsEnRupture();
-        verify(stockService, times(1)).obtenirProduitsStockBas();
+        verify(stockService, times(1)).obtenirAlertesStock();
     }
 
     @Test
     @DisplayName("GET /stock/alertes - Devrait retourner zéro alerte si aucun problème")
     void obtenirAlertes_DevraitRetournerZeroAlerte() throws Exception {
         // Arrange
-        when(stockService.obtenirProduitsEnRupture()).thenReturn(Arrays.asList());
-        when(stockService.obtenirProduitsStockBas()).thenReturn(Arrays.asList());
+        when(stockService.obtenirAlertesStock())
+                .thenReturn(Map.of("ruptures", Arrays.asList(), "stocksBas", Arrays.asList()));
 
         // Act & Assert
         mockMvc.perform(get("/stock/alertes")
@@ -314,8 +313,7 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.nombreStocksBas", is(0)))
                 .andExpect(jsonPath("$.nombreTotalAlertes", is(0)));
 
-        verify(stockService, times(1)).obtenirProduitsEnRupture();
-        verify(stockService, times(1)).obtenirProduitsStockBas();
+        verify(stockService, times(1)).obtenirAlertesStock();
     }
 
     // ==================== Tests pour GET /stock/verifier ====================
@@ -336,8 +334,8 @@ class StockControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nomProduit", is(nomProduit)))
-                .andExpect(jsonPath("$.quantiteDemandee", is(10)))
-                .andExpect(jsonPath("$.stockDisponible", is(20)))
+                .andExpect(jsonPath("$.quantiteDemandee", is(10.0)))
+                .andExpect(jsonPath("$.stockDisponible", is(20.0)))
                 .andExpect(jsonPath("$.disponible", is(true)))
                 .andExpect(jsonPath("$.message", is("Stock suffisant pour cette vente")));
 
@@ -361,8 +359,8 @@ class StockControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nomProduit", is(nomProduit)))
-                .andExpect(jsonPath("$.quantiteDemandee", is(10)))
-                .andExpect(jsonPath("$.stockDisponible", is(5)))
+                .andExpect(jsonPath("$.quantiteDemandee", is(10.0)))
+                .andExpect(jsonPath("$.stockDisponible", is(5.0)))
                 .andExpect(jsonPath("$.disponible", is(false)))
                 .andExpect(jsonPath("$.message", containsString("Stock insuffisant")));
 
@@ -386,7 +384,7 @@ class StockControllerTest {
                         .param("quantite", quantite.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.stockDisponible", is(0)))
+                .andExpect(jsonPath("$.stockDisponible", is(0.0)))
                 .andExpect(jsonPath("$.disponible", is(false)));
 
         verify(stockService, times(1)).verifierStockDisponible(nomProduit, quantite);
@@ -398,9 +396,7 @@ class StockControllerTest {
     @DisplayName("GET /stock/valeur-totale - Devrait retourner la valeur totale du stock")
     void obtenirValeurTotale_DevraitRetournerValeurTotale() throws Exception {
         // Arrange
-        BigDecimal valeurTotale = new BigDecimal("2250000.00");
         List<StockDto> stocks = Arrays.asList(stockTest1, stockTest2, stockTest3);
-        when(stockService.obtenirValeurTotaleStock()).thenReturn(valeurTotale);
         when(stockService.obtenirTousLesStocks(any())).thenReturn(stocks);
 
         // Act & Assert
@@ -411,7 +407,6 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.nombreProduits", is(3)))
                 .andExpect(jsonPath("$.details", hasSize(3)));
 
-        verify(stockService, times(1)).obtenirValeurTotaleStock();
         verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
@@ -419,7 +414,6 @@ class StockControllerTest {
     @DisplayName("GET /stock/valeur-totale - Devrait retourner zéro si aucun stock")
     void obtenirValeurTotale_DevraitRetournerZero() throws Exception {
         // Arrange
-        when(stockService.obtenirValeurTotaleStock()).thenReturn(BigDecimal.ZERO);
         when(stockService.obtenirTousLesStocks(any())).thenReturn(Arrays.asList());
 
         // Act & Assert
@@ -429,7 +423,6 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.valeurTotale", is(0)))
                 .andExpect(jsonPath("$.nombreProduits", is(0)));
 
-        verify(stockService, times(1)).obtenirValeurTotaleStock();
         verify(stockService, times(1)).obtenirTousLesStocks(any());
     }
 
@@ -440,22 +433,19 @@ class StockControllerTest {
     void obtenirResume_DevraitRetournerResume() throws Exception {
         // Arrange
         List<StockDto> stocks = Arrays.asList(stockTest1, stockTest2, stockTest3);
-        BigDecimal valeurTotale = new BigDecimal("2250000.00");
         when(stockService.obtenirTousLesStocks(any())).thenReturn(stocks);
-        when(stockService.obtenirValeurTotaleStock()).thenReturn(valeurTotale);
 
         // Act & Assert
         mockMvc.perform(get("/stock/resume")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nombreTotalProduits", is(3)))
+                .andExpect(jsonPath("$.totalProduits", is(3)))
                 .andExpect(jsonPath("$.produitsEnStock", is(2))) // stockTest1 et stockTest2
                 .andExpect(jsonPath("$.produitsEnRupture", is(1))) // stockTest3
                 .andExpect(jsonPath("$.produitsStockBas", is(1))) // stockTest2
                 .andExpect(jsonPath("$.valeurTotaleStock", is(2250000.00)));
 
         verify(stockService, times(1)).obtenirTousLesStocks(any());
-        verify(stockService, times(1)).obtenirValeurTotaleStock();
     }
 
     // ==================== Tests pour GET /stock/produits-disponibles ====================
@@ -543,9 +533,9 @@ class StockControllerTest {
         mockMvc.perform(get("/stock")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].quantiteAchetee", is(50)))
-                .andExpect(jsonPath("$[0].quantiteVendue", is(30)))
-                .andExpect(jsonPath("$[0].stockDisponible", is(20))) // 50 - 30 = 20
+                .andExpect(jsonPath("$[0].quantiteAchetee", is(50.0)))
+                .andExpect(jsonPath("$[0].quantiteVendue", is(30.0)))
+                .andExpect(jsonPath("$[0].stockDisponible", is(20.0))) // 50 - 30 = 20
                 .andExpect(jsonPath("$[0].valeurStock", is(2000000.00))) // 20 × 100000 = 2000000
                 .andExpect(jsonPath("$[0].margeUnitaire", is(50000.00))); // 150000 - 100000 = 50000
 
@@ -560,8 +550,9 @@ class StockControllerTest {
         StockDto stockBas2 = StockDto.builder().nomProduit("Produit B").stockDisponible(7.0).statut(StockDto.StatutStock.STOCK_BAS).build();
         StockDto rupture1 = StockDto.builder().nomProduit("Produit C").stockDisponible(0.0).statut(StockDto.StatutStock.RUPTURE).build();
 
-        when(stockService.obtenirProduitsEnRupture()).thenReturn(Arrays.asList(rupture1));
-        when(stockService.obtenirProduitsStockBas()).thenReturn(Arrays.asList(stockBas1, stockBas2));
+        when(stockService.obtenirAlertesStock()).thenReturn(Map.of(
+                "ruptures", Arrays.asList(rupture1),
+                "stocksBas", Arrays.asList(stockBas1, stockBas2)));
 
         // Act & Assert
         mockMvc.perform(get("/stock/alertes")
@@ -571,7 +562,6 @@ class StockControllerTest {
                 .andExpect(jsonPath("$.nombreStocksBas", is(2)))
                 .andExpect(jsonPath("$.nombreTotalAlertes", is(3))); // 1 + 2
 
-        verify(stockService, times(1)).obtenirProduitsEnRupture();
-        verify(stockService, times(1)).obtenirProduitsStockBas();
+        verify(stockService, times(1)).obtenirAlertesStock();
     }
 }
