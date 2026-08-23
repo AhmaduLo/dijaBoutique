@@ -154,8 +154,7 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequestUser)))
                 .andExpect(status().isOk())
-                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
-                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.token", is("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.user.token")))
                 .andExpect(jsonPath("$.user.id", is(1)))
                 .andExpect(jsonPath("$.user.nom", is("Diop")))
                 .andExpect(jsonPath("$.user.prenom", is("Amadou")))
@@ -176,8 +175,7 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequestAdmin)))
                 .andExpect(status().isOk())
-                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
-                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.token", is("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.admin.token")))
                 .andExpect(jsonPath("$.user.id", is(2)))
                 .andExpect(jsonPath("$.user.nom", is("Saliou")))
                 .andExpect(jsonPath("$.user.prenom", is("Dija")))
@@ -198,8 +196,7 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequestUser)))
                 .andExpect(status().isOk())
-                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
-                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.token", notNullValue()))
                 .andExpect(jsonPath("$.user", notNullValue()));
 
         verify(authService, times(1)).register(any(RegisterRequest.class));
@@ -216,19 +213,14 @@ class AuthControllerTest {
         requestInvalide.setMotDePasse("password");
         requestInvalide.setRole(UserEntity.Role.USER);
 
-        when(authService.register(any(RegisterRequest.class)))
-                .thenThrow(new IllegalArgumentException("Email invalide"));
+        // @Email sur RegisterRequest rejette la requête via @Valid avant même
+        // d'atteindre le service (400 Bad Request, service jamais appelé)
+        mockMvc.perform(post("/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestInvalide)))
+                .andExpect(status().isBadRequest());
 
-        // Act & Assert - L'exception devrait être lancée
-        try {
-            mockMvc.perform(post("/auth/register")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(requestInvalide)));
-        } catch (Exception e) {
-            // Exception attendue
-        }
-
-        verify(authService, times(1)).register(any(RegisterRequest.class));
+        verify(authService, never()).register(any(RegisterRequest.class));
     }
 
     @Test
@@ -261,19 +253,14 @@ class AuthControllerTest {
         requestSansMotDePasse.setMotDePasse("");
         requestSansMotDePasse.setRole(UserEntity.Role.USER);
 
-        when(authService.register(any(RegisterRequest.class)))
-                .thenThrow(new IllegalArgumentException("Mot de passe requis"));
+        // @NotBlank sur RegisterRequest rejette la requête via @Valid avant même
+        // d'atteindre le service (400 Bad Request, service jamais appelé)
+        mockMvc.perform(post("/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestSansMotDePasse)))
+                .andExpect(status().isBadRequest());
 
-        // Act & Assert - L'exception devrait être lancée
-        try {
-            mockMvc.perform(post("/auth/register")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(requestSansMotDePasse)));
-        } catch (Exception e) {
-            // Exception attendue
-        }
-
-        verify(authService, times(1)).register(any(RegisterRequest.class));
+        verify(authService, never()).register(any(RegisterRequest.class));
     }
 
     @Test
@@ -315,8 +302,7 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
-                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
-                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.token", is("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.user.token")))
                 .andExpect(jsonPath("$.user.id", is(1)))
                 .andExpect(jsonPath("$.user.email", is("amadou@example.com")))
                 .andExpect(jsonPath("$.user.nom", is("Diop")))
@@ -337,8 +323,7 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequestAdmin)))
                 .andExpect(status().isOk())
-                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
-                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.token", is("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.admin.token")))
                 .andExpect(jsonPath("$.user.id", is(2)))
                 .andExpect(jsonPath("$.user.email", is("dija@boutique.com")))
                 .andExpect(jsonPath("$.user.role", is("ADMIN")));
@@ -357,8 +342,7 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
-                // Le token est dans le cookie HttpOnly (pas dans le body) → $.token est null
-                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.token", notNullValue()))
                 .andExpect(jsonPath("$.user", notNullValue()));
 
         verify(authService, times(1)).login(any(LoginRequest.class));
@@ -409,19 +393,15 @@ class AuthControllerTest {
     void login_DevraitRejeterEmailVide() throws Exception {
         // Arrange
         LoginRequest loginSansEmail = new LoginRequest("", "password");
-        when(authService.login(any(LoginRequest.class)))
-                .thenThrow(new IllegalArgumentException("Email requis"));
 
-        // Act & Assert - L'exception devrait être lancée
-        try {
-            mockMvc.perform(post("/auth/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(loginSansEmail)));
-        } catch (Exception e) {
-            // Exception attendue
-        }
+        // @NotBlank sur LoginRequest rejette la requête via @Valid avant même
+        // d'atteindre le service (400 Bad Request, service jamais appelé)
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginSansEmail)))
+                .andExpect(status().isBadRequest());
 
-        verify(authService, times(1)).login(any(LoginRequest.class));
+        verify(authService, never()).login(any(LoginRequest.class));
     }
 
     @Test
@@ -429,19 +409,15 @@ class AuthControllerTest {
     void login_DevraitRejeterMotDePasseVide() throws Exception {
         // Arrange
         LoginRequest loginSansPassword = new LoginRequest("amadou@example.com", "");
-        when(authService.login(any(LoginRequest.class)))
-                .thenThrow(new IllegalArgumentException("Mot de passe requis"));
 
-        // Act & Assert - L'exception devrait être lancée
-        try {
-            mockMvc.perform(post("/auth/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(loginSansPassword)));
-        } catch (Exception e) {
-            // Exception attendue
-        }
+        // @NotBlank sur LoginRequest rejette la requête via @Valid avant même
+        // d'atteindre le service (400 Bad Request, service jamais appelé)
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginSansPassword)))
+                .andExpect(status().isBadRequest());
 
-        verify(authService, times(1)).login(any(LoginRequest.class));
+        verify(authService, never()).login(any(LoginRequest.class));
     }
 
     // ==================== Tests additionnels ====================
