@@ -2,6 +2,7 @@ package com.example.dijasaliou.controller;
 
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.VenteDto;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.service.UserService;
@@ -91,12 +92,17 @@ class VenteControllerTest {
     private UserEntity utilisateurTest;
     private VenteEntity venteTest;
     private VenteEntity venteTest2;
+    private TenantEntity tenantTest;
 
     /**
      * Initialisation des données de test avant chaque test
      */
     @BeforeEach
     void setUp() {
+        tenantTest = new TenantEntity();
+        tenantTest.setTenantUuid("uuid-tenant-test");
+        tenantTest.setDevisePreferee("XOF");
+
         // Création d'un utilisateur de test
         utilisateurTest = UserEntity.builder()
                 .id(1L)
@@ -150,7 +156,7 @@ class VenteControllerTest {
                 .andExpect(jsonPath("$.content", hasSize(2)))
                 .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$.content[0].quantite", is(5)))
+                .andExpect(jsonPath("$.content[0].quantite", is(5.0)))
                 .andExpect(jsonPath("$.content[0].client", is("Mme Ndiaye")))
                 .andExpect(jsonPath("$.content[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$.content[1].nomProduit", is("Bracelet en argent")));
@@ -191,7 +197,7 @@ class VenteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$.quantite", is(5)))
+                .andExpect(jsonPath("$.quantite", is(5.0)))
                 .andExpect(jsonPath("$.prixUnitaire", is(150000.00)))
                 .andExpect(jsonPath("$.prixTotal", is(750000.00)))
                 .andExpect(jsonPath("$.client", is("Mme Ndiaye")));
@@ -251,11 +257,11 @@ class VenteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelleVente)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id", is("test-id-3")))
-                .andExpect(jsonPath("$.nomProduit", is("Bague en diamant")))
-                .andExpect(jsonPath("$.quantite", is(10)))
-                .andExpect(jsonPath("$.prixTotal", is(2000000.00)))
-                .andExpect(jsonPath("$.client", is("Mme Ba")));
+                .andExpect(jsonPath("$.vente.id", is("test-id-3")))
+                .andExpect(jsonPath("$.vente.nomProduit", is("Bague en diamant")))
+                .andExpect(jsonPath("$.vente.quantite", is(10.0)))
+                .andExpect(jsonPath("$.vente.prixTotal", is(2000000.00)))
+                .andExpect(jsonPath("$.vente.client", is("Mme Ba")));
 
         verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
         verify(venteService, times(1)).creerVente(any(VenteEntity.class), eq(utilisateurTest));
@@ -301,7 +307,7 @@ class VenteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or - Mise à jour")))
-                .andExpect(jsonPath("$.quantite", is(8)))
+                .andExpect(jsonPath("$.quantite", is(8.0)))
                 .andExpect(jsonPath("$.prixTotal", is(1280000.00)));
 
         verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
@@ -468,10 +474,9 @@ class VenteControllerTest {
         LocalDate dateDebut = LocalDate.of(2025, 10, 1);
         LocalDate dateFin = LocalDate.of(2025, 10, 31);
         List<VenteEntity> ventes = Arrays.asList(venteTest, venteTest2);
-        BigDecimal chiffreAffaires = new BigDecimal("990000.00");
 
         when(venteService.obtenirVentesParPeriode(dateDebut, dateFin)).thenReturn(ventes);
-        when(venteService.calculerChiffreAffaires(dateDebut, dateFin)).thenReturn(chiffreAffaires);
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         // Act & Assert
         mockMvc.perform(get("/ventes/statistiques")
@@ -486,7 +491,6 @@ class VenteControllerTest {
                 .andExpect(jsonPath("$.ventes", hasSize(2)));
 
         verify(venteService, times(1)).obtenirVentesParPeriode(dateDebut, dateFin);
-        verify(venteService, times(1)).calculerChiffreAffaires(dateDebut, dateFin);
     }
 
     @Test
@@ -495,10 +499,8 @@ class VenteControllerTest {
         // Arrange
         LocalDate dateDebut = LocalDate.of(2025, 11, 1);
         LocalDate dateFin = LocalDate.of(2025, 11, 30);
-        BigDecimal chiffreAffaires = BigDecimal.ZERO;
-
         when(venteService.obtenirVentesParPeriode(dateDebut, dateFin)).thenReturn(Arrays.asList());
-        when(venteService.calculerChiffreAffaires(dateDebut, dateFin)).thenReturn(chiffreAffaires);
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         // Act & Assert
         mockMvc.perform(get("/ventes/statistiques")
@@ -507,11 +509,10 @@ class VenteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nombreVentes", is(0)))
-                .andExpect(jsonPath("$.chiffreAffaires", is(0)))
+                .andExpect(jsonPath("$.chiffreAffaires", is(0.0)))
                 .andExpect(jsonPath("$.ventes", hasSize(0)));
 
         verify(venteService, times(1)).obtenirVentesParPeriode(dateDebut, dateFin);
-        verify(venteService, times(1)).calculerChiffreAffaires(dateDebut, dateFin);
     }
 
     @Test
@@ -592,7 +593,7 @@ class VenteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelleVente)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.prixTotal", is(630000.00)));
+                .andExpect(jsonPath("$.vente.prixTotal", is(630000.00)));
 
         verify(venteService, times(1)).creerVente(any(VenteEntity.class), eq(utilisateurTest));
     }
