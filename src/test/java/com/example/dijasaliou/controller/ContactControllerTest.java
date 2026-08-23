@@ -51,6 +51,12 @@ class ContactControllerTest {
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
 
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.TenantService tenantService;
+
     private ContactRequest contactRequest;
     private final UsernamePasswordAuthenticationToken principal =
             new UsernamePasswordAuthenticationToken("admin@boutique.com", null,

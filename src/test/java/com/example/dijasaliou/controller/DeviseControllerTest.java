@@ -55,6 +55,12 @@ class DeviseControllerTest {
     @MockitoBean
     private DeviseService deviseService;
 
+    @MockitoBean
+    private com.example.dijasaliou.repository.TenantRepository tenantRepository;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.StockService stockService;
+
     // Mocker les beans de sécurité pour éviter les problèmes de dépendances
     @MockitoBean(name = "jwtAuthenticationFilter")
     private com.example.dijasaliou.jwt.JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -67,6 +73,12 @@ class DeviseControllerTest {
 
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
+
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.TenantService tenantService;
 
     private DeviseEntity deviseXOF;
     private DeviseEntity deviseEUR;

@@ -61,6 +61,12 @@ class VenteControllerTest {
     private VenteService venteService;
 
     @MockitoBean
+    private com.example.dijasaliou.repository.AchatRepository achatRepository;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.DeviseService deviseService;
+
+    @MockitoBean
     private UserService userService;
 
     // Mocker les beans de sécurité pour éviter les problèmes de dépendances
@@ -75,6 +81,12 @@ class VenteControllerTest {
 
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
+
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.TenantService tenantService;
 
     private UserEntity utilisateurTest;
     private VenteEntity venteTest;
