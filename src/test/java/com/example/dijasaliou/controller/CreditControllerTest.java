@@ -230,7 +230,7 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), any(), eq(utilisateurTest)))
                 .thenReturn(creditDto);
 
         mockMvc.perform(post("/credits/test-id-1/payer")
@@ -244,7 +244,7 @@ class CreditControllerTest {
 
         verify(userService).obtenirUtilisateurParEmail("amadou@example.com");
         verify(creditClientService).enregistrerPaiement(
-                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest));
+                eq("test-id-1"), any(), any(), any(), any(), eq(utilisateurTest));
     }
 
     @Test
@@ -266,7 +266,7 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), any(), eq(utilisateurTest)))
                 .thenReturn(creditSolde);
 
         mockMvc.perform(post("/credits/test-id-1/payer")
@@ -287,7 +287,7 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), any(), eq(utilisateurTest)))
                 .thenThrow(new IllegalArgumentException("Le montant dépasse le restant dû"));
 
         mockMvc.perform(post("/credits/test-id-1/payer")
