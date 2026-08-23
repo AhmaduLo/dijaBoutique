@@ -3,6 +3,7 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.DepenseDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.DepenseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.DepenseService;
 import com.example.dijasaliou.service.UserService;
@@ -15,6 +16,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -86,12 +89,17 @@ class DepenseControllerTest {
     private UserEntity utilisateurTest;
     private DepenseEntity depenseTest;
     private DepenseEntity depenseTest2;
+    private TenantEntity tenantTest;
 
     /**
      * Initialisation des données de test avant chaque test
      */
     @BeforeEach
     void setUp() {
+        tenantTest = new TenantEntity();
+        tenantTest.setTenantUuid("uuid-tenant-test");
+        tenantTest.setDevisePreferee("XOF");
+
         // Création d'un utilisateur de test
         utilisateurTest = UserEntity.builder()
                 .id(1L)
@@ -283,13 +291,14 @@ class DepenseControllerTest {
                 .build();
         depenseCreee.setId("test-id-3");
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(depenseService.creerDepense(any(DepenseEntity.class), eq(utilisateurTest)))
                 .thenReturn(depenseCreee);
 
         // Act & Assert
         mockMvc.perform(post("/depenses")
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null,
+                                List.of(new SimpleGrantedAuthority("ADMIN"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelleDepense)))
                 .andExpect(status().isCreated())
@@ -298,7 +307,7 @@ class DepenseControllerTest {
                 .andExpect(jsonPath("$.montant", is(120000.00)))
                 .andExpect(jsonPath("$.categorie", is("ASSURANCE")));
 
-        verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
+        verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
         verify(depenseService, times(1)).creerDepense(any(DepenseEntity.class), eq(utilisateurTest));
     }
 
@@ -331,13 +340,14 @@ class DepenseControllerTest {
                 .build();
         depenseMiseAJour.setId(depenseId);
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(depenseService.modifierDepense(eq(depenseId), any(DepenseEntity.class)))
                 .thenReturn(depenseMiseAJour);
 
         // Act & Assert
         mockMvc.perform(put("/depenses/{id}", depenseId)
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null,
+                                List.of(new SimpleGrantedAuthority("ADMIN"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(depenseModifiee)))
                 .andExpect(status().isOk())
@@ -345,7 +355,7 @@ class DepenseControllerTest {
                 .andExpect(jsonPath("$.libelle", is("Loyer du magasin - Mise à jour")))
                 .andExpect(jsonPath("$.montant", is(550000.00)));
 
-        verify(userService, times(1)).obtenirUtilisateurParId(utilisateurId);
+        verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
         verify(depenseService, times(1)).modifierDepense(eq(depenseId), any(DepenseEntity.class));
     }
 
@@ -363,13 +373,14 @@ class DepenseControllerTest {
                 .categorie(DepenseEntity.CategorieDepense.AUTRE)
                 .build();
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(depenseService.modifierDepense(eq(depenseId), any(DepenseEntity.class)))
                 .thenThrow(new RuntimeException("Dépense non trouvée"));
 
         // Act & Assert
         mockMvc.perform(put("/depenses/{id}", depenseId)
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null,
+                                List.of(new SimpleGrantedAuthority("ADMIN"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(depenseModifiee)))
                 .andExpect(status().isBadRequest());
@@ -456,9 +467,10 @@ class DepenseControllerTest {
         // Arrange
         LocalDate dateDebut = LocalDate.of(2025, 10, 1);
         LocalDate dateFin = LocalDate.of(2025, 10, 31);
-        BigDecimal montantTotal = new BigDecimal("575000.00");
 
-        when(depenseService.calculerTotalDepenses(dateDebut, dateFin)).thenReturn(montantTotal);
+        when(depenseService.obtenirDepensesParPeriode(dateDebut, dateFin))
+                .thenReturn(Arrays.asList(depenseTest, depenseTest2));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         // Act & Assert
         mockMvc.perform(get("/depenses/total")
@@ -468,7 +480,7 @@ class DepenseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", is(575000.00)));
 
-        verify(depenseService, times(1)).calculerTotalDepenses(dateDebut, dateFin);
+        verify(depenseService, times(1)).obtenirDepensesParPeriode(dateDebut, dateFin);
     }
 
     @Test
@@ -477,9 +489,9 @@ class DepenseControllerTest {
         // Arrange
         LocalDate dateDebut = LocalDate.of(2025, 11, 1);
         LocalDate dateFin = LocalDate.of(2025, 11, 30);
-        BigDecimal montantTotal = BigDecimal.ZERO;
 
-        when(depenseService.calculerTotalDepenses(dateDebut, dateFin)).thenReturn(montantTotal);
+        when(depenseService.obtenirDepensesParPeriode(dateDebut, dateFin)).thenReturn(Arrays.asList());
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         // Act & Assert
         mockMvc.perform(get("/depenses/total")
@@ -487,9 +499,9 @@ class DepenseControllerTest {
                         .param("fin", dateFin.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", is(0)));
+                .andExpect(jsonPath("$", is(0.0)));
 
-        verify(depenseService, times(1)).calculerTotalDepenses(dateDebut, dateFin);
+        verify(depenseService, times(1)).obtenirDepensesParPeriode(dateDebut, dateFin);
     }
 
     // ==================== Tests pour GET /depenses/statistiques ====================
@@ -501,10 +513,9 @@ class DepenseControllerTest {
         LocalDate dateDebut = LocalDate.of(2025, 10, 1);
         LocalDate dateFin = LocalDate.of(2025, 10, 31);
         List<DepenseEntity> depenses = Arrays.asList(depenseTest, depenseTest2);
-        BigDecimal montantTotal = new BigDecimal("575000.00");
 
         when(depenseService.obtenirDepensesParPeriode(dateDebut, dateFin)).thenReturn(depenses);
-        when(depenseService.calculerTotalDepenses(dateDebut, dateFin)).thenReturn(montantTotal);
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         // Act & Assert
         mockMvc.perform(get("/depenses/statistiques")
@@ -519,7 +530,6 @@ class DepenseControllerTest {
                 .andExpect(jsonPath("$.depenses", hasSize(2)));
 
         verify(depenseService, times(1)).obtenirDepensesParPeriode(dateDebut, dateFin);
-        verify(depenseService, times(1)).calculerTotalDepenses(dateDebut, dateFin);
     }
 
     @Test
@@ -528,10 +538,9 @@ class DepenseControllerTest {
         // Arrange
         LocalDate dateDebut = LocalDate.of(2025, 11, 1);
         LocalDate dateFin = LocalDate.of(2025, 11, 30);
-        BigDecimal montantTotal = BigDecimal.ZERO;
 
         when(depenseService.obtenirDepensesParPeriode(dateDebut, dateFin)).thenReturn(Arrays.asList());
-        when(depenseService.calculerTotalDepenses(dateDebut, dateFin)).thenReturn(montantTotal);
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         // Act & Assert
         mockMvc.perform(get("/depenses/statistiques")
@@ -540,11 +549,10 @@ class DepenseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nombreDepenses", is(0)))
-                .andExpect(jsonPath("$.montantTotal", is(0)))
+                .andExpect(jsonPath("$.montantTotal", is(0.0)))
                 .andExpect(jsonPath("$.depenses", hasSize(0)));
 
         verify(depenseService, times(1)).obtenirDepensesParPeriode(dateDebut, dateFin);
-        verify(depenseService, times(1)).calculerTotalDepenses(dateDebut, dateFin);
     }
 
     @Test
@@ -617,13 +625,14 @@ class DepenseControllerTest {
                 .utilisateur(utilisateurTest)
                 .build();
 
-        when(userService.obtenirUtilisateurParId(utilisateurId)).thenReturn(utilisateurTest);
+        when(userService.obtenirUtilisateurParEmail("amadou@example.com")).thenReturn(utilisateurTest);
         when(depenseService.creerDepense(any(DepenseEntity.class), eq(utilisateurTest)))
                 .thenReturn(depenseCreee);
 
         // Act & Assert
         mockMvc.perform(post("/depenses")
-                        .param("utilisateurId", utilisateurId.toString())
+                        .principal(new UsernamePasswordAuthenticationToken("amadou@example.com", null,
+                                List.of(new SimpleGrantedAuthority("ADMIN"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(nouvelleDepense)))
                 .andExpect(status().isCreated())
