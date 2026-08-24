@@ -2,9 +2,11 @@ package com.example.dijasaliou.service;
 
 import com.example.dijasaliou.dto.ActiverCaisseRequest;
 import com.example.dijasaliou.dto.CaisseSoldeDto;
+import com.example.dijasaliou.dto.MouvementHistoriqueDto;
 import com.example.dijasaliou.entity.CaisseConfigEntity;
 import com.example.dijasaliou.entity.CompteCaisse;
 import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.MouvementCaisseManuelEntity;
 import com.example.dijasaliou.entity.MouvementCaisseManuelEntity.TypeMouvement;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.repository.*;
@@ -206,5 +208,38 @@ class CaisseServiceTest {
 
         // (200 000 + 50 000) / 655.957 ≈ 381.12 € — pas 50 305 € (bug : mouvement affiché brut, non converti)
         assertThat(resultat.getSoldeEspeces()).isEqualByComparingTo(new BigDecimal("381.12"));
+    }
+
+    @Test
+    @DisplayName("getHistoriqueBetween() — les montants sont convertis dans la devise demandée, pas affichés bruts")
+    void getHistoriqueBetween_convertitLesMontantsDansLaDeviseCible() {
+        tenantTest.setDevisePreferee("EUR");
+        LocalDateTime dateActivation = LocalDateTime.of(2026, 8, 1, 0, 0);
+        CaisseConfigEntity config = CaisseConfigEntity.builder()
+                .tenant(tenantTest)
+                .dateActivation(dateActivation)
+                .build();
+        when(caisseConfigRepository.findByTenant(tenantTest)).thenReturn(Optional.of(config));
+
+        DeviseEntity eur = DeviseEntity.builder().code("EUR").tauxChange(655.957).build();
+        when(deviseService.obtenirDeviseParCode("EUR")).thenReturn(eur);
+
+        // Mouvement fraîchement créé de 50 000 CFA (référence fixe XOF, comme toutes
+        // les entrées de l'historique — voir le modal "Mouvement manuel").
+        MouvementCaisseManuelEntity mouvement = MouvementCaisseManuelEntity.builder()
+                .tenant(tenantTest)
+                .typeMouvement(TypeMouvement.ENTREE)
+                .compte(CompteCaisse.ESPECES)
+                .montant(new BigDecimal("50000"))
+                .dateMouvement(LocalDateTime.of(2026, 8, 20, 10, 0))
+                .build();
+        when(mouvementManuelRepository.findByTenantBetween(eq(tenantTest), any(), any()))
+                .thenReturn(List.of(mouvement));
+
+        List<MouvementHistoriqueDto> resultat = caisseService.getHistoriqueBetween(null, null, "EUR");
+
+        assertThat(resultat).hasSize(1);
+        // 50 000 / 655.957 ≈ 76.22 € — pas 50 000 € (bug : montant brut affiché avec le mauvais symbole)
+        assertThat(resultat.get(0).getMontant()).isEqualByComparingTo(new BigDecimal("76.22"));
     }
 }

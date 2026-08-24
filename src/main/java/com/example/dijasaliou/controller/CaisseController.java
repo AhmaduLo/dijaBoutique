@@ -75,8 +75,9 @@ public class CaisseController {
     )
     public ResponseEntity<List<MouvementHistoriqueDto>> getHistorique(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate) {
-        return ResponseEntity.ok(caisseService.getHistoriqueBetween(fromDate, asOfDate));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate,
+            @RequestParam(required = false) String devise) {
+        return ResponseEntity.ok(caisseService.getHistoriqueBetween(fromDate, asOfDate, devise));
     }
 
     @PostMapping("/activer")

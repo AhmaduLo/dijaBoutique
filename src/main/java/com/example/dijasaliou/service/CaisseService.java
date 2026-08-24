@@ -670,18 +670,23 @@ public class CaisseService {
      */
     @Transactional(readOnly = true)
     public List<MouvementHistoriqueDto> getHistorique() {
-        return getHistoriqueBetween(null, null);
+        return getHistoriqueBetween(null, null, null);
     }
 
     /**
-     * Historique borné à un intervalle [fromDate, toDate] (inclusif).
+     * Historique borné à un intervalle [fromDate, toDate] (inclusif), avec les montants
+     * convertis dans {@code devise} (référence du tenant par défaut). Les mouvements
+     * manuels/transferts sont une référence fixe en XOF (voir chargerAgregats) — sans
+     * cette conversion, un montant de 50 000 CFA s'affichait "50 000 €" tel quel dès que
+     * la devise active n'était pas XOF, au lieu d'être divisé par son taux.
+     *
      * {@code fromDate} = null → on part de la date d'activation.
      * {@code toDate}   = null → on va jusqu'à maintenant.
      * Sinon, l'intervalle est restreint à la fenêtre demandée (mais jamais avant
      * l'activation, qui reste la borne inférieure absolue).
      */
     @Transactional(readOnly = true)
-    public List<MouvementHistoriqueDto> getHistoriqueBetween(LocalDate fromDate, LocalDate toDate) {
+    public List<MouvementHistoriqueDto> getHistoriqueBetween(LocalDate fromDate, LocalDate toDate, String devise) {
         TenantEntity tenant = tenantService.getCurrentTenant();
 
         var configOpt = caisseConfigRepository.findByTenant(tenant);
@@ -699,6 +704,10 @@ public class CaisseService {
             return List.of();
         }
 
+        double tauxTenant = resoudreTauxTenant(tenant);
+        double tauxCible = resoudreTauxCible(devise, tauxTenant);
+        BigDecimal tauxCibleBd = BigDecimal.valueOf(tauxCible);
+
         List<MouvementHistoriqueDto> historique = new ArrayList<>();
 
         mouvementManuelRepository.findByTenantBetween(tenant, debut, fin).forEach(m ->
@@ -708,7 +717,7 @@ public class CaisseService {
                             ? TypeHistorique.ENTREE
                             : TypeHistorique.SORTIE)
                     .compte(m.getCompte())
-                    .montant(m.getMontant())
+                    .montant(convertirVersDeviseCible(m.getMontant(), tauxCibleBd))
                     .motif(m.getMotif())
                     .date(m.getDateMouvement())
                     .faitPar(m.getFaitPar())
@@ -721,7 +730,7 @@ public class CaisseService {
                     .type(TypeHistorique.TRANSFERT)
                     .compteSource(t.getCompteSource())
                     .compteDestination(t.getCompteDestination())
-                    .montant(t.getMontant())
+                    .montant(convertirVersDeviseCible(t.getMontant(), tauxCibleBd))
                     .motif(t.getMotif())
                     .date(t.getDateTransfert())
                     .faitPar(t.getFaitPar())
@@ -735,6 +744,11 @@ public class CaisseService {
         historique.forEach(h -> h.setFaitParNom(nomsParId.get(h.getFaitPar())));
 
         return historique;
+    }
+
+    /** Montant (référence fixe XOF, comme le solde initial) → devise cible demandée. */
+    private static BigDecimal convertirVersDeviseCible(BigDecimal montantXof, BigDecimal tauxCible) {
+        return nz(montantXof).divide(tauxCible, 2, java.math.RoundingMode.HALF_UP);
     }
 
     /**
