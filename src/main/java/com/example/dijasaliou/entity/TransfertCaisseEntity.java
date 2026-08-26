@@ -74,6 +74,14 @@ public class TransfertCaisseEntity extends BaseEntity {
     @Column(name = "fait_par", length = 36)
     private String faitPar;
 
+    @Column(name = "devise_code", length = 10, nullable = false)
+    @Builder.Default
+    private String deviseCode = "XOF";
+
+    @Column(name = "taux_change_applique", nullable = false)
+    @Builder.Default
+    private Double tauxChangeApplique = 1.0;
+
     @Override
     protected void beforePersist() {
         if (this.dateTransfert == null) {
