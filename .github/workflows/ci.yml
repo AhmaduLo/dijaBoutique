@@ -25,8 +25,10 @@ jobs:
       - name: Run tests
         run: ./mvnw verify -B
         env:
-          # JWT has a default fallback in application.properties — no secret needed for tests
           SPRING_PROFILES_ACTIVE: test
+          # jwt.secret n'a pas de valeur par defaut (${JWT_SECRET} sans fallback) — obligatoire
+          # pour que le contexte Spring demarre. Valeur factice, jamais utilisee hors CI.
+          JWT_SECRET: ci-test-only-secret-key-never-used-outside-github-actions-0000
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
