@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -30,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ne peut jamais retourner les données du tenant B, et vice-versa.
  */
 @DataJpaTest
+@TestPropertySource(properties = "spring.flyway.enabled=false")
 @DisplayName("Tests d'isolation multi-tenant — filtre Hibernate tenantFilter")
 class MultiTenantIsolationTest {
 
