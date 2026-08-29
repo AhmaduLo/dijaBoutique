@@ -3,6 +3,7 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.CreateDeviseDto;
 import com.example.dijasaliou.dto.UpdateDeviseDto;
 import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.repository.DeviseRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,42 +11,64 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Service pour la gestion des devises
+ * Service pour la gestion des devises.
+ *
+ * Une devise est soit "système" (tenant = null, catalogue partagé XOF/EUR/USD…),
+ * soit "personnalisée" (créée par une boutique précise, visible et modifiable
+ * uniquement par elle). Toute méthode qui liste/résout/modifie une devise est
+ * scopée sur le tenant courant — aucune méthode ne doit exposer ou permettre de
+ * modifier la devise personnalisée d'une AUTRE boutique.
  */
 @Service
 public class DeviseService {
 
     private final DeviseRepository deviseRepository;
+    private final TenantService tenantService;
 
-    public DeviseService(DeviseRepository deviseRepository) {
+    public DeviseService(DeviseRepository deviseRepository, TenantService tenantService) {
         this.deviseRepository = deviseRepository;
+        this.tenantService = tenantService;
     }
 
     /**
-     * Récupère toutes les devises
+     * Récupère toutes les devises visibles par la boutique courante :
+     * les devises système + ses propres devises personnalisées.
      */
     public List<DeviseEntity> obtenirToutesLesDevises() {
-        return deviseRepository.findAll();
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        return deviseRepository.findVisiblesPourTenant(tenant);
     }
 
     /**
-     * Récupère une devise par son ID
+     * Récupère une devise par son ID — vérifie qu'elle est visible par la
+     * boutique courante (système ou lui appartenant).
      */
     public DeviseEntity obtenirDeviseParId(Long id) {
-        return deviseRepository.findById(id)
+        DeviseEntity devise = deviseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Devise non trouvée avec l'ID : " + id));
+        verifierVisiblePourTenantCourant(devise);
+        return devise;
     }
 
     /**
-     * Récupère une devise par son code
+     * Récupère une devise par son code, visible pour la boutique courante :
+     * sa propre version personnalisée si elle existe, sinon la version système.
      */
     public DeviseEntity obtenirDeviseParCode(String code) {
-        return deviseRepository.findByCode(code.toUpperCase())
-                .orElseThrow(() -> new RuntimeException("Devise non trouvée avec le code : " + code));
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        List<DeviseEntity> resultats = deviseRepository
+                .findByCodeVisiblePourTenant(code.toUpperCase(), tenant);
+        if (resultats.isEmpty()) {
+            throw new RuntimeException("Devise non trouvée avec le code : " + code);
+        }
+        // La requête trie déjà personnalisée avant système — le premier résultat
+        // est la version prioritaire pour ce tenant.
+        return resultats.get(0);
     }
 
     /**
-     * Récupère la devise par défaut
+     * Récupère la devise par défaut (mécanisme legacy, non utilisé par le
+     * flux réel — voir tenants.devise_preferee).
      */
     public DeviseEntity obtenirDeviseParDefaut() {
         return deviseRepository.findByIsDefaultTrue()
@@ -53,52 +76,55 @@ public class DeviseService {
     }
 
     /**
-     * Crée une nouvelle devise
+     * Crée une nouvelle devise, personnalisée pour la boutique courante.
      */
     @Transactional
     public DeviseEntity creerDevise(CreateDeviseDto dto) {
-        // Vérifier si le code existe déjà
+        TenantEntity tenant = tenantService.getCurrentTenant();
         String codeNormalise = dto.getCode().toUpperCase();
-        if (deviseRepository.existsByCode(codeNormalise)) {
-            throw new RuntimeException("Une devise avec le code " + codeNormalise + " existe déjà");
+
+        // Le code ne doit collisionner ni avec une devise système, ni avec une
+        // devise déjà créée par cette même boutique (deux boutiques différentes
+        // peuvent en revanche avoir chacune leur propre devise du même code).
+        if (deviseRepository.existsByCodeAndTenantIsNull(codeNormalise)) {
+            throw new RuntimeException("Le code " + codeNormalise + " est déjà utilisé par une devise système");
+        }
+        if (deviseRepository.existsByCodeAndTenant(codeNormalise, tenant)) {
+            throw new RuntimeException("Vous avez déjà une devise avec le code " + codeNormalise);
         }
 
-        // Si c'est la première devise ou si isDefault est true, gérer la devise par défaut
-        boolean isDefault = dto.getIsDefault() != null && dto.getIsDefault();
-        if (isDefault) {
-            // Retirer le statut par défaut des autres devises
-            retirerDeviseParDefaut();
-        } else if (!deviseRepository.existsByIsDefaultTrue()) {
-            // Si aucune devise par défaut n'existe, cette devise devient par défaut
-            isDefault = true;
-        }
-
-        // Créer la devise
         DeviseEntity devise = DeviseEntity.builder()
                 .code(codeNormalise)
                 .nom(dto.getNom())
                 .symbole(dto.getSymbole())
                 .pays(dto.getPays())
                 .tauxChange(dto.getTauxChange())
-                .isDefault(isDefault)
+                .isDefault(false)
+                .tenant(tenant)
                 .build();
 
         return deviseRepository.save(devise);
     }
 
     /**
-     * Met à jour une devise
+     * Met à jour une devise — réservé aux devises personnalisées de la
+     * boutique courante. Les devises système (XOF/EUR/USD…) ne sont pas
+     * modifiables via cette méthode.
      */
     @Transactional
     public DeviseEntity modifierDevise(Long id, UpdateDeviseDto dto) {
-        DeviseEntity devise = obtenirDeviseParId(id);
+        DeviseEntity devise = deviseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Devise non trouvée avec l'ID : " + id));
+        verifierAppartientAuTenantCourant(devise);
 
-        // Mettre à jour les champs si présents
         if (dto.getCode() != null) {
             String nouveauCode = dto.getCode().toUpperCase();
-            // Vérifier que le nouveau code n'est pas déjà utilisé par une autre devise
-            if (!devise.getCode().equals(nouveauCode) && deviseRepository.existsByCode(nouveauCode)) {
-                throw new RuntimeException("Une devise avec le code " + nouveauCode + " existe déjà");
+            if (!devise.getCode().equals(nouveauCode)) {
+                TenantEntity tenant = tenantService.getCurrentTenant();
+                if (deviseRepository.existsByCodeAndTenantIsNull(nouveauCode)
+                        || deviseRepository.existsByCodeAndTenant(nouveauCode, tenant)) {
+                    throw new RuntimeException("Une devise avec le code " + nouveauCode + " existe déjà");
+                }
             }
             devise.setCode(nouveauCode);
         }
@@ -119,29 +145,18 @@ public class DeviseService {
             devise.setTauxChange(dto.getTauxChange());
         }
 
-        if (dto.getIsDefault() != null && dto.getIsDefault()) {
-            // Si on veut définir cette devise comme par défaut, retirer le statut des autres
-            retirerDeviseParDefaut();
-            devise.setIsDefault(true);
-        }
-
         return deviseRepository.save(devise);
     }
 
     /**
-     * Supprime une devise
+     * Supprime une devise — réservé aux devises personnalisées de la
+     * boutique courante.
      */
     @Transactional
     public void supprimerDevise(Long id) {
-        DeviseEntity devise = obtenirDeviseParId(id);
-
-        // Vérifier que ce n'est pas la devise par défaut
-        if (devise.getIsDefault()) {
-            throw new RuntimeException(
-                    "Impossible de supprimer la devise par défaut. " +
-                    "Définissez d'abord une autre devise comme devise par défaut."
-            );
-        }
+        DeviseEntity devise = deviseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Devise non trouvée avec l'ID : " + id));
+        verifierAppartientAuTenantCourant(devise);
 
         // Les entités VenteEntity et AchatEntity ne stockent pas de FK vers la devise —
         // elles utilisent DeviseService.convertir() à la volée. La suppression est sûre.
@@ -149,27 +164,26 @@ public class DeviseService {
     }
 
     /**
-     * Définit une devise comme devise par défaut
+     * Définit une devise comme devise par défaut (mécanisme legacy, non
+     * utilisé par le flux réel — voir DeviseController#definirDeviseParDefaut
+     * qui écrit directement dans tenants.devise_preferee).
      */
     @Transactional
     public DeviseEntity definirDeviseParDefaut(Long id) {
-        DeviseEntity devise = obtenirDeviseParId(id);
+        DeviseEntity devise = deviseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Devise non trouvée avec l'ID : " + id));
 
-        // Si déjà par défaut, ne rien faire
         if (devise.getIsDefault()) {
             return devise;
         }
 
-        // Retirer le statut par défaut des autres devises
         retirerDeviseParDefaut();
-
-        // Définir cette devise comme par défaut
         devise.setIsDefault(true);
         return deviseRepository.save(devise);
     }
 
     /**
-     * Retire le statut de devise par défaut de toutes les devises
+     * Retire le statut de devise par défaut de toutes les devises (mécanisme legacy).
      */
     private void retirerDeviseParDefaut() {
         deviseRepository.findByIsDefaultTrue().ifPresent(deviseParDefaut -> {
@@ -179,7 +193,8 @@ public class DeviseService {
     }
 
     /**
-     * Convertit un montant d'une devise à une autre
+     * Convertit un montant d'une devise à une autre (visibles pour la
+     * boutique courante).
      */
     public Double convertir(Double montant, String codeDeviseSource, String codeDeviseCible) {
         if (montant == null || montant == 0) {
@@ -189,11 +204,35 @@ public class DeviseService {
         DeviseEntity deviseSource = obtenirDeviseParCode(codeDeviseSource);
         DeviseEntity deviseCible = obtenirDeviseParCode(codeDeviseCible);
 
-        // Conversion en 2 étapes :
-        // 1. Convertir de la devise source vers la devise de référence
         Double montantReference = deviseSource.convertirVersReference(montant);
-
-        // 2. Convertir de la devise de référence vers la devise cible
         return deviseCible.convertirDepuisReference(montantReference);
+    }
+
+    /**
+     * Une devise système est visible par tout le monde ; une devise
+     * personnalisée uniquement par sa boutique.
+     */
+    private void verifierVisiblePourTenantCourant(DeviseEntity devise) {
+        if (devise.getTenant() == null) {
+            return;
+        }
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (!devise.getTenant().getId().equals(tenant.getId())) {
+            throw new RuntimeException("Devise non trouvée avec l'ID : " + devise.getId());
+        }
+    }
+
+    /**
+     * Bloque toute modification/suppression d'une devise système, ou d'une
+     * devise personnalisée appartenant à une AUTRE boutique.
+     */
+    private void verifierAppartientAuTenantCourant(DeviseEntity devise) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        if (devise.getTenant() == null) {
+            throw new RuntimeException("Les devises système ne sont pas modifiables");
+        }
+        if (!devise.getTenant().getId().equals(tenant.getId())) {
+            throw new RuntimeException("Devise non trouvée avec l'ID : " + devise.getId());
+        }
     }
 }
