@@ -1,5 +1,6 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.BeneficeStatistiquesDto;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.*;
 import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
@@ -130,7 +131,15 @@ public class RapportService {
         BigDecimal ca            = somme(ventes.stream().map(v -> convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique())).collect(Collectors.toList()));
         BigDecimal totalAchats   = somme(achats.stream().map(a -> convertirMontant(a.getPrixTotal(), a.getTauxChangeApplique())).collect(Collectors.toList()));
         BigDecimal totalDepenses = somme(depenses.stream().map(d -> convertirMontant(d.getMontant(), d.getTauxChangeApplique())).collect(Collectors.toList()));
-        BigDecimal benefice      = ca.subtract(totalAchats).subtract(totalDepenses);
+        // Bénéfice net = marge FIFO (coût des marchandises réellement VENDUES, pas achetées)
+        // moins les dépenses — réutilise le même calcul que la carte "Bénéfice" du module
+        // Ventes et du dashboard, pour ne jamais afficher deux chiffres différents pour la
+        // même activité. "Total Achats" reste affiché tel quel (dépense de trésorerie brute),
+        // mais ne sert plus de base au bénéfice net : du stock acheté et non vendu ne doit
+        // pas être compté comme un coût déjà supporté par le résultat de la période.
+        BeneficeStatistiquesDto statsBenefice = venteService.calculerStatistiquesBenefice(debut, fin, codeDeviseRapport);
+        BigDecimal margeBruteFifo = statsBenefice.getBeneficeNet() != null ? statsBenefice.getBeneficeNet() : BigDecimal.ZERO;
+        BigDecimal benefice      = margeBruteFifo.subtract(totalDepenses);
 
         // ── Période précédente ────────────────────────────────────────────────
         long      nbJours     = ChronoUnit.DAYS.between(debut, fin) + 1;
@@ -142,7 +151,9 @@ public class RapportService {
         BigDecimal caPrev            = somme(ventesPrev.stream().map(v -> convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique())).collect(Collectors.toList()));
         BigDecimal totalAchatsPrev   = somme(achatsPrev.stream().map(a -> convertirMontant(a.getPrixTotal(), a.getTauxChangeApplique())).collect(Collectors.toList()));
         BigDecimal totalDepensesPrev = somme(depensesPrev.stream().map(d -> convertirMontant(d.getMontant(), d.getTauxChangeApplique())).collect(Collectors.toList()));
-        BigDecimal beneficePrev      = caPrev.subtract(totalAchatsPrev).subtract(totalDepensesPrev);
+        BeneficeStatistiquesDto statsBeneficePrev = venteService.calculerStatistiquesBenefice(debutPrev, finPrev, codeDeviseRapport);
+        BigDecimal margeBruteFifoPrev = statsBeneficePrev.getBeneficeNet() != null ? statsBeneficePrev.getBeneficeNet() : BigDecimal.ZERO;
+        BigDecimal beneficePrev      = margeBruteFifoPrev.subtract(totalDepensesPrev);
 
         // ── Numéro de rapport ─────────────────────────────────────────────────
         String numRapport = String.format("RPT-%d%02d-%04d",
