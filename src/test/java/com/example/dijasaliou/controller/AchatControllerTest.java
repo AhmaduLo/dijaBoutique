@@ -3,6 +3,7 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.AchatDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AchatService;
 import com.example.dijasaliou.service.UserService;
@@ -62,6 +63,9 @@ class AchatControllerTest {
     private AchatService achatService;
 
     @MockitoBean
+    private com.example.dijasaliou.service.DeviseService deviseService;
+
+    @MockitoBean
     private UserService userService;
 
     // Mocker les beans de sécurité pour éviter les problèmes de dépendances
@@ -77,9 +81,16 @@ class AchatControllerTest {
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
 
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.TenantService tenantService;
+
     private UserEntity utilisateurTest;
     private AchatEntity achatTest;
     private AchatEntity achatTest2;
+    private TenantEntity tenantTest;
 
     /**
      * Initialisation des données de test avant chaque test
@@ -87,6 +98,10 @@ class AchatControllerTest {
      */
     @BeforeEach
     void setUp() {
+        tenantTest = new TenantEntity();
+        tenantTest.setTenantUuid("uuid-tenant-test");
+        tenantTest.setDevisePreferee("XOF");
+
         // Création d'un utilisateur de test
         utilisateurTest = UserEntity.builder()
                 .id(1L)
@@ -101,6 +116,7 @@ class AchatControllerTest {
                 .nomProduit("Collier en or")
                 .prixUnitaire(new BigDecimal("50.00"))
                 .prixTotal(new BigDecimal("500.00"))
+                .tauxChangeApplique(1.0)
                 .dateAchat(LocalDateTime.of(2025, 10, 15, 0, 0))
                 .fournisseur("Fournisseur A")
                 .utilisateur(utilisateurTest)
@@ -113,6 +129,7 @@ class AchatControllerTest {
                 .nomProduit("Bracelet en argent")
                 .prixUnitaire(new BigDecimal("30.00"))
                 .prixTotal(new BigDecimal("150.00"))
+                .tauxChangeApplique(1.0)
                 .dateAchat(LocalDateTime.of(2025, 10, 20, 0, 0))
                 .fournisseur("Fournisseur B")
                 .utilisateur(utilisateurTest)
@@ -138,7 +155,7 @@ class AchatControllerTest {
                 .andExpect(jsonPath("$.content", hasSize(2)))
                 .andExpect(jsonPath("$.content[0].id", is("test-id-1")))
                 .andExpect(jsonPath("$.content[0].nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$.content[0].quantite", is(10)))
+                .andExpect(jsonPath("$.content[0].quantite", is(10.0)))
                 .andExpect(jsonPath("$.content[1].id", is("test-id-2")))
                 .andExpect(jsonPath("$.content[1].nomProduit", is("Bracelet en argent")));
 
@@ -178,7 +195,7 @@ class AchatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or")))
-                .andExpect(jsonPath("$.quantite", is(10)))
+                .andExpect(jsonPath("$.quantite", is(10.0)))
                 .andExpect(jsonPath("$.prixUnitaire", is(50.00)))
                 .andExpect(jsonPath("$.prixTotal", is(500.00)))
                 .andExpect(jsonPath("$.fournisseur", is("Fournisseur A")));
@@ -283,7 +300,7 @@ class AchatControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id", is("test-id-3")))
                 .andExpect(jsonPath("$.nomProduit", is("Bague en diamant")))
-                .andExpect(jsonPath("$.quantite", is(15)))
+                .andExpect(jsonPath("$.quantite", is(15.0)))
                 .andExpect(jsonPath("$.prixTotal", is(1500.00)));
 
         verify(userService, times(1)).obtenirUtilisateurParEmail("amadou@example.com");
@@ -300,8 +317,8 @@ class AchatControllerTest {
                 .prixUnitaire(new BigDecimal("-10.00")) // Prix négatif (invalide)
                 .build();
 
-        // @Valid déclenche MethodArgumentNotValidException qui est interceptée par
-        // GlobalExceptionHandler.handleGeneralException → 500 (il n'étend pas ResponseEntityExceptionHandler)
+        // @Valid déclenche MethodArgumentNotValidException, interceptée par
+        // GlobalExceptionHandler.handleValidationException → 400 Bad Request
 
         // Act & Assert
         mockMvc.perform(post("/achats")
@@ -309,7 +326,7 @@ class AchatControllerTest {
                                 List.of(new SimpleGrantedAuthority("USER"))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(achatInvalide)))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
 
         // La validation échoue avant d'appeler le service
         verify(achatService, never()).creerAchat(any(), any());
@@ -356,7 +373,7 @@ class AchatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is("test-id-1")))
                 .andExpect(jsonPath("$.nomProduit", is("Collier en or modifié")))
-                .andExpect(jsonPath("$.quantite", is(20)))
+                .andExpect(jsonPath("$.quantite", is(20.0)))
                 .andExpect(jsonPath("$.prixUnitaire", is(60.00)))
                 .andExpect(jsonPath("$.prixTotal", is(1200.00)));
 
@@ -404,10 +421,9 @@ class AchatControllerTest {
         LocalDate dateDebut = LocalDate.of(2025, 10, 1);
         LocalDate dateFin = LocalDate.of(2025, 10, 31);
         List<AchatEntity> achats = Arrays.asList(achatTest, achatTest2);
-        BigDecimal montantTotal = new BigDecimal("650.00");
 
         when(achatService.obtenirAchatsParPeriode(dateDebut, dateFin)).thenReturn(achats);
-        when(achatService.calculerTotalAchats(dateDebut, dateFin)).thenReturn(montantTotal);
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         // Act & Assert
         mockMvc.perform(get("/achats/statistiques")
@@ -422,7 +438,6 @@ class AchatControllerTest {
                 .andExpect(jsonPath("$.achats", hasSize(2)));
 
         verify(achatService, times(1)).obtenirAchatsParPeriode(dateDebut, dateFin);
-        verify(achatService, times(1)).calculerTotalAchats(dateDebut, dateFin);
     }
 
     @Test
@@ -431,10 +446,9 @@ class AchatControllerTest {
         // Arrange
         LocalDate dateDebut = LocalDate.of(2025, 11, 1);
         LocalDate dateFin = LocalDate.of(2025, 11, 30);
-        BigDecimal montantTotal = BigDecimal.ZERO;
 
         when(achatService.obtenirAchatsParPeriode(dateDebut, dateFin)).thenReturn(Arrays.asList());
-        when(achatService.calculerTotalAchats(dateDebut, dateFin)).thenReturn(montantTotal);
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         // Act & Assert
         mockMvc.perform(get("/achats/statistiques")
@@ -443,11 +457,10 @@ class AchatControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nombreAchats", is(0)))
-                .andExpect(jsonPath("$.montantTotal", is(0)))
+                .andExpect(jsonPath("$.montantTotal", is(0.0)))
                 .andExpect(jsonPath("$.achats", hasSize(0)));
 
         verify(achatService, times(1)).obtenirAchatsParPeriode(dateDebut, dateFin);
-        verify(achatService, times(1)).calculerTotalAchats(dateDebut, dateFin);
     }
 
     @Test

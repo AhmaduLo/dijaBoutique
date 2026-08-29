@@ -57,6 +57,7 @@ public class ImportService {
     private final DepenseRepository  depenseRepository;
     private final StockService       stockService;
     private final TenantService      tenantService;
+    private final DeviseService      deviseService;
     private final FifoBackfillService fifoBackfillService;
 
     /** Auto-injection différée pour appeler les méthodes @Transactional via le proxy Spring */
@@ -220,6 +221,20 @@ public class ImportService {
 
         TenantEntity tenant = tenantService.getCurrentTenant();
 
+        // DEVISE : résolue une seule fois pour tout le batch (comme la devise active du
+        // tenant au moment de l'import) plutôt qu'une requête par ligne.
+        String codeDevisePreferee = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        String codeDevise;
+        double tauxChangeApplique;
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevisePreferee);
+            codeDevise = devise.getCode();
+            tauxChangeApplique = devise.getTauxChange();
+        } catch (RuntimeException e) {
+            codeDevise = "XOF";
+            tauxChangeApplique = 1.0;
+        }
+
         // Pré-charger les existants en UNE seule requête puis comparer en mémoire
         // (évite N+1 requêtes — 1000 lignes = 1 requête au lieu de 1000)
         Set<String> cleesExistantes = chargerCleesDoublons(donneesParsees, type);
@@ -231,7 +246,7 @@ public class ImportService {
         List<Object> batch = new ArrayList<>();
 
         for (Map<String, Object> donnees : donneesParsees) {
-            Object entite = construireEntite(donnees, type, utilisateur, tenant);
+            Object entite = construireEntite(donnees, type, utilisateur, tenant, codeDevise, tauxChangeApplique);
             if (entite == null) continue;
 
             String cle = cleDoublon(entite, type);
@@ -588,17 +603,17 @@ public class ImportService {
     // CONSTRUCTION DES ENTITÉS
     // ─────────────────────────────────────────────────────────────────────────
     private Object construireEntite(Map<String, Object> d, String type,
-            UserEntity utilisateur, TenantEntity tenant) {
+            UserEntity utilisateur, TenantEntity tenant, String codeDevise, double tauxChangeApplique) {
         return switch (type) {
-            case "achats"   -> construireAchat(d, utilisateur, tenant);
-            case "ventes"   -> construireVente(d, utilisateur, tenant);
-            case "depenses" -> construireDepense(d, utilisateur, tenant);
+            case "achats"   -> construireAchat(d, utilisateur, tenant, codeDevise, tauxChangeApplique);
+            case "ventes"   -> construireVente(d, utilisateur, tenant, codeDevise, tauxChangeApplique);
+            case "depenses" -> construireDepense(d, utilisateur, tenant, codeDevise, tauxChangeApplique);
             default         -> null;
         };
     }
 
     private AchatEntity construireAchat(Map<String, Object> d,
-            UserEntity utilisateur, TenantEntity tenant) {
+            UserEntity utilisateur, TenantEntity tenant, String codeDevise, double tauxChangeApplique) {
         LocalDate date     = (LocalDate) d.get(K_DATE_ACHAT_PARSED);
         Double prixAchat   = (Double) d.get("prixAchat");
         Double prixVente   = (Double) d.get(K_PRIX_VENTE);
@@ -614,13 +629,15 @@ public class ImportService {
                 .prixVenteSuggere(BigDecimal.valueOf(prixVente))
                 .dateAchat(date.atStartOfDay())
                 .fournisseur((String) d.get(K_FOURNISSEUR))
+                .deviseCode(codeDevise)
+                .tauxChangeApplique(tauxChangeApplique)
                 .utilisateur(utilisateur)
                 .tenant(tenant)
                 .build();
     }
 
     private VenteEntity construireVente(Map<String, Object> d,
-            UserEntity utilisateur, TenantEntity tenant) {
+            UserEntity utilisateur, TenantEntity tenant, String codeDevise, double tauxChangeApplique) {
         LocalDate date   = (LocalDate) d.get(K_DATE_VENTE_PARSED);
         Double prixVente = (Double) d.get(K_PRIX_VENTE);
         Double quantite  = (Double) d.get("quantite");
@@ -636,13 +653,15 @@ public class ImportService {
                 .client((String) d.get("nomClient"))
                 .dateVente(date.atStartOfDay())
                 .modePaiement(mode)
+                .deviseCode(codeDevise)
+                .tauxChangeApplique(tauxChangeApplique)
                 .utilisateur(utilisateur)
                 .tenant(tenant)
                 .build();
     }
 
     private DepenseEntity construireDepense(Map<String, Object> d,
-            UserEntity utilisateur, TenantEntity tenant) {
+            UserEntity utilisateur, TenantEntity tenant, String codeDevise, double tauxChangeApplique) {
         LocalDate date = (LocalDate) d.get("dateDepenseParsed");
         DepenseEntity.CategorieDepense categorie;
         try {
@@ -656,6 +675,8 @@ public class ImportService {
                 .categorie(categorie)
                 .dateDepense(date.atStartOfDay())
                 .notes((String) d.get(K_NOTES))
+                .deviseCode(codeDevise)
+                .tauxChangeApplique(tauxChangeApplique)
                 .utilisateur(utilisateur)
                 .tenant(tenant)
                 .build();

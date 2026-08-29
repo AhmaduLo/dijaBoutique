@@ -128,7 +128,7 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("enregistrerPaiement() — lève exception si crédit non trouvé")
     void enregistrerPaiement_leveExceptionCreditIntrouvable() {
-        when(creditClientRepository.findById("999")).thenReturn(Optional.empty());
+        when(creditClientRepository.findByIdForUpdate("999")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> creditClientService.enregistrerPaiement(
                 "999", new BigDecimal("100.00"), ModePaiement.ESPECES, null, employe))
@@ -140,7 +140,7 @@ class CreditClientServiceTest {
     @DisplayName("enregistrerPaiement() — lève exception si crédit déjà soldé")
     void enregistrerPaiement_leveExceptionDejasSolde() {
         credit.setStatut(StatutCredit.SOLDE);
-        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findByIdForUpdate("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         assertThatThrownBy(() -> creditClientService.enregistrerPaiement(
@@ -152,7 +152,7 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("enregistrerPaiement() — lève exception si montant = 0")
     void enregistrerPaiement_leveExceptionMontantZero() {
-        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findByIdForUpdate("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         assertThatThrownBy(() -> creditClientService.enregistrerPaiement(
@@ -164,7 +164,7 @@ class CreditClientServiceTest {
     @Test
     @DisplayName("enregistrerPaiement() — lève exception si montant dépasse le restant dû")
     void enregistrerPaiement_leveExceptionMontantTropEleve() {
-        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findByIdForUpdate("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
 
         assertThatThrownBy(() -> creditClientService.enregistrerPaiement(
@@ -181,7 +181,7 @@ class CreditClientServiceTest {
     @DisplayName("enregistrerPaiement() — paiement partiel : statut devient PARTIEL")
     void enregistrerPaiement_partiel_statutPartiel() {
         credit.setMontantRestant(new BigDecimal("200.00"));
-        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findByIdForUpdate("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(paiementCreditRepository.save(any())).thenReturn(new PaiementCreditEntity());
         when(creditClientRepository.save(any())).thenReturn(credit);
@@ -204,7 +204,7 @@ class CreditClientServiceTest {
     void enregistrerPaiement_total_statutSolde() {
         credit.setMontantRestant(new BigDecimal("200.00"));
         client.setDetteTotale(new BigDecimal("200.00"));
-        when(creditClientRepository.findById("test-id-20")).thenReturn(Optional.of(credit));
+        when(creditClientRepository.findByIdForUpdate("test-id-20")).thenReturn(Optional.of(credit));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(paiementCreditRepository.save(any())).thenReturn(new PaiementCreditEntity());
         when(venteRepository.save(any())).thenReturn(vente);
@@ -275,16 +275,17 @@ class CreditClientServiceTest {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, "uuid-tenant-test"))
                 .thenReturn(new BigDecimal("500.00"));
-        when(creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, "uuid-tenant-test"))
+        when(creditClientRepository.sumMontantInitialTous("uuid-tenant-test"))
                 .thenReturn(new BigDecimal("1000.00"));
         when(creditClientRepository.countCreditsActifs(StatutCredit.SOLDE, "uuid-tenant-test"))
                 .thenReturn(3L);
         when(creditClientRepository.countClientsCrediteurs(StatutCredit.SOLDE, "uuid-tenant-test"))
                 .thenReturn(2L);
+        when(tenantService.todayInTenantTz()).thenReturn(LocalDate.now());
         when(creditClientRepository.countCreditsEnRetard(eq(StatutCredit.SOLDE), any(LocalDate.class), eq("uuid-tenant-test")))
                 .thenReturn(1L);
 
-        var stats = creditClientService.obtenirStats();
+        var stats = creditClientService.obtenirStats(null);
 
         assertThat(stats).containsKeys("totalEnAttente", "montantTotalDu",
                 "nombreCreditsActifs", "nombreClientsCrediteurs",
@@ -297,12 +298,12 @@ class CreditClientServiceTest {
     void obtenirStats_tauxZeroSiAucunCredit() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         when(creditClientRepository.sumMontantRestantActif(any(), any())).thenReturn(null);
-        when(creditClientRepository.sumMontantInitialActif(any(), any())).thenReturn(null);
+        when(creditClientRepository.sumMontantInitialTous(any())).thenReturn(null);
         when(creditClientRepository.countCreditsActifs(any(), any())).thenReturn(0L);
         when(creditClientRepository.countClientsCrediteurs(any(), any())).thenReturn(0L);
         when(creditClientRepository.countCreditsEnRetard(any(), any(), any())).thenReturn(0L);
 
-        var stats = creditClientService.obtenirStats();
+        var stats = creditClientService.obtenirStats(null);
 
         assertThat((double) stats.get("tauxRecouvrement")).isEqualTo(0.0);
     }

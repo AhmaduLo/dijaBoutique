@@ -53,6 +53,9 @@ class TenantControllerTest {
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
 
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
     private TenantEntity tenantTest;
     private UserEntity adminTest;
     private final UsernamePasswordAuthenticationToken principal =

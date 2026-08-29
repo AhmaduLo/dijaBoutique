@@ -4,8 +4,12 @@ import com.example.dijasaliou.dto.AchatDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.ProduitPourVenteDto;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.AchatService;
+import com.example.dijasaliou.service.DeviseService;
+import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -36,10 +40,15 @@ public class AchatController {
 
     private final AchatService achatService;
     private final UserService userService;
+    private final TenantService tenantService;
+    private final DeviseService deviseService;
 
-    public AchatController(AchatService achatService, UserService userService) {
+    public AchatController(AchatService achatService, UserService userService,
+                           TenantService tenantService, DeviseService deviseService) {
         this.achatService = achatService;
         this.userService = userService;
+        this.tenantService = tenantService;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -136,21 +145,47 @@ public class AchatController {
     @GetMapping("/statistiques")
     public ResponseEntity<Map<String, Object>> obtenirStatistiques(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
         List<AchatEntity> achats = achatService.obtenirAchatsParPeriode(debut, fin);
-        BigDecimal total = achatService.calculerTotalAchats(debut, fin);
 
         // Convertir les achats en DTOs
         List<AchatDto> achatsDto = achats.stream()
                 .map(AchatDto::fromEntity)
                 .collect(Collectors.toList());
 
+        // Devise de rapport : paramètre explicite ou devise préférée du tenant
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        double tauxTemp = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null) {
+                tauxTemp = deviseRapport.getTauxChange().doubleValue();
+            }
+        } catch (RuntimeException e) {
+            // fallback to default 1.0
+        }
+        final double tauxTenant = tauxTemp;
+
+        // Calculer le total dans la devise du tenant : montant × tauxChangeApplique → XOF → / tauxTenant
+        BigDecimal total = achats.stream()
+                .filter(a -> a.getPrixTotal() != null && a.getTauxChangeApplique() != null)
+                .map(a -> a.getPrixTotal()
+                        .multiply(BigDecimal.valueOf(a.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxTenant), 2, java.math.RoundingMode.HALF_UP))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
         stats.put("nombreAchats", achatsDto.size());
         stats.put("montantTotal", total);
+        stats.put("deviseCode", codeDevise);
         stats.put("achats", achatsDto);
 
         return ResponseEntity.ok(stats);

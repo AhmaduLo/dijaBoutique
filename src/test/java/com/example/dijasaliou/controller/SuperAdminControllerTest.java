@@ -49,6 +49,9 @@ class SuperAdminControllerTest {
     @MockitoBean
     private SuperAdminService superAdminService;
 
+    @MockitoBean
+    private com.example.dijasaliou.service.PlatformConfigService platformConfigService;
+
     @MockitoBean(name = "jwtAuthenticationFilter")
     private com.example.dijasaliou.jwt.JwtAuthenticationFilter jwtAuthenticationFilter;
 
@@ -60,6 +63,12 @@ class SuperAdminControllerTest {
 
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
+
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.TenantService tenantService;
 
     private TenantAdminDto tenantDto1;
     private TenantAdminDto tenantDto2;

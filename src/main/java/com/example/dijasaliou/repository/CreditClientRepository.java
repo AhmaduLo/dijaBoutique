@@ -54,11 +54,18 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
 
     boolean existsByVenteIdAndStatutIn(String venteId, List<StatutCredit> statuts);
 
-    @Query("SELECT COALESCE(SUM(c.montantRestant), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
+    /** Retourne le montant restant total en XOF (montant × taux). Le caller divise par son tauxRapport. */
+    @Query("SELECT COALESCE(SUM(c.montantRestant * c.tauxChangeApplique), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     BigDecimal sumMontantRestantActif(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
 
-    @Query("SELECT COALESCE(SUM(c.montantInitial), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
+    /** Retourne le montant initial total en XOF (montant × taux). Le caller divise par son tauxRapport. */
+    @Query("SELECT COALESCE(SUM(c.montantInitial * c.tauxChangeApplique), 0) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     BigDecimal sumMontantInitialActif(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
+
+    /** Retourne le montant initial total en XOF de TOUS les crédits (actifs + soldés).
+     *  Utilisé comme dénominateur du taux de recouvrement global. */
+    @Query("SELECT COALESCE(SUM(c.montantInitial * c.tauxChangeApplique), 0) FROM CreditClientEntity c WHERE c.tenant.tenantUuid = :tenantUuid")
+    BigDecimal sumMontantInitialTous(@Param("tenantUuid") String tenantUuid);
 
     @Query("SELECT COUNT(c) FROM CreditClientEntity c WHERE c.statut != :statut AND c.tenant.tenantUuid = :tenantUuid")
     long countCreditsActifs(@Param("statut") StatutCredit statut, @Param("tenantUuid") String tenantUuid);
@@ -111,7 +118,8 @@ public interface CreditClientRepository extends JpaRepository<CreditClientEntity
      * Somme le montant restant dû sur les crédits non soldés dont la vente a été créée dans la période.
      * Retourne List<Object[]> : chaque Object[] = [count, sum(montantRestant)]
      */
-    @Query("SELECT COUNT(c), COALESCE(SUM(c.montantRestant), 0) " +
+    /** Retourne [count, sum(montantRestant * tauxChangeApplique)] en XOF pour la période. */
+    @Query("SELECT COUNT(c), COALESCE(SUM(c.montantRestant * c.tauxChangeApplique), 0) " +
            "FROM CreditClientEntity c " +
            "WHERE c.vente IS NOT NULL " +
            "AND c.vente.dateVente BETWEEN :debut AND :fin " +

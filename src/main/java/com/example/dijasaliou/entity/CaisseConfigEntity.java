@@ -3,7 +3,6 @@ package com.example.dijasaliou.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -19,6 +18,11 @@ import java.time.LocalDateTime;
  *
  * Le solde actuel est calculé EN TEMPS RÉEL dans CaisseService — il n'est jamais
  * stocké pour éviter toute désynchronisation.
+ *
+ * Les 4 champs soldeInitialXxx sont des termes correctifs internes (cible saisie
+ * moins contributions déjà enregistrées depuis la date d'activation), pas des
+ * soldes réels affichés — ils peuvent légitimement être négatifs si des
+ * ventes/achats payés ont déjà dépassé le montant cible saisi à l'activation.
  */
 @Entity
 @Table(
@@ -46,25 +50,21 @@ public class CaisseConfigEntity extends BaseEntity {
     private TenantEntity tenant;
 
     @NotNull
-    @PositiveOrZero
     @Column(name = "solde_initial_especes", nullable = false, precision = 15, scale = 2)
     @Builder.Default
     private BigDecimal soldeInitialEspeces = BigDecimal.ZERO;
 
     @NotNull
-    @PositiveOrZero
     @Column(name = "solde_initial_wave", nullable = false, precision = 15, scale = 2)
     @Builder.Default
     private BigDecimal soldeInitialWave = BigDecimal.ZERO;
 
     @NotNull
-    @PositiveOrZero
     @Column(name = "solde_initial_om", nullable = false, precision = 15, scale = 2)
     @Builder.Default
     private BigDecimal soldeInitialOm = BigDecimal.ZERO;
 
     @NotNull
-    @PositiveOrZero
     @Column(name = "solde_initial_virement", nullable = false, precision = 15, scale = 2)
     @Builder.Default
     private BigDecimal soldeInitialVirement = BigDecimal.ZERO;

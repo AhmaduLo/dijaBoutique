@@ -1,5 +1,6 @@
 package com.example.dijasaliou.service;
 
+import com.example.dijasaliou.dto.BeneficeStatistiquesDto;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.entity.*;
 import com.example.dijasaliou.entity.CreditClientEntity.StatutCredit;
@@ -48,6 +49,12 @@ public class RapportService {
     private final CreditClientRepository creditClientRepository;
     private final BonLivraisonRepository bonLivraisonRepository;
     private final TenantService tenantService;
+    private final DeviseService deviseService;
+
+    /** Stocke le symbole de la devise de rapport pour la requête en cours (thread-safe). */
+    private final ThreadLocal<String> symboleRapport = ThreadLocal.withInitial(() -> "FCFA");
+    /** Stocke le taux de la devise de rapport (1 unité = X XOF). */
+    private final ThreadLocal<Double> tauxRapport = ThreadLocal.withInitial(() -> 1.0);
 
     // ── Couleurs ──────────────────────────────────────────────────────────────
     private static final Color C_PRIMAIRE   = new Color(30, 58, 95);
@@ -73,21 +80,46 @@ public class RapportService {
     // ─────────────────────────────────────────────────────────────────────────
     // POINT D'ENTRÉE
     // ─────────────────────────────────────────────────────────────────────────
-    public byte[] genererRapportPdf(LocalDate debut, LocalDate fin) {
+    /**
+     * @param devise Code devise pour le rapport (ex: "EUR", "XOF"). Si null,
+     *               utilise la devise préférée du tenant.
+     */
+    public byte[] genererRapportPdf(LocalDate debut, LocalDate fin, String devise) {
 
         TenantEntity tenant    = tenantService.getCurrentTenant();
         String tenantUuid      = tenant.getTenantUuid();
         LocalDateTime debutDt  = debut.atStartOfDay();
         LocalDateTime finDt    = fin.atTime(23, 59, 59);
 
+        // ── Devise de rapport : paramètre explicite, sinon préférence du tenant ──
+        String codeDeviseRapport;
+        if (devise != null && !devise.isBlank()) {
+            codeDeviseRapport = devise.toUpperCase().trim();
+        } else {
+            codeDeviseRapport = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        }
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDeviseRapport);
+            symboleRapport.set(deviseRapport.getSymbole());
+            tauxRapport.set(deviseRapport.getTauxChange());
+        } catch (RuntimeException e) {
+            symboleRapport.set("FCFA");
+            tauxRapport.set(1.0);
+        }
+
         // ── Collecte des données ──────────────────────────────────────────────
         List<VenteEntity>   ventes   = venteService.obtenirVentesParPeriode(debut, fin);
         List<AchatEntity>   achats   = achatRepository.findByDateAchatBetween(debutDt, finDt);
         List<DepenseEntity> depenses = depenseRepository.findByDateDepenseBetween(debutDt, finDt);
-        List<StockDto>      stocks   = stockService.obtenirTousLesStocks();
+        List<StockDto>      stocks   = stockService.obtenirTousLesStocks(codeDeviseRapport);
 
-        BigDecimal montantDuCredits      = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
-        BigDecimal montantInitialCredits = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid);
+        // sumMontantRestantActif/sumMontantInitialActif retournent des montants en XOF (montant × tauxChangeApplique)
+        // On divise par le taux du rapport pour obtenir la devise demandée
+        double tauxRapportVal = tauxRapport.get() > 0 ? tauxRapport.get() : 1.0;
+        BigDecimal montantDuCredits = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid)
+                .divide(BigDecimal.valueOf(tauxRapportVal), 2, RoundingMode.HALF_UP);
+        BigDecimal montantInitialCredits = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid)
+                .divide(BigDecimal.valueOf(tauxRapportVal), 2, RoundingMode.HALF_UP);
         long nbCreditsActifs  = creditClientRepository.countCreditsActifs(StatutCredit.SOLDE, tenantUuid);
         long nbCreditsRetard  = creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, LocalDate.now(), tenantUuid);
 
@@ -95,11 +127,19 @@ public class RapportService {
                 .findAllWithSearch(null, null, debutDt, finDt, PageRequest.of(0, 1000))
                 .getContent();
 
-        // ── Agrégats ──────────────────────────────────────────────────────────
-        BigDecimal ca            = somme(ventes.stream().map(VenteEntity::getPrixTotal).collect(Collectors.toList()));
-        BigDecimal totalAchats   = somme(achats.stream().map(AchatEntity::getPrixTotal).collect(Collectors.toList()));
-        BigDecimal totalDepenses = somme(depenses.stream().map(DepenseEntity::getMontant).collect(Collectors.toList()));
-        BigDecimal benefice      = ca.subtract(totalAchats).subtract(totalDepenses);
+        // ── Agrégats (convertis vers la devise de rapport) ────────────────────
+        BigDecimal ca            = somme(ventes.stream().map(v -> convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique())).collect(Collectors.toList()));
+        BigDecimal totalAchats   = somme(achats.stream().map(a -> convertirMontant(a.getPrixTotal(), a.getTauxChangeApplique())).collect(Collectors.toList()));
+        BigDecimal totalDepenses = somme(depenses.stream().map(d -> convertirMontant(d.getMontant(), d.getTauxChangeApplique())).collect(Collectors.toList()));
+        // Bénéfice net = marge FIFO (coût des marchandises réellement VENDUES, pas achetées)
+        // moins les dépenses — réutilise le même calcul que la carte "Bénéfice" du module
+        // Ventes et du dashboard, pour ne jamais afficher deux chiffres différents pour la
+        // même activité. "Total Achats" reste affiché tel quel (dépense de trésorerie brute),
+        // mais ne sert plus de base au bénéfice net : du stock acheté et non vendu ne doit
+        // pas être compté comme un coût déjà supporté par le résultat de la période.
+        BeneficeStatistiquesDto statsBenefice = venteService.calculerStatistiquesBenefice(debut, fin, codeDeviseRapport);
+        BigDecimal margeBruteFifo = statsBenefice.getBeneficeNet() != null ? statsBenefice.getBeneficeNet() : BigDecimal.ZERO;
+        BigDecimal benefice      = margeBruteFifo.subtract(totalDepenses);
 
         // ── Période précédente ────────────────────────────────────────────────
         long      nbJours     = ChronoUnit.DAYS.between(debut, fin) + 1;
@@ -108,10 +148,12 @@ public class RapportService {
         List<VenteEntity>   ventesPrev   = venteService.obtenirVentesParPeriode(debutPrev, finPrev);
         List<AchatEntity>   achatsPrev   = achatRepository.findByDateAchatBetween(debutPrev.atStartOfDay(), finPrev.atTime(23, 59, 59));
         List<DepenseEntity> depensesPrev = depenseRepository.findByDateDepenseBetween(debutPrev.atStartOfDay(), finPrev.atTime(23, 59, 59));
-        BigDecimal caPrev            = somme(ventesPrev.stream().map(VenteEntity::getPrixTotal).collect(Collectors.toList()));
-        BigDecimal totalAchatsPrev   = somme(achatsPrev.stream().map(AchatEntity::getPrixTotal).collect(Collectors.toList()));
-        BigDecimal totalDepensesPrev = somme(depensesPrev.stream().map(DepenseEntity::getMontant).collect(Collectors.toList()));
-        BigDecimal beneficePrev      = caPrev.subtract(totalAchatsPrev).subtract(totalDepensesPrev);
+        BigDecimal caPrev            = somme(ventesPrev.stream().map(v -> convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique())).collect(Collectors.toList()));
+        BigDecimal totalAchatsPrev   = somme(achatsPrev.stream().map(a -> convertirMontant(a.getPrixTotal(), a.getTauxChangeApplique())).collect(Collectors.toList()));
+        BigDecimal totalDepensesPrev = somme(depensesPrev.stream().map(d -> convertirMontant(d.getMontant(), d.getTauxChangeApplique())).collect(Collectors.toList()));
+        BeneficeStatistiquesDto statsBeneficePrev = venteService.calculerStatistiquesBenefice(debutPrev, finPrev, codeDeviseRapport);
+        BigDecimal margeBruteFifoPrev = statsBeneficePrev.getBeneficeNet() != null ? statsBeneficePrev.getBeneficeNet() : BigDecimal.ZERO;
+        BigDecimal beneficePrev      = margeBruteFifoPrev.subtract(totalDepensesPrev);
 
         // ── Numéro de rapport ─────────────────────────────────────────────────
         String numRapport = String.format("RPT-%d%02d-%04d",
@@ -286,7 +328,7 @@ public class RapportService {
             stats.computeIfAbsent(v.getNomProduit(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
             stats.get(v.getNomProduit())[0] = stats.get(v.getNomProduit())[0].add(BigDecimal.valueOf(v.getQuantite()));
             stats.get(v.getNomProduit())[1] = stats.get(v.getNomProduit())[1]
-                    .add(v.getPrixTotal() != null ? v.getPrixTotal() : BigDecimal.ZERO);
+                    .add(convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique()));
         }
 
         List<Map.Entry<String, BigDecimal[]>> top5 = stats.entrySet().stream()
@@ -320,7 +362,7 @@ public class RapportService {
 
         for (VenteEntity v : ventes) {
             String mode = v.getModePaiement() != null ? v.getModePaiement().name() : "ESPECES";
-            totaux.merge(mode, v.getPrixTotal() != null ? v.getPrixTotal() : BigDecimal.ZERO, BigDecimal::add);
+            totaux.merge(mode, convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique()), BigDecimal::add);
         }
 
         PdfPTable table = tableau(new float[]{40, 35, 25}, "Mode de paiement", "Montant", "Pourcentage");
@@ -403,7 +445,7 @@ public class RapportService {
 
         BigDecimal panierMoyen = ventes.isEmpty() ? BigDecimal.ZERO
                 : ca.divide(BigDecimal.valueOf(ventes.size()), 0, RoundingMode.HALF_UP);
-        BigDecimal totalAchats   = somme(achats.stream().map(AchatEntity::getPrixTotal).collect(Collectors.toList()));
+        BigDecimal totalAchats   = somme(achats.stream().map(a -> convertirMontant(a.getPrixTotal(), a.getTauxChangeApplique())).collect(Collectors.toList()));
         BigDecimal margeBrute    = ca.subtract(totalAchats);
         BigDecimal tauxMarge     = ca.compareTo(BigDecimal.ZERO) > 0
                 ? margeBrute.multiply(new BigDecimal("100")).divide(ca, 1, RoundingMode.HALF_UP)
@@ -499,7 +541,7 @@ public class RapportService {
             stats.computeIfAbsent(a.getNomProduit(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
             stats.get(a.getNomProduit())[0] = stats.get(a.getNomProduit())[0].add(BigDecimal.valueOf(a.getQuantite()));
             stats.get(a.getNomProduit())[1] = stats.get(a.getNomProduit())[1]
-                    .add(a.getPrixTotal() != null ? a.getPrixTotal() : BigDecimal.ZERO);
+                    .add(convertirMontant(a.getPrixTotal(), a.getTauxChangeApplique()));
         }
 
         List<Map.Entry<String, BigDecimal[]>> top5 = stats.entrySet().stream()
@@ -528,7 +570,7 @@ public class RapportService {
         Map<String, BigDecimal> parCat = new LinkedHashMap<>();
         for (DepenseEntity d : depenses) {
             String cat = d.getCategorie() != null ? d.getCategorie().getLibelle() : "Autre";
-            parCat.merge(cat, d.getMontant() != null ? d.getMontant() : BigDecimal.ZERO, BigDecimal::add);
+            parCat.merge(cat, convertirMontant(d.getMontant(), d.getTauxChangeApplique()), BigDecimal::add);
         }
 
         List<Map.Entry<String, BigDecimal>> sorted = parCat.entrySet().stream()
@@ -598,7 +640,7 @@ public class RapportService {
                     v.getDateVente().format(FMT_DATETIME),
                     v.getNomProduit(),
                     fmt0(BigDecimal.valueOf(v.getQuantite())),
-                    formaterMontant(v.getPrixTotal()),
+                    formaterMontant(convertirMontant(v.getPrixTotal(), v.getTauxChangeApplique())),
                     libellePaiement(v.getModePaiement() != null ? v.getModePaiement().name() : "ESPECES"));
         }
         if (ventes.isEmpty()) ligneVide(table, 5, "Aucune vente sur cette période");
@@ -750,11 +792,27 @@ public class RapportService {
         return String.format("%.0f", v.doubleValue());
     }
 
+    /**
+     * Convertit un montant depuis sa devise d'origine (via tauxStocke) vers la devise de rapport.
+     * tauxStocke = taux appliqué au moment de la saisie (1 unité devise d'origine = tauxStocke XOF).
+     */
+    private BigDecimal convertirMontant(BigDecimal montant, Double tauxStocke) {
+        if (montant == null) return BigDecimal.ZERO;
+        double taux = (tauxStocke != null && tauxStocke > 0) ? tauxStocke : 1.0;
+        double tauxDest = tauxRapport.get();
+        if (tauxDest <= 0) tauxDest = 1.0;
+        // montant → XOF → devise rapport
+        double montantXof = montant.doubleValue() * taux;
+        double montantRapport = montantXof / tauxDest;
+        return BigDecimal.valueOf(montantRapport).setScale(2, RoundingMode.HALF_UP);
+    }
+
     private String formaterMontant(BigDecimal montant) {
-        if (montant == null) return "0 FCFA";
+        if (montant == null) return "0 " + symboleRapport.get();
         NumberFormat nf = NumberFormat.getNumberInstance(Locale.FRANCE);
-        nf.setMaximumFractionDigits(0);
-        return nf.format(montant) + " FCFA";
+        nf.setMaximumFractionDigits(2);
+        nf.setMinimumFractionDigits(0);
+        return nf.format(montant) + " " + symboleRapport.get();
     }
 
     private String variation(BigDecimal avant, BigDecimal apres) {

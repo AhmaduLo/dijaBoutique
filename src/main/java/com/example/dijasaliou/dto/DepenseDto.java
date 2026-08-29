@@ -31,6 +31,8 @@ public class DepenseDto {
     private DepenseEntity.CategorieDepense categorie;
     private String notes;
     private Boolean estRecurrente;
+    private String deviseCode;
+    private Double tauxChangeApplique;
 
     /** Mode de paiement utilisé (caisse multi-comptes BUSINESS). Peut être null pour les anciennes dépenses. */
     private ModePaiementCaisse modePaiement;
@@ -61,6 +63,8 @@ public class DepenseDto {
                 .categorie(depense.getCategorie())
                 .notes(depense.getNotes())
                 .estRecurrente(depense.getEstRecurrente())
+                .deviseCode(depense.getDeviseCode())
+                .tauxChangeApplique(depense.getTauxChangeApplique())
                 .modePaiement(depense.getModePaiement())
                 .utilisateur(UserDto.fromEntityMinimal(depense.getUtilisateur()))
                 .estRecente(depense.estRecente())
@@ -87,6 +91,8 @@ public class DepenseDto {
                 .categorie(depense.getCategorie())
                 .notes(depense.getNotes())
                 .estRecurrente(depense.getEstRecurrente())
+                .deviseCode(depense.getDeviseCode())
+                .tauxChangeApplique(depense.getTauxChangeApplique())
                 .modePaiement(depense.getModePaiement())
                 .estRecente(depense.estRecente())
                 .mois(depense.getMois())

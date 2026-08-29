@@ -55,6 +55,12 @@ class BonLivraisonControllerTest {
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
 
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.TenantService tenantService;
+
     private BonLivraisonDto bl1;
     private BonLivraisonDto bl2;
     private final UsernamePasswordAuthenticationToken principal =

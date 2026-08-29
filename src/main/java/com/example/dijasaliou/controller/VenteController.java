@@ -4,10 +4,12 @@ import com.example.dijasaliou.dto.BeneficeStatistiquesDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.dto.VenteDto;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
+import com.example.dijasaliou.service.DeviseService;
 import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.UserService;
 import com.example.dijasaliou.service.VenteService;
@@ -39,13 +41,16 @@ public class VenteController {
     private final UserService userService;
     private final AchatRepository achatRepository;
     private final TenantService tenantService;
+    private final DeviseService deviseService;
 
     public VenteController(VenteService venteService, UserService userService,
-                           AchatRepository achatRepository, TenantService tenantService) {
+                           AchatRepository achatRepository, TenantService tenantService,
+                           DeviseService deviseService) {
         this.venteService = venteService;
         this.userService = userService;
         this.achatRepository = achatRepository;
         this.tenantService = tenantService;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -227,8 +232,9 @@ public class VenteController {
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> rapportModePaiement(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
-        return ResponseEntity.ok(venteService.calculerRapportModePaiement(debut, fin));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
+        return ResponseEntity.ok(venteService.calculerRapportModePaiement(debut, fin, devise));
     }
 
     /**
@@ -242,21 +248,47 @@ public class VenteController {
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> obtenirStatistiques(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
         List<VenteEntity> ventes = venteService.obtenirVentesParPeriode(debut, fin);
-        BigDecimal ca = venteService.calculerChiffreAffaires(debut, fin);
 
         // Convertir en DTOs
         List<VenteDto> ventesDto = ventes.stream()
                 .map(VenteDto::fromEntity)
                 .collect(Collectors.toList());
 
+        // Devise de rapport : paramètre explicite ou devise préférée du tenant
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        double tauxTemp = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null) {
+                tauxTemp = deviseRapport.getTauxChange().doubleValue();
+            }
+        } catch (RuntimeException e) {
+            // fallback to default 1.0
+        }
+        final double tauxTenant = tauxTemp;
+
+        // Calculer le CA dans la devise du tenant : montant × tauxChangeApplique → XOF → / tauxTenant
+        BigDecimal ca = ventes.stream()
+                .filter(v -> v.getPrixTotal() != null && v.getTauxChangeApplique() != null)
+                .map(v -> v.getPrixTotal()
+                        .multiply(BigDecimal.valueOf(v.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxTenant), 2, java.math.RoundingMode.HALF_UP))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
         stats.put("nombreVentes", ventesDto.size());
         stats.put("chiffreAffaires", ca);
+        stats.put("deviseCode", codeDevise);
         stats.put("ventes", ventesDto);
 
         return ResponseEntity.ok(stats);
@@ -272,8 +304,9 @@ public class VenteController {
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<List<VenteDto>> obtenirSorties(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
-        return ResponseEntity.ok(venteService.obtenirSortiesPeriode(debut, fin));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
+        return ResponseEntity.ok(venteService.obtenirSortiesPeriode(debut, fin, devise));
     }
 
     /**
@@ -289,8 +322,9 @@ public class VenteController {
     @PreAuthorize("hasAnyAuthority('GERANT', 'ADMIN')")
     public ResponseEntity<BeneficeStatistiquesDto> obtenirBenefice(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
-        return ResponseEntity.ok(venteService.calculerStatistiquesBenefice(debut, fin));
+        return ResponseEntity.ok(venteService.calculerStatistiquesBenefice(debut, fin, devise));
     }
 }

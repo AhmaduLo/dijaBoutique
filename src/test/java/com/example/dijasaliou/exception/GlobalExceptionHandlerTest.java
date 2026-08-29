@@ -35,7 +35,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("status", 400);
         assertThat(response.getBody()).containsEntry("message", "Ressource non trouvée");
-        assertThat(response.getBody()).containsEntry("error", "Erreur");
+        assertThat(response.getBody()).containsEntry("error", "Erreur de traitement");
         assertThat(response.getBody()).containsKey("timestamp");
     }
 
@@ -53,7 +53,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("status", 400);
         assertThat(response.getBody()).containsEntry("message", "Le montant doit être positif");
-        assertThat(response.getBody()).containsEntry("error", "Argument invalide");
+        assertThat(response.getBody()).containsEntry("error", "Requête invalide");
         assertThat(response.getBody()).containsKey("timestamp");
     }
 
@@ -71,7 +71,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("status", 400);
         assertThat(response.getBody()).containsEntry("message", "Crédit déjà soldé");
-        assertThat(response.getBody()).containsEntry("error", "Erreur de traitement");
+        assertThat(response.getBody()).containsEntry("error", "Opération non autorisée");
         assertThat(response.getBody()).containsKey("timestamp");
     }
 

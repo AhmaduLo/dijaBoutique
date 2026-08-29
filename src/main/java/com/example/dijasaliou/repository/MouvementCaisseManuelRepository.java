@@ -28,9 +28,9 @@ public interface MouvementCaisseManuelRepository extends JpaRepository<Mouvement
                                                           @Param("debut") LocalDateTime debut,
                                                           @Param("fin") LocalDateTime fin);
 
-    /** Somme des mouvements d'un type et d'un compte entre deux dates. */
+    /** Somme des mouvements d'un type et d'un compte entre deux dates, normalisée en XOF. */
     @Query("""
-            SELECT COALESCE(SUM(m.montant), 0) FROM MouvementCaisseManuelEntity m
+            SELECT COALESCE(SUM(m.montant * m.tauxChangeApplique), 0) FROM MouvementCaisseManuelEntity m
             WHERE m.tenant = :tenant
               AND m.compte = :compte
               AND m.typeMouvement = :type
@@ -43,9 +43,9 @@ public interface MouvementCaisseManuelRepository extends JpaRepository<Mouvement
                                          @Param("debut") LocalDateTime debut,
                                          @Param("fin") LocalDateTime fin);
 
-    /** Optimisation caisse : mouvements GROUPÉS par (compte, type) en une seule query. */
+    /** Optimisation caisse : mouvements GROUPÉS par (compte, type) en une seule query, normalisés en XOF. */
     @Query("""
-            SELECT m.compte, m.typeMouvement, COALESCE(SUM(m.montant), 0)
+            SELECT m.compte, m.typeMouvement, COALESCE(SUM(m.montant * m.tauxChangeApplique), 0)
             FROM MouvementCaisseManuelEntity m
             WHERE m.tenant = :tenant
               AND m.dateMouvement >= :debut

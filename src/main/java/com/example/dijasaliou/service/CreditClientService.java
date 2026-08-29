@@ -11,6 +11,7 @@ import com.example.dijasaliou.repository.CreditClientRepository;
 import com.example.dijasaliou.repository.PaiementCreditRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteRepository;
+import java.math.RoundingMode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,6 +43,7 @@ public class CreditClientService {
     private final ClientRepository clientRepository;
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
+    private final DeviseService deviseService;
     // @Lazy : VenteService injecte déjà CreditClientService en @Lazy → on évite la cycle
     private final VenteService venteService;
     private final UserPushNotificationService userPushService;
@@ -53,6 +55,7 @@ public class CreditClientService {
                                 ClientRepository clientRepository,
                                 VenteRepository venteRepository,
                                 TenantService tenantService,
+                                DeviseService deviseService,
                                 @org.springframework.context.annotation.Lazy VenteService venteService,
                                 UserPushNotificationService userPushService,
                                 UserNotificationPreferenceService prefService,
@@ -62,6 +65,7 @@ public class CreditClientService {
         this.clientRepository = clientRepository;
         this.venteRepository = venteRepository;
         this.tenantService = tenantService;
+        this.deviseService = deviseService;
         this.venteService = venteService;
         this.userPushService = userPushService;
         this.prefService = prefService;
@@ -83,11 +87,16 @@ public class CreditClientService {
                     .orElseThrow(() -> new IllegalStateException("Crédit actif introuvable malgré le garde"));
         }
 
+        String deviseCode = (vente.getDeviseCode() != null) ? vente.getDeviseCode() : "XOF";
+        Double tauxChange = (vente.getTauxChangeApplique() != null) ? vente.getTauxChangeApplique() : 1.0;
+
         CreditClientEntity credit = CreditClientEntity.builder()
                 .client(client)
                 .vente(vente)
                 .montantInitial(vente.getPrixTotal())
                 .montantRestant(vente.getPrixTotal())
+                .deviseCode(deviseCode)
+                .tauxChangeApplique(tauxChange)
                 .statut(StatutCredit.EN_ATTENTE)
                 .dateEcheance(dateEcheance)
                 .employe(employe)
@@ -226,11 +235,13 @@ public class CreditClientService {
                     "Le montant (" + montant + ") dépasse le restant dû (" + credit.getMontantRestant() + ")");
         }
 
-        // 5. Créer le paiement (date du payload ou today dans la TZ du tenant)
+        // 5. Créer le paiement (hérite de la devise du crédit ; date du payload ou today dans la TZ du tenant)
         LocalDate dateEffective = datePaiement != null ? datePaiement : tenantService.todayInTenantTz();
         PaiementCreditEntity paiement = PaiementCreditEntity.builder()
                 .credit(credit)
                 .montantPaye(montant)
+                .deviseCode(credit.getDeviseCode() != null ? credit.getDeviseCode() : "XOF")
+                .tauxChangeApplique(credit.getTauxChangeApplique() != null ? credit.getTauxChangeApplique() : 1.0)
                 .modePaiement(modePaiement)
                 .datePaiement(dateEffective)
                 .employe(employe)
@@ -567,27 +578,54 @@ public class CreditClientService {
         }
     }
 
+    /**
+     * @param devise Code devise explicite (ex: "EUR"). Si null, utilise la devise préférée du tenant.
+     *               Les SUM retournent des montants en XOF (montant × tauxChangeApplique).
+     *               On divise par le taux de la devise demandée pour obtenir le bon montant.
+     */
     @Transactional(readOnly = true)
-    public Map<String, Object> obtenirStats() {
+    public Map<String, Object> obtenirStats(String devise) {
         Map<String, Object> stats = new HashMap<>();
-        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String tenantUuid = tenant.getTenantUuid();
 
-        BigDecimal montantTotalDu = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
-        if (montantTotalDu == null) montantTotalDu = BigDecimal.ZERO;
+        // Montants en XOF (après fix V17 : SUM × tauxChangeApplique)
+        // montantTotalDuXOF = ce qui reste à payer sur les crédits ACTIFS
+        BigDecimal montantTotalDuXOF = creditClientRepository.sumMontantRestantActif(StatutCredit.SOLDE, tenantUuid);
+        if (montantTotalDuXOF == null) montantTotalDuXOF = BigDecimal.ZERO;
 
-        BigDecimal montantInitialTotal = creditClientRepository.sumMontantInitialActif(StatutCredit.SOLDE, tenantUuid);
-        if (montantInitialTotal == null) montantInitialTotal = BigDecimal.ZERO;
+        // Dénominateur du taux de recouvrement = montantInitial de TOUS les crédits (actifs + soldés)
+        BigDecimal montantInitialTousXOF = creditClientRepository.sumMontantInitialTous(tenantUuid);
+        if (montantInitialTousXOF == null) montantInitialTousXOF = BigDecimal.ZERO;
 
+        // Taux de recouvrement = (total initial - restant actif) / total initial × 100
+        // Calculé en XOF (le ratio est indépendant de la devise)
         double tauxRecouvrement = 0.0;
-        if (montantInitialTotal.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal montantPaye = montantInitialTotal.subtract(montantTotalDu);
-            tauxRecouvrement = montantPaye.multiply(new BigDecimal("100"))
-                    .divide(montantInitialTotal, 1, java.math.RoundingMode.HALF_UP)
+        if (montantInitialTousXOF.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal montantPayeXOF = montantInitialTousXOF.subtract(montantTotalDuXOF);
+            tauxRecouvrement = montantPayeXOF.multiply(new BigDecimal("100"))
+                    .divide(montantInitialTousXOF, 1, RoundingMode.HALF_UP)
                     .doubleValue();
         }
 
+        // Conversion vers la devise de rapport
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        double tauxRapport = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null && deviseRapport.getTauxChange() > 0) {
+                tauxRapport = deviseRapport.getTauxChange();
+            }
+        } catch (RuntimeException ignored) {}
+
+        BigDecimal montantTotalDu = montantTotalDuXOF.divide(BigDecimal.valueOf(tauxRapport), 2, RoundingMode.HALF_UP);
+        BigDecimal montantInitialTotal = montantInitialTousXOF.divide(BigDecimal.valueOf(tauxRapport), 2, RoundingMode.HALF_UP);
+
         stats.put("totalEnAttente", montantTotalDu);
         stats.put("montantTotalDu", montantTotalDu);
+        stats.put("montantInitialTotal", montantInitialTotal);
         stats.put("nombreCreditsActifs", creditClientRepository.countCreditsActifs(StatutCredit.SOLDE, tenantUuid));
         stats.put("nombreClientsCrediteurs", creditClientRepository.countClientsCrediteurs(StatutCredit.SOLDE, tenantUuid));
         stats.put("creditsEnRetard", creditClientRepository.countCreditsEnRetard(StatutCredit.SOLDE, tenantService.todayInTenantTz(), tenantUuid));

@@ -21,9 +21,10 @@ public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEn
 
     /**
      * Agrège les remboursements de crédits par mode de paiement sur une période.
-     * Retourne Object[] : [modePaiement, count, sum(montantPaye)]
+     * Retourne Object[] : [modePaiement, count, sum(montantPaye * tauxChangeApplique)] en XOF.
+     * Le caller divise par son tauxRapport pour obtenir la devise voulue.
      */
-    @Query("SELECT p.modePaiement, COUNT(p), COALESCE(SUM(p.montantPaye), 0) " +
+    @Query("SELECT p.modePaiement, COUNT(p), COALESCE(SUM(p.montantPaye * p.tauxChangeApplique), 0) " +
            "FROM PaiementCreditEntity p " +
            "WHERE p.datePaiement BETWEEN :debut AND :fin " +
            "AND p.credit.tenant.tenantUuid = :tenantUuid " +
@@ -39,7 +40,7 @@ public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEn
      * Utilisé par le module Caisse pour intégrer les remboursements aux soldes.
      */
     @Query("""
-            SELECT COALESCE(SUM(p.montantPaye), 0)
+            SELECT COALESCE(SUM(p.montantPaye * p.tauxChangeApplique), 0)
             FROM PaiementCreditEntity p
             WHERE p.credit.tenant = :tenant
               AND p.modePaiement = :mode
@@ -53,7 +54,7 @@ public interface PaiementCreditRepository extends JpaRepository<PaiementCreditEn
 
     /** Optimisation caisse : total paiements crédit GROUPÉ par mode en une query. */
     @Query("""
-            SELECT p.modePaiement, COALESCE(SUM(p.montantPaye), 0)
+            SELECT p.modePaiement, COALESCE(SUM(p.montantPaye * p.tauxChangeApplique), 0)
             FROM PaiementCreditEntity p
             WHERE p.credit.tenant = :tenant
               AND p.datePaiement >= :debut

@@ -27,6 +27,9 @@ public class ProduitPourVenteDto {
 
     private String nomProduit;
     private BigDecimal prixVenteSuggere;
+    /** Devise dans laquelle prixVenteSuggere a été saisi — nécessaire pour la conversion frontend */
+    private String deviseCode;
+    private Double tauxChangeApplique;
     private String codeBarre;
     private String photoUrl;
     private String unite;
@@ -42,6 +45,8 @@ public class ProduitPourVenteDto {
         return ProduitPourVenteDto.builder()
                 .nomProduit(achat.getNomProduit())
                 .prixVenteSuggere(achat.getPrixVenteSuggere())
+                .deviseCode(achat.getDeviseCode())
+                .tauxChangeApplique(achat.getTauxChangeApplique())
                 .codeBarre(achat.getCodeBarre())
                 .photoUrl(achat.getPhotoUrl())
                 .unite(achat.getUnite())

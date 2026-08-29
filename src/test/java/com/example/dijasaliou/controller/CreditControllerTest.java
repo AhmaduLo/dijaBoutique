@@ -63,6 +63,12 @@ class CreditControllerTest {
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
 
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.TenantService tenantService;
+
     private CreditClientDto creditDto;
     private PaiementCreditDto paiementDto;
     private UserEntity utilisateurTest;
@@ -224,7 +230,7 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), any(), eq(utilisateurTest)))
                 .thenReturn(creditDto);
 
         mockMvc.perform(post("/credits/test-id-1/payer")
@@ -238,7 +244,7 @@ class CreditControllerTest {
 
         verify(userService).obtenirUtilisateurParEmail("amadou@example.com");
         verify(creditClientService).enregistrerPaiement(
-                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest));
+                eq("test-id-1"), any(), any(), any(), any(), eq(utilisateurTest));
     }
 
     @Test
@@ -260,7 +266,7 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), any(), eq(utilisateurTest)))
                 .thenReturn(creditSolde);
 
         mockMvc.perform(post("/credits/test-id-1/payer")
@@ -281,7 +287,7 @@ class CreditControllerTest {
         when(userService.obtenirUtilisateurParEmail("amadou@example.com"))
                 .thenReturn(utilisateurTest);
         when(creditClientService.enregistrerPaiement(
-                eq("test-id-1"), any(), any(), any(), eq(utilisateurTest)))
+                eq("test-id-1"), any(), any(), any(), any(), eq(utilisateurTest)))
                 .thenThrow(new IllegalArgumentException("Le montant dépasse le restant dû"));
 
         mockMvc.perform(post("/credits/test-id-1/payer")
@@ -350,7 +356,7 @@ class CreditControllerTest {
                 "tauxRecouvrement", 50.0
         );
 
-        when(creditClientService.obtenirStats()).thenReturn(stats);
+        when(creditClientService.obtenirStats(null)).thenReturn(stats);
 
         mockMvc.perform(get("/credits/stats")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -359,7 +365,7 @@ class CreditControllerTest {
                 .andExpect(jsonPath("$.nombreClientsCrediteurs", is(3)))
                 .andExpect(jsonPath("$.tauxRecouvrement", is(50.0)));
 
-        verify(creditClientService).obtenirStats();
+        verify(creditClientService).obtenirStats(null);
     }
 
     @Test
@@ -372,7 +378,7 @@ class CreditControllerTest {
                 "tauxRecouvrement", 0.0
         );
 
-        when(creditClientService.obtenirStats()).thenReturn(stats);
+        when(creditClientService.obtenirStats(null)).thenReturn(stats);
 
         mockMvc.perform(get("/credits/stats"))
                 .andExpect(status().isOk())

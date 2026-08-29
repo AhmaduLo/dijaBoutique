@@ -40,7 +40,8 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Trouver tous les achats d'un utilisateur
      */
-    List<AchatEntity> findByUtilisateur(UserEntity utilisateur);
+    @Query("SELECT a FROM AchatEntity a WHERE a.utilisateur = :utilisateur ORDER BY a.dateAchat DESC, a.id DESC")
+    List<AchatEntity> findByUtilisateur(@Param("utilisateur") UserEntity utilisateur);
 
     /**
      * Trouver les achats d'une date précise
@@ -73,7 +74,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     /**
      * Récupère tous les achats d'un tenant (filtre explicite — évite findAll())
      */
-    @Query("SELECT a FROM AchatEntity a WHERE a.tenant = :tenant ORDER BY a.nomProduit")
+    @Query("SELECT a FROM AchatEntity a WHERE a.tenant = :tenant ORDER BY a.dateAchat DESC, a.id DESC")
     List<AchatEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
@@ -132,7 +133,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
      * (avec borne supérieure pour les snapshots).
      */
     @Query("""
-            SELECT COALESCE(SUM(a.prixTotal), 0)
+            SELECT COALESCE(SUM(a.prixTotal * a.tauxChangeApplique), 0)
             FROM AchatEntity a
             WHERE a.tenant = :tenant
               AND a.modePaiement = :modePaiement
@@ -147,7 +148,7 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
 
     /** Optimisation caisse : total achats GROUPÉ par mode en une seule query. */
     @Query("""
-            SELECT a.modePaiement, COALESCE(SUM(a.prixTotal), 0)
+            SELECT a.modePaiement, COALESCE(SUM(a.prixTotal * a.tauxChangeApplique), 0)
             FROM AchatEntity a
             WHERE a.tenant = :tenant
               AND a.dateAchat >= :debut

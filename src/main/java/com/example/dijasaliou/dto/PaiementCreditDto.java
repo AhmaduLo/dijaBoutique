@@ -19,6 +19,8 @@ public class PaiementCreditDto {
     private String id;
     private String creditId;
     private BigDecimal montantPaye;
+    private String deviseCode;
+    private Double tauxChangeApplique;
     private String modePaiement;
     private LocalDate datePaiement;
     private String employeNom;
@@ -30,6 +32,8 @@ public class PaiementCreditDto {
                 .id(p.getId())
                 .creditId(p.getCredit() != null ? p.getCredit().getId() : null)
                 .montantPaye(p.getMontantPaye())
+                .deviseCode(p.getDeviseCode())
+                .tauxChangeApplique(p.getTauxChangeApplique())
                 .modePaiement(p.getModePaiement() != null ? p.getModePaiement().name() : null)
                 .datePaiement(p.getDatePaiement())
                 .employeNom(p.getEmployeNom())

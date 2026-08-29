@@ -36,6 +36,15 @@ class AchatServiceTest {
     @Mock private AchatRepository achatRepository;
     @Mock private TenantService tenantService;
     @Mock private StockService stockService;
+    @Mock private com.example.dijasaliou.repository.VenteRepository venteRepository;
+    @Mock private com.example.dijasaliou.service.DeviseService deviseService;
+    @Mock private com.example.dijasaliou.service.ProduitReferenceService produitReferenceService;
+    @Mock private com.example.dijasaliou.service.ArchiveStockService archiveStockService;
+    @Mock private com.example.dijasaliou.service.UserPushNotificationService userPushService;
+    @Mock private com.example.dijasaliou.service.UserNotificationPreferenceService prefService;
+    @Mock private com.example.dijasaliou.repository.UserRepository userRepository;
+    @Mock private com.example.dijasaliou.repository.VenteLotConsommationRepository venteLotConsommationRepository;
+    @Mock private com.example.dijasaliou.repository.ProductionRepository productionRepository;
 
     @InjectMocks
     private AchatService achatService;
@@ -269,6 +278,9 @@ class AchatServiceTest {
     void supprimerAchat_succes() {
         when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        // Stock = totalAchats(5) - quantite supprimée(5) - totalVentes(0) = 0, pas négatif
+        when(achatRepository.sumQuantiteByNomProduitAndTenant("Ordinateur portable", tenantTest)).thenReturn(5.0);
+        when(venteRepository.findByNomProduitAndTenant("Ordinateur portable", tenantTest)).thenReturn(Collections.emptyList());
 
         achatService.supprimerAchat("test-id-1");
 
@@ -320,6 +332,7 @@ class AchatServiceTest {
     @Test
     @DisplayName("obtenirAchatsPagines() — retourne une page d'achats")
     void obtenirAchatsPagines_retournePage() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
         Page<AchatEntity> pageMock = new PageImpl<>(Collections.emptyList());
         when(achatRepository.findAllWithSearch(any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(pageMock);

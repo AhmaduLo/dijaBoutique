@@ -3,6 +3,7 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.StockDto;
 import com.example.dijasaliou.dto.StockExportDto;
 import com.example.dijasaliou.entity.AchatEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.repository.AchatRepository;
@@ -36,15 +37,18 @@ public class StockService {
     private final AchatRepository achatRepository;
     private final VenteRepository venteRepository;
     private final TenantService tenantService;
+    private final DeviseService deviseService;
     private final ProduitArchiveRepository produitArchiveRepository;
     private final VenteLotConsommationRepository venteLotConsommationRepository;
 
     public StockService(AchatRepository achatRepository, VenteRepository venteRepository,
-                        TenantService tenantService, ProduitArchiveRepository produitArchiveRepository,
+                        TenantService tenantService, DeviseService deviseService,
+                        ProduitArchiveRepository produitArchiveRepository,
                         VenteLotConsommationRepository venteLotConsommationRepository) {
         this.achatRepository = achatRepository;
         this.venteRepository = venteRepository;
         this.tenantService = tenantService;
+        this.deviseService = deviseService;
         this.produitArchiveRepository = produitArchiveRepository;
         this.venteLotConsommationRepository = venteLotConsommationRepository;
     }
@@ -58,7 +62,10 @@ public class StockService {
         List<Object[]> rows = venteLotConsommationRepository.sumBeneficeAndQuantiteByProduit(tenant);
         for (Object[] row : rows) {
             String nom = ((String) row[0]).toLowerCase().trim();
-            BigDecimal benefice = (BigDecimal) row[1];
+            // Cast défensif : la multiplication par tauxChangeApplique (Double) dans la requête
+            // fait renvoyer un Double par Hibernate plutôt qu'un BigDecimal.
+            BigDecimal benefice = row[1] instanceof BigDecimal bd ? bd
+                    : (row[1] instanceof Number n ? BigDecimal.valueOf(n.doubleValue()) : null);
             Double quantite = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
             resultat.put(nom, new BigDecimal[]{
                     benefice != null ? benefice : BigDecimal.ZERO,
@@ -80,7 +87,7 @@ public class StockService {
     @Transactional(readOnly = true)
     public List<StockExportDto> obtenirStocksPourExport(LocalDate debut, LocalDate fin) {
         TenantEntity tenant = tenantService.getCurrentTenant();
-        List<StockDto> stocks = obtenirTousLesStocks();
+        List<StockDto> stocks = obtenirTousLesStocks(null);
 
         // Si pas de période → on retourne tous les stocks sans activité
         if (debut == null && fin == null) {
@@ -146,12 +153,18 @@ public class StockService {
 
     /**
      * Enrichit un StockDto avec le bénéfice FIFO total et la quantité vendue avec bénéfice.
+     *
+     * @param tauxRapport taux de la devise cible (1.0 = XOF, pas de conversion). Le bénéfice
+     *                    FIFO ({@link #chargerBeneficesParProduit}) est déjà normalisé en XOF
+     *                    côté SQL — il ne reste qu'à diviser par ce taux, même logique que
+     *                    {@link #calculerStock} pour les autres montants du stock.
      */
-    private void enrichirAvecBenefice(StockDto stock, Map<String, BigDecimal[]> beneficesParProduit) {
+    private void enrichirAvecBenefice(StockDto stock, Map<String, BigDecimal[]> beneficesParProduit, double tauxRapport) {
         String key = stock.getNomProduit().toLowerCase().trim();
         BigDecimal[] benef = beneficesParProduit.get(key);
+        double taux = tauxRapport > 0 ? tauxRapport : 1.0;
         if (benef != null) {
-            stock.setBeneficeTotal(benef[0]);
+            stock.setBeneficeTotal(benef[0].divide(BigDecimal.valueOf(taux), 2, java.math.RoundingMode.HALF_UP));
             stock.setQuantiteVendueAvecBenefice(benef[1].doubleValue());
         } else {
             stock.setBeneficeTotal(BigDecimal.ZERO);
@@ -165,15 +178,26 @@ public class StockService {
      *
      * @return Liste des stocks par produit
      */
-    @Cacheable(value = "stocks", key = "#root.target.getCurrentTenantKey()")
+    /**
+     * @param devise Code devise explicite (ex: "EUR"). Si null, utilise la devise préférée du tenant.
+     */
+    @Cacheable(value = "stocks", key = "#root.target.getCurrentTenantKey() + ':' + (#devise != null ? #devise : 'default')")
     @Transactional(readOnly = true)
-    public List<StockDto> obtenirTousLesStocks() {
+    public List<StockDto> obtenirTousLesStocks(String devise) {
         // 1. Récupérer les achats et ventes du tenant courant uniquement
         TenantEntity tenant = tenantService.getCurrentTenant();
         List<AchatEntity> achats = achatRepository.findAllByTenant(tenant);
         List<VenteEntity> ventes = venteRepository.findAllByTenant(tenant);
         // Pré-charger les bénéfices FIFO par produit (1 seule requête)
         Map<String, BigDecimal[]> beneficesParProduit = chargerBeneficesParProduit(tenant);
+
+        // Devise de rapport : paramètre explicite ou préférence du tenant
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+        double tauxRapport = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                ? deviseRapport.getTauxChange() : 1.0;
 
         // 2. Grouper les achats par nom de produit et calculer les totaux
         Map<String, List<AchatEntity>> achatsParProduit = achats.stream()
@@ -196,8 +220,8 @@ public class StockService {
             List<AchatEntity> achatsProduitsListe = entry.getValue();
             List<VenteEntity> ventesProduitsListe = ventesParProduit.getOrDefault(nomProduit, new ArrayList<>());
 
-            StockDto stock = calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe);
-            enrichirAvecBenefice(stock, beneficesParProduit);
+            StockDto stock = calculerStock(nomProduit, achatsProduitsListe, ventesProduitsListe, tauxRapport, codeDevise);
+            enrichirAvecBenefice(stock, beneficesParProduit, tauxRapport);
             stocks.add(stock);
         }
 
@@ -238,7 +262,7 @@ public class StockService {
             List<VenteEntity> ventesP = ventesParProduit.getOrDefault(nomArchive, new ArrayList<>());
             if (!achatsP.isEmpty()) {
                 StockDto stock = calculerStock(nomArchive, achatsP, ventesP);
-                enrichirAvecBenefice(stock, beneficesParProduit);
+                enrichirAvecBenefice(stock, beneficesParProduit, 1.0);
                 stocksArchives.add(stock);
             }
         }
@@ -265,7 +289,7 @@ public class StockService {
         for (Map.Entry<String, List<AchatEntity>> entry : achatsParProduit.entrySet()) {
             StockDto stock = calculerStock(entry.getKey(), entry.getValue(),
                     ventesParProduit.getOrDefault(entry.getKey(), new ArrayList<>()));
-            enrichirAvecBenefice(stock, beneficesParProduit);
+            enrichirAvecBenefice(stock, beneficesParProduit, 1.0);
             stocks.add(stock);
         }
         return stocks;
@@ -300,8 +324,13 @@ public class StockService {
             throw new RuntimeException("Produit non trouvé : " + nomProduit);
         }
 
-        StockDto stock = calculerStock(nomProduit, achats, ventes);
-        enrichirAvecBenefice(stock, chargerBeneficesParProduit(tenant));
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+        double tauxRapport = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                ? deviseRapport.getTauxChange() : 1.0;
+
+        StockDto stock = calculerStock(nomProduit, achats, ventes, tauxRapport, codeDevise);
+        enrichirAvecBenefice(stock, chargerBeneficesParProduit(tenant), tauxRapport);
         return stock;
     }
 
@@ -312,7 +341,7 @@ public class StockService {
      */
     @Transactional(readOnly = true)
     public List<StockDto> obtenirProduitsEnRupture() {
-        return obtenirTousLesStocks().stream()
+        return obtenirTousLesStocks(null).stream()
                 .filter(stock -> stock.getStockDisponible() <= 0)
                 .collect(Collectors.toList());
     }
@@ -324,9 +353,32 @@ public class StockService {
      */
     @Transactional(readOnly = true)
     public List<StockDto> obtenirProduitsStockBas() {
-        return obtenirTousLesStocks().stream()
+        return obtenirTousLesStocks(null).stream()
                 .filter(stock -> stock.getStockDisponible() > 0 && stock.getStockDisponible() < 10)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Calcule ruptures + stock bas en un seul appel à {@link #obtenirTousLesStocks}, au lieu
+     * d'appeler {@link #obtenirProduitsEnRupture} et {@link #obtenirProduitsStockBas} séparément
+     * (chacun recalculerait tout le stock depuis zéro — et l'auto-appel interne empêcherait
+     * de toute façon le cache Spring de s'appliquer sur ces deux méthodes).
+     * Utilisé par GET /stock/alertes, qui a besoin des deux listes en même temps.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, List<StockDto>> obtenirAlertesStock() {
+        List<StockDto> tousLesStocks = obtenirTousLesStocks(null);
+        List<StockDto> ruptures = tousLesStocks.stream()
+                .filter(stock -> stock.getStockDisponible() <= 0)
+                .collect(Collectors.toList());
+        List<StockDto> stocksBas = tousLesStocks.stream()
+                .filter(stock -> stock.getStockDisponible() > 0 && stock.getStockDisponible() < 10)
+                .collect(Collectors.toList());
+
+        Map<String, List<StockDto>> resultat = new java.util.LinkedHashMap<>();
+        resultat.put("ruptures", ruptures);
+        resultat.put("stocksBas", stocksBas);
+        return resultat;
     }
 
     /**
@@ -354,7 +406,7 @@ public class StockService {
      */
     @Transactional(readOnly = true)
     public BigDecimal obtenirValeurTotaleStock() {
-        return obtenirTousLesStocks().stream()
+        return obtenirTousLesStocks(null).stream()
                 .map(StockDto::getValeurStock)
                 .filter(valeur -> valeur != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -374,9 +426,17 @@ public class StockService {
      * Invalide le cache des stocks pour le tenant courant.
      * À appeler après chaque achat ou vente.
      */
-    @CacheEvict(value = "stocks", key = "#tenantUuid")
+    @CacheEvict(value = "stocks", allEntries = true)
     public void invalidateStockCache(String tenantUuid) {
         // méthode vide — l'annotation fait le travail
+    }
+
+    /**
+     * Surcharge sans conversion de devise (valeurs en XOF, la devise de base) —
+     * utilisée là où la devise de rapport n'a pas de sens (archives, job cross-tenant).
+     */
+    private StockDto calculerStock(String nomProduit, List<AchatEntity> achats, List<VenteEntity> ventes) {
+        return calculerStock(nomProduit, achats, ventes, 1.0, "XOF");
     }
 
     /**
@@ -385,9 +445,12 @@ public class StockService {
      * @param nomProduit Nom du produit
      * @param achats Liste des achats
      * @param ventes Liste des ventes
+     * @param tauxDeviceTenant Taux de conversion vers la devise de rapport (1.0 = pas de conversion)
+     * @param deviseCode Code de la devise de rapport (étiquette sur le StockDto résultant)
      * @return StockDto calculé
      */
-    private StockDto calculerStock(String nomProduit, List<AchatEntity> achats, List<VenteEntity> ventes) {
+    private StockDto calculerStock(String nomProduit, List<AchatEntity> achats, List<VenteEntity> ventes,
+                                   double tauxDeviceTenant, String deviseCode) {
         // Calculer la quantité totale achetée
         Double quantiteAchetee = achats.stream()
                 .mapToDouble(AchatEntity::getQuantite)
@@ -401,11 +464,17 @@ public class StockService {
         // Calculer le stock disponible
         Double stockDisponible = quantiteAchetee - quantiteVendue;
 
-        // Calculer le prix moyen pondéré d'achat (somme(prix × qté) / totalQté)
+        // Calculer le prix moyen pondéré d'achat en devise tenant
+        // Formule : prixUnitaireXOF = prixUnitaire * tauxChangeApplique → prixTenant = prixXOF / tauxDeviceTenant
         BigDecimal prixMoyenAchat = BigDecimal.ZERO;
         if (quantiteAchetee > 0) {
             BigDecimal totalValeurAchats = achats.stream()
-                    .map(a -> a.getPrixUnitaire().multiply(BigDecimal.valueOf(a.getQuantite())))
+                    .map(a -> {
+                        double taux = (a.getTauxChangeApplique() != null) ? a.getTauxChangeApplique() : 1.0;
+                        BigDecimal prixXOF = a.getPrixUnitaire().multiply(BigDecimal.valueOf(taux));
+                        return prixXOF.divide(BigDecimal.valueOf(tauxDeviceTenant), 4, RoundingMode.HALF_UP)
+                                      .multiply(BigDecimal.valueOf(a.getQuantite()));
+                    })
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             prixMoyenAchat = totalValeurAchats.divide(
                     BigDecimal.valueOf(quantiteAchetee),
@@ -414,11 +483,16 @@ public class StockService {
             );
         }
 
-        // Calculer le prix moyen pondéré de vente (somme(prix × qté) / totalQté)
+        // Calculer le prix moyen pondéré de vente en devise tenant
         BigDecimal prixMoyenVente = BigDecimal.ZERO;
         if (quantiteVendue > 0) {
             BigDecimal totalValeurVentes = ventes.stream()
-                    .map(v -> v.getPrixUnitaire().multiply(BigDecimal.valueOf(v.getQuantite())))
+                    .map(v -> {
+                        double taux = (v.getTauxChangeApplique() != null) ? v.getTauxChangeApplique() : 1.0;
+                        BigDecimal prixXOF = v.getPrixUnitaire().multiply(BigDecimal.valueOf(taux));
+                        return prixXOF.divide(BigDecimal.valueOf(tauxDeviceTenant), 4, RoundingMode.HALF_UP)
+                                      .multiply(BigDecimal.valueOf(v.getQuantite()));
+                    })
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             prixMoyenVente = totalValeurVentes.divide(
                     BigDecimal.valueOf(quantiteVendue),
@@ -426,11 +500,15 @@ public class StockService {
                     RoundingMode.HALF_UP
             );
         } else {
-            // Aucune vente : utiliser le prixVenteSuggere du dernier achat comme référence
+            // Aucune vente : utiliser le prixVenteSuggere du dernier achat comme référence (converti)
             prixMoyenVente = achats.stream()
                     .filter(a -> a.getPrixVenteSuggere() != null && a.getPrixVenteSuggere().compareTo(BigDecimal.ZERO) > 0)
                     .max(Comparator.comparing(AchatEntity::getDateAchat))
-                    .map(AchatEntity::getPrixVenteSuggere)
+                    .map(a -> {
+                        double taux = (a.getTauxChangeApplique() != null) ? a.getTauxChangeApplique() : 1.0;
+                        BigDecimal suggXOF = a.getPrixVenteSuggere().multiply(BigDecimal.valueOf(taux));
+                        return suggXOF.divide(BigDecimal.valueOf(tauxDeviceTenant), 2, RoundingMode.HALF_UP);
+                    })
                     .orElse(BigDecimal.ZERO);
         }
 
@@ -498,6 +576,7 @@ public class StockService {
                 .valeurStock(valeurStock)
                 .margeUnitaire(margeUnitaire)
                 .statut(statut)
+                .deviseCode(deviseCode)
                 .build();
     }
 }

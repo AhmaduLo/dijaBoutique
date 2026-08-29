@@ -40,6 +40,7 @@ class AuthServiceTest {
     @Mock private VenteRepository venteRepository;
     @Mock private DepenseRepository depenseRepository;
     @Mock private UserPushSubscriptionRepository pushSubscriptionRepository;
+    @Mock private PushNotificationService pushService;
 
     @InjectMocks
     private AuthService authService;
@@ -88,7 +89,6 @@ class AuthServiceTest {
     @DisplayName("register() — crée un tenant + utilisateur ADMIN et retourne un token")
     void register_creeUtilisateurEtRetourneToken() {
         when(userRepository.existsByEmailAndDeletedFalse(anyString())).thenReturn(false);
-        when(tenantRepository.existsByNomEntreprise(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
         when(tenantRepository.save(any())).thenReturn(tenantTest);
         when(userRepository.save(any())).thenReturn(utilisateur);
@@ -110,19 +110,23 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("existe déjà");
+                .hasMessageContaining("déjà utilisée");
         verify(userRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("register() — lève exception si nom entreprise déjà pris")
+    @DisplayName("register() — autorise un nom d'entreprise déjà utilisé par un autre tenant")
     void register_leveExceptionEntrepriseExiste() {
         when(userRepository.existsByEmailAndDeletedFalse(anyString())).thenReturn(false);
-        when(tenantRepository.existsByNomEntreprise("Boutique Test")).thenReturn(true);
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
+        when(tenantRepository.save(any())).thenReturn(tenantTest);
+        when(userRepository.save(any())).thenReturn(utilisateur);
+        when(jwtService.generateToken(anyString(), anyString(), any())).thenReturn("token123");
 
-        assertThatThrownBy(() -> authService.register(registerRequest))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("entreprise");
+        AuthResponse response = authService.register(registerRequest);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getToken()).isEqualTo("token123");
     }
 
     @Test
@@ -130,7 +134,6 @@ class AuthServiceTest {
     void register_leveExceptionCGUNonAcceptees() {
         registerRequest.setAcceptationCGU(false);
         when(userRepository.existsByEmailAndDeletedFalse(anyString())).thenReturn(false);
-        when(tenantRepository.existsByNomEntreprise(anyString())).thenReturn(false);
 
         assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(RuntimeException.class)
@@ -141,7 +144,6 @@ class AuthServiceTest {
     @DisplayName("register() — encode le mot de passe avant de sauvegarder")
     void register_encodeMotDePasse() {
         when(userRepository.existsByEmailAndDeletedFalse(anyString())).thenReturn(false);
-        when(tenantRepository.existsByNomEntreprise(anyString())).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("encodedPassword");
         when(tenantRepository.save(any())).thenReturn(tenantTest);
         when(userRepository.save(any())).thenReturn(utilisateur);
@@ -204,7 +206,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("désactivé");
+                .hasMessageContaining("suspendu");
     }
 
     // =========================================================
@@ -278,18 +280,22 @@ class AuthServiceTest {
     // =========================================================
 
     @Test
-    @DisplayName("deleteAdminAccount() — supprime le tenant et toutes les données associées")
+    @DisplayName("deleteAdminAccount() — soft-delete le tenant et les utilisateurs associés")
     void deleteAdminAccount_succes() {
-        tenantTest.setUtilisateurs(java.util.List.of(utilisateur));
         when(userRepository.findByEmailAndDeletedFalse("amadou@example.com"))
                 .thenReturn(Optional.of(utilisateur));
+        when(userRepository.findByTenantIdAndDeletedFalse(tenantTest.getId()))
+                .thenReturn(java.util.List.of(utilisateur));
 
         authService.deleteAdminAccount("amadou@example.com");
 
-        verify(tenantRepository).delete(tenantTest);
-        verify(achatRepository).deleteByUtilisateur(utilisateur);
-        verify(venteRepository).deleteByUtilisateur(utilisateur);
-        verify(depenseRepository).deleteByUtilisateur(utilisateur);
+        assertThat(utilisateur.getDeleted()).isTrue();
+        assertThat(tenantTest.getDeleted()).isTrue();
+        assertThat(tenantTest.getActif()).isFalse();
+        verify(passwordResetTokenRepository).deleteByUser(utilisateur);
+        verify(pushSubscriptionRepository).deleteByUser(utilisateur);
+        verify(userRepository).saveAll(java.util.List.of(utilisateur));
+        verify(tenantRepository).save(tenantTest);
     }
 
     @Test

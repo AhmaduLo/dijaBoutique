@@ -114,11 +114,27 @@ public class VenteLotConsommationEntity extends BaseEntity {
     /**
      * Recalcule le bénéfice unitaire et total à partir des snapshots de prix.
      * À appeler avant la persistance.
+     *
+     * prixAchatUnitaireSnapshot et prixVenteUnitaireSnapshot sont chacun bruts, dans
+     * la devise propre de leur transaction d'origine (l'achat et la vente peuvent avoir
+     * des deviseCode différents si la devise du tenant a changé entre les deux — courant
+     * en usage réel). Les soustraire directement mélange deux devises : ex. un achat de
+     * 100 000 XOF et une vente de 150 EUR produirait un "bénéfice" de -99 850 au lieu
+     * d'un profit réel. On pivote donc le prix d'achat par XOF (via son propre taux) puis
+     * on le reconvertit dans la devise de la VENTE (via le taux de la vente), pour rester
+     * cohérent avec beneficeTotalLigne qui est ensuite normalisé en XOF ailleurs via
+     * `× vente.tauxChangeApplique` (voir VenteLotConsommationRepository).
      */
     public void recalculerBenefice() {
         if (this.prixVenteUnitaireSnapshot != null && this.prixAchatUnitaireSnapshot != null) {
+            double tauxAchat = (this.achat != null && this.achat.getTauxChangeApplique() != null)
+                    ? this.achat.getTauxChangeApplique() : 1.0;
+            double tauxVente = (this.vente != null && this.vente.getTauxChangeApplique() != null)
+                    ? this.vente.getTauxChangeApplique() : 1.0;
+            BigDecimal prixAchatXof = this.prixAchatUnitaireSnapshot.multiply(BigDecimal.valueOf(tauxAchat));
+            BigDecimal prixAchatEnDeviseVente = prixAchatXof.divide(BigDecimal.valueOf(tauxVente), 6, RoundingMode.HALF_UP);
             this.beneficeUnitaire = this.prixVenteUnitaireSnapshot
-                    .subtract(this.prixAchatUnitaireSnapshot)
+                    .subtract(prixAchatEnDeviseVente)
                     .setScale(2, RoundingMode.HALF_UP);
         }
         if (this.beneficeUnitaire != null && this.quantiteConsommee != null) {

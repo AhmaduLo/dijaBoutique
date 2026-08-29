@@ -42,6 +42,7 @@ public class FifoBackfillService {
     private final AchatRepository                  achatRepository;
     private final VenteRepository                  venteRepository;
     private final VenteLotConsommationRepository   consommationRepository;
+    private final StockService                     stockService;
 
     /**
      * Lance le backfill pour un tenant donné.
@@ -176,6 +177,10 @@ public class FifoBackfillService {
             consommationRepository.saveAll(nouvellesConsommations);
             log.info("FIFO Backfill : {} ligne(s) de consommation créée(s), {} achat(s) mis à jour",
                     nouvellesConsommations.size(), achats.size());
+            // Le stock (obtenirTousLesStocks) est mis en cache par tenant/devise et n'est
+            // sinon invalidé qu'à chaque achat/vente — sans ça, la page Stock continuerait
+            // de servir les anciens bénéfices (avant correction) jusqu'au prochain achat/vente.
+            stockService.invalidateStockCache(tenant.getTenantUuid());
         } else {
             log.info("FIFO Backfill (DRY-RUN) : {} ligne(s) qui auraient été créées, {} achat(s) qui auraient été mis à jour",
                     nouvellesConsommations.size(), achats.size());

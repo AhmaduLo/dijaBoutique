@@ -57,8 +57,9 @@ public class StockController {
      * Exemple : GET /api/stock
      */
     @GetMapping
-    public ResponseEntity<List<StockDto>> obtenirTousLesStocks() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+    public ResponseEntity<List<StockDto>> obtenirTousLesStocks(
+            @RequestParam(required = false) String devise) {
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(devise);
         return ResponseEntity.ok(stocks);
     }
 
@@ -139,8 +140,9 @@ public class StockController {
      */
     @GetMapping("/alertes")
     public ResponseEntity<Map<String, Object>> obtenirAlertes() {
-        List<StockDto> ruptures = stockService.obtenirProduitsEnRupture();
-        List<StockDto> stocksBas = stockService.obtenirProduitsStockBas();
+        Map<String, List<StockDto>> alertesStock = stockService.obtenirAlertesStock();
+        List<StockDto> ruptures = alertesStock.get("ruptures");
+        List<StockDto> stocksBas = alertesStock.get("stocksBas");
 
         Map<String, Object> alertes = new HashMap<>();
         alertes.put("ruptures", ruptures);
@@ -197,8 +199,9 @@ public class StockController {
      * Exemple : GET /api/stock/valeur-totale
      */
     @GetMapping("/valeur-totale")
-    public ResponseEntity<Map<String, Object>> obtenirValeurTotale() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+    public ResponseEntity<Map<String, Object>> obtenirValeurTotale(
+            @RequestParam(required = false) String devise) {
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(devise);
         BigDecimal valeurTotale = stocks.stream()
                 .map(StockDto::getValeurStock)
                 .filter(v -> v != null)
@@ -225,8 +228,9 @@ public class StockController {
      * Exemple : GET /api/stock/resume
      */
     @GetMapping("/resume")
-    public ResponseEntity<Map<String, Object>> obtenirResume() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+    public ResponseEntity<Map<String, Object>> obtenirResume(
+            @RequestParam(required = false) String devise) {
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(devise);
         BigDecimal valeurTotale = stocks.stream()
                 .map(StockDto::getValeurStock)
                 .filter(v -> v != null)
@@ -248,11 +252,22 @@ public class StockController {
                 .mapToDouble(s -> s.getStockDisponible() != null && s.getStockDisponible() > 0 ? s.getStockDisponible() : 0.0)
                 .sum();
 
-        BigDecimal margeGlobale = stocks.stream()
+        BigDecimal margeGlobaleMontant = stocks.stream()
                 .map(s -> s.getMargeUnitaire() != null && s.getStockDisponible() != null && s.getStockDisponible() > 0
                         ? s.getMargeUnitaire().multiply(BigDecimal.valueOf(s.getStockDisponible()))
                         : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Vrai pourcentage : indépendant de la devise (même ratio quelle que soit la devise)
+        BigDecimal margeGlobalePct = valeurTotale.compareTo(BigDecimal.ZERO) > 0
+                ? margeGlobaleMontant.multiply(new BigDecimal("100"))
+                        .divide(valeurTotale, 2, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        String deviseCode = "XOF";
+        if (!stocks.isEmpty() && stocks.get(0).getDeviseCode() != null) {
+            deviseCode = stocks.get(0).getDeviseCode();
+        }
 
         Map<String, Object> resume = new HashMap<>();
         resume.put("totalProduits", stocks.size());
@@ -261,7 +276,9 @@ public class StockController {
         resume.put("produitsStockBas", produitsStockBas);
         resume.put("valeurTotaleStock", valeurTotale);
         resume.put("quantiteTotaleDisponible", quantiteTotaleDisponible);
-        resume.put("margeGlobale", margeGlobale);
+        resume.put("margeGlobale", margeGlobalePct);
+        resume.put("margeGlobaleMontant", margeGlobaleMontant);
+        resume.put("deviseCode", deviseCode);
 
         return ResponseEntity.ok(resume);
     }
@@ -281,7 +298,7 @@ public class StockController {
      */
     @GetMapping("/produits-disponibles")
     public ResponseEntity<List<Map<String, Object>>> obtenirProduitsDisponibles() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(null);
 
         // Filtrer uniquement les produits avec stock > 0
         List<Map<String, Object>> produitsDisponibles = stocks.stream()
@@ -312,7 +329,7 @@ public class StockController {
      */
     @GetMapping("/noms-produits")
     public ResponseEntity<List<String>> obtenirNomsProduits() {
-        List<StockDto> stocks = stockService.obtenirTousLesStocks();
+        List<StockDto> stocks = stockService.obtenirTousLesStocks(null);
 
         List<String> nomsProduits = stocks.stream()
                 .filter(s -> s.getStockDisponible() > 0)

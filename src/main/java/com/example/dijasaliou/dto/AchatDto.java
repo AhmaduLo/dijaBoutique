@@ -36,6 +36,8 @@ public class AchatDto {
     private String photoUrl;
     private String codeBarre;
     private String unite;
+    private String deviseCode;
+    private Double tauxChangeApplique;
     private String categorie;
     private String description;
 
@@ -77,6 +79,8 @@ public class AchatDto {
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .codeBarre(achat.getCodeBarre())
                 .unite(achat.getUnite())
+                .deviseCode(achat.getDeviseCode())
+                .tauxChangeApplique(achat.getTauxChangeApplique())
                 .categorie(achat.getCategorie())
                 .description(achat.getDescription())
                 .modePaiement(achat.getModePaiement())
@@ -114,6 +118,8 @@ public class AchatDto {
                 .photoUrl(canViewPhotos ? achat.getPhotoUrl() : null)
                 .codeBarre(achat.getCodeBarre())
                 .unite(achat.getUnite())
+                .deviseCode(achat.getDeviseCode())
+                .tauxChangeApplique(achat.getTauxChangeApplique())
                 .categorie(achat.getCategorie())
                 .description(achat.getDescription())
                 .modePaiement(achat.getModePaiement())

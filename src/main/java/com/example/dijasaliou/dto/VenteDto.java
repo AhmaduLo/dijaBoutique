@@ -35,6 +35,8 @@ public class VenteDto {
     private String adresseClient;
     private String photoUrl;
     private String unite;
+    private String deviseCode;
+    private Double tauxChangeApplique;
 
     // Groupe de vente multi-produits (UUID partagé entre les articles du même panier)
     private String groupeVenteId;
@@ -100,6 +102,8 @@ public class VenteDto {
                 .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
+                .deviseCode(vente.getDeviseCode())
+                .tauxChangeApplique(vente.getTauxChangeApplique())
                 .groupeVenteId(vente.getGroupeVenteId())
                 .clientId(vente.getClientRef() != null ? vente.getClientRef().getId() : null)
                 .modePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : "ESPECES")
@@ -120,16 +124,29 @@ public class VenteDto {
      * à côté des vraies sorties hors vente, avec la même structure.
      *
      * - typeSortie = CREDIT_IMPAYE
-     * - motifSortie = nom client + montant restant non payé
+     * - motifSortie = nom client + montant restant non payé, converti dans la devise cible
      * - dateVente = datePassageEnPerte (pas la date de la vente originale)
      * - id = id du crédit
      * - quantite/produit : repris de la vente originale pour traçabilité
+     *
+     * @param symboleCible symbole de la devise dans laquelle afficher le montant restant (ex: "CFA", "€")
+     * @param tauxCible taux de change de la devise cible (1 unité devise cible → XOF)
      */
-    public static VenteDto fromCreditPerdu(com.example.dijasaliou.entity.CreditClientEntity credit) {
+    public static VenteDto fromCreditPerdu(com.example.dijasaliou.entity.CreditClientEntity credit,
+                                            String symboleCible, double tauxCible) {
         if (credit == null) return null;
         VenteEntity vente = credit.getVente();
         String nomClient = credit.getClient() != null ? credit.getClient().getNom() : "Client inconnu";
         java.math.BigDecimal restantDu = credit.getMontantRestant() != null ? credit.getMontantRestant() : java.math.BigDecimal.ZERO;
+
+        // Le montant restant est stocké dans la devise du crédit — on repasse par le pivot XOF
+        // avant de convertir vers la devise cible (même logique que calculerRapportModePaiement).
+        double tauxCredit = (credit.getTauxChangeApplique() != null && credit.getTauxChangeApplique() > 0)
+                ? credit.getTauxChangeApplique() : 1.0;
+        double tauxFinal = tauxCible > 0 ? tauxCible : 1.0;
+        java.math.BigDecimal restantDuConverti = restantDu
+                .multiply(java.math.BigDecimal.valueOf(tauxCredit))
+                .divide(java.math.BigDecimal.valueOf(tauxFinal), 0, java.math.RoundingMode.HALF_UP);
 
         return VenteDto.builder()
                 .id(credit.getId())
@@ -143,9 +160,8 @@ public class VenteDto {
                 .client(nomClient)
                 .unite(vente != null ? vente.getUnite() : "pièce")
                 .typeSortie("CREDIT_IMPAYE")
-                .motifSortie(String.format("%s — reste dû %s CFA",
-                        nomClient,
-                        restantDu.setScale(0, java.math.RoundingMode.HALF_UP)))
+                .motifSortie(String.format("%s — reste dû %s %s",
+                        nomClient, restantDuConverti, symboleCible != null ? symboleCible : "CFA"))
                 .creditStatut("PERTE")
                 .build();
     }
@@ -177,6 +193,8 @@ public class VenteDto {
                 .adresseClient(vente.getAdresseClient())
                 .photoUrl(canViewPhotos ? vente.getPhotoUrl() : null)
                 .unite(vente.getUnite())
+                .deviseCode(vente.getDeviseCode())
+                .tauxChangeApplique(vente.getTauxChangeApplique())
                 .groupeVenteId(vente.getGroupeVenteId())
                 .estRecente(vente.estRecente())
                 .mois(vente.getMois())

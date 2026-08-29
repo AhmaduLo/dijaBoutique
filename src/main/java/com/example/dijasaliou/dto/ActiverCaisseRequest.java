@@ -7,10 +7,12 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 /**
- * Requête pour activer la caisse pour la 1ère fois.
+ * Requête pour activer la caisse (1ère fois) ou corriger son solde actuel
+ * (ex: après un comptage physique).
  *
- * Le commerçant saisit les soldes qu'il a physiquement à l'instant t.
- * Tous les achats/ventes/dépenses antérieurs sont ignorés.
+ * Les champs soldeInitial* représentent le TOTAL ACTUEL VOULU par compte,
+ * exprimé dans {@link #devise} — pas nécessairement un "solde initial" figé.
+ * Voir {@link com.example.dijasaliou.service.CaisseService#activerCaisse}.
  */
 @Data
 public class ActiverCaisseRequest {
@@ -32,9 +34,17 @@ public class ActiverCaisseRequest {
     private BigDecimal soldeInitialVirement;
 
     /**
+     * Code de la devise dans laquelle les montants ci-dessus sont exprimés
+     * (ex: "EUR", "XOF"). Optionnel — XOF par défaut si absent.
+     */
+    private String devise;
+
+    /**
      * Date d'activation (optionnelle). Si fournie, c'est l'heure locale du
      * navigateur — évite tout problème de fuseau quand le serveur est dans
-     * un autre pays. Si null, le backend utilise son heure locale.
+     * un autre pays, et force une réinitialisation volontaire du suivi. Si
+     * null, le backend conserve la date déjà active (ou l'initialise à
+     * maintenant lors de la toute première activation).
      */
     private java.time.LocalDateTime dateActivation;
 }

@@ -515,6 +515,11 @@ public class AuthService {
         for (UserEntity utilisateur : utilisateurs) {
             utilisateur.setDeleted(true);
             utilisateur.setDateSuppression(maintenant);
+            // La colonne email a une contrainte UNIQUE au niveau base non filtrée sur
+            // "deleted" : sans ce renommage, l'ancien compte supprimé garderait l'email
+            // occupé pour toujours et bloquerait toute réinscription (par ce même
+            // utilisateur ou un tiers) avec cette adresse.
+            utilisateur.setEmail(libererEmail(utilisateur.getEmail(), utilisateur.getId()));
             passwordResetTokenRepository.deleteByUser(utilisateur);
             // Sans ça, les crons de résumé (quotidien/hebdo/mensuel) continuent
             // de notifier ce compte indéfiniment malgré la suppression.
@@ -527,5 +532,17 @@ public class AuthService {
         tenant.setDateSuppression(maintenant);
         tenant.setActif(false);
         tenantRepository.save(tenant);
+    }
+
+    /**
+     * Insère un suffixe "+deletedID" avant le "@" pour libérer l'email d'origine
+     * tout en gardant un format d'email valide et une valeur unique.
+     */
+    private String libererEmail(String email, Long userId) {
+        int indexArobase = email.indexOf('@');
+        if (indexArobase <= 0) {
+            return email + "+deleted" + userId;
+        }
+        return email.substring(0, indexArobase) + "+deleted" + userId + email.substring(indexArobase);
     }
 }

@@ -3,13 +3,18 @@ package com.example.dijasaliou.controller;
 import com.example.dijasaliou.dto.DepenseDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.DepenseEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
+import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.DepenseService;
+import com.example.dijasaliou.service.DeviseService;
+import com.example.dijasaliou.service.TenantService;
 import com.example.dijasaliou.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -29,10 +34,15 @@ public class DepenseController {
 
     private final DepenseService depenseService;
     private final UserService userService;
+    private final TenantService tenantService;
+    private final DeviseService deviseService;
 
-    public DepenseController(DepenseService depenseService, UserService userService) {
+    public DepenseController(DepenseService depenseService, UserService userService,
+                             TenantService tenantService, DeviseService deviseService) {
         this.depenseService = depenseService;
         this.userService = userService;
+        this.tenantService = tenantService;
+        this.deviseService = deviseService;
     }
 
     /**
@@ -77,13 +87,15 @@ public class DepenseController {
 
     /**
      * POST /api/depenses
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PostMapping
     public ResponseEntity<DepenseDto> creer(
             @Valid @RequestBody DepenseEntity depense,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
         DepenseEntity depenseCree = depenseService.creerDepense(depense, utilisateur);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(DepenseDto.fromEntity(depenseCree));
@@ -91,15 +103,17 @@ public class DepenseController {
 
     /**
      * PUT /api/depenses/{id}
+     * SÉCURITÉ : L'utilisateur est extrait du token JWT (Authentication),
+     * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PutMapping("/{id}")
     public ResponseEntity<DepenseDto> modifier(
             @PathVariable String id,
             @Valid @RequestBody DepenseEntity depenseModifiee,
-            @RequestParam Long utilisateurId) {
+            Authentication authentication) {
 
-        // Récupérer l'utilisateur qui modifie
-        UserEntity utilisateur = userService.obtenirUtilisateurParId(utilisateurId);
+        // Récupérer l'utilisateur authentifié (depuis le JWT, pas d'un paramètre client)
+        UserEntity utilisateur = userService.obtenirUtilisateurParEmail(authentication.getName());
 
         // Mettre à jour l'utilisateur de la dépense
         depenseModifiee.setUtilisateur(utilisateur);
@@ -142,9 +156,34 @@ public class DepenseController {
     @GetMapping("/total")
     public ResponseEntity<BigDecimal> calculerTotalDepenses(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
-        BigDecimal total = depenseService.calculerTotalDepenses(debut, fin);
+        List<DepenseEntity> depenses = depenseService.obtenirDepensesParPeriode(debut, fin);
+
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        double tauxTemp = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null) {
+                tauxTemp = deviseRapport.getTauxChange().doubleValue();
+            }
+        } catch (RuntimeException e) {
+            // fallback to default 1.0
+        }
+        final double tauxFinal = tauxTemp;
+
+        BigDecimal total = depenses.stream()
+                .filter(d -> d.getMontant() != null && d.getTauxChangeApplique() != null)
+                .map(d -> d.getMontant()
+                        .multiply(BigDecimal.valueOf(d.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxFinal), 2, java.math.RoundingMode.HALF_UP))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
         return ResponseEntity.ok(total);
     }
 
@@ -155,22 +194,61 @@ public class DepenseController {
     @GetMapping("/statistiques")
     public ResponseEntity<Map<String, Object>> obtenirStatistiques(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) String devise) {
 
         List<DepenseEntity> depenses = depenseService.obtenirDepensesParPeriode(debut, fin);
-        BigDecimal total = depenseService.calculerTotalDepenses(debut, fin);
 
         // Convertir en DTOs
         List<DepenseDto> depensesDto = depenses.stream()
                 .map(DepenseDto::fromEntity)
                 .collect(Collectors.toList());
 
+        // Devise de rapport : paramètre explicite ou devise préférée du tenant
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        double tauxTemp2 = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null && deviseRapport.getTauxChange() != null) {
+                tauxTemp2 = deviseRapport.getTauxChange().doubleValue();
+            }
+        } catch (RuntimeException e) {
+            // fallback to default 1.0
+        }
+        final double tauxFinal = tauxTemp2;
+
+        // Calculer le total dans la devise du tenant : montant × tauxChangeApplique → XOF → / tauxTenant
+        BigDecimal total = depenses.stream()
+                .filter(d -> d.getMontant() != null && d.getTauxChangeApplique() != null)
+                .map(d -> d.getMontant()
+                        .multiply(BigDecimal.valueOf(d.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxFinal), 2, java.math.RoundingMode.HALF_UP))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
+        // Répartition par catégorie (attendue par le frontend pour les rapports)
+        Map<String, BigDecimal> repartitionParCategorie = new HashMap<>();
+        for (DepenseEntity d : depenses) {
+            if (d.getCategorie() != null && d.getMontant() != null && d.getTauxChangeApplique() != null) {
+                String cat = d.getCategorie().name();
+                BigDecimal montantConverti = d.getMontant()
+                        .multiply(BigDecimal.valueOf(d.getTauxChangeApplique()))
+                        .divide(BigDecimal.valueOf(tauxFinal), 2, java.math.RoundingMode.HALF_UP);
+                repartitionParCategorie.merge(cat, montantConverti, BigDecimal::add);
+            }
+        }
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("dateDebut", debut);
         stats.put("dateFin", fin);
         stats.put("nombreDepenses", depensesDto.size());
         stats.put("montantTotal", total);
+        stats.put("deviseCode", codeDevise);
         stats.put("depenses", depensesDto);
+        stats.put("repartitionParCategorie", repartitionParCategorie);
 
         return ResponseEntity.ok(stats);
     }

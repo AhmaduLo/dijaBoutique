@@ -51,6 +51,12 @@ class ContactControllerTest {
     @MockitoBean
     private com.example.dijasaliou.filter.SubscriptionExpirationFilter subscriptionExpirationFilter;
 
+    @MockitoBean(name = "activityTrackingFilter")
+    private com.example.dijasaliou.filter.ActivityTrackingFilter activityTrackingFilter;
+
+    @MockitoBean
+    private com.example.dijasaliou.service.TenantService tenantService;
+
     private ContactRequest contactRequest;
     private final UsernamePasswordAuthenticationToken principal =
             new UsernamePasswordAuthenticationToken("admin@boutique.com", null,
@@ -62,8 +68,8 @@ class ContactControllerTest {
                 "Dija Saliou",
                 "admin@boutique.com",
                 "Boutique DijaSaliou",
-                null,
                 "Demande d'assistance technique",
+                null,
                 "Bonjour, j'ai besoin d'aide pour configurer mon compte correctement."
         );
     }
@@ -100,16 +106,16 @@ class ContactControllerTest {
     }
 
     @Test
-    @DisplayName("POST /contact - Devrait retourner 500 si données invalides (@Valid)")
+    @DisplayName("POST /contact - Devrait retourner 400 si données invalides (@Valid)")
     void sendContactMessage_DevraitRetourner500SiValidationEchoue() throws Exception {
         // Message trop court (<10 chars), email invalide, nom vide
-        ContactRequest invalide = new ContactRequest("", "email-invalide", "", null, "Sujet", "court");
+        ContactRequest invalide = new ContactRequest("", "email-invalide", "", "Sujet", null, "court");
 
         mockMvc.perform(post("/contact")
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalide)))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
 
         // La validation échoue avant l'appel au service
         verify(emailService, never()).sendContactEmail(any());

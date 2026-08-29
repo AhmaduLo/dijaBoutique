@@ -27,11 +27,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.example.dijasaliou.entity.DeviseEntity;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
@@ -50,6 +53,7 @@ public class VenteService {
     private final ClientRepository clientRepository;
     private final CreditClientRepository creditClientRepository;
     private final PaiementCreditRepository paiementCreditRepository;
+    private final DeviseService deviseService;
     private final FifoCalculService fifoCalculService;
     private final VenteLotConsommationRepository consommationRepository;
     private final UserPushNotificationService userPushService;
@@ -64,6 +68,7 @@ public class VenteService {
                         ClientRepository clientRepository,
                         CreditClientRepository creditClientRepository,
                         PaiementCreditRepository paiementCreditRepository,
+                        DeviseService deviseService,
                         FifoCalculService fifoCalculService,
                         VenteLotConsommationRepository consommationRepository,
                         UserPushNotificationService userPushService,
@@ -77,6 +82,7 @@ public class VenteService {
         this.clientRepository = clientRepository;
         this.creditClientRepository = creditClientRepository;
         this.paiementCreditRepository = paiementCreditRepository;
+        this.deviseService = deviseService;
         this.fifoCalculService = fifoCalculService;
         this.consommationRepository = consommationRepository;
         this.userPushService = userPushService;
@@ -196,7 +202,19 @@ public class VenteService {
         }
 
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
-        vente.setTenant(tenantService.getCurrentTenant());
+        TenantEntity tenantActuel = tenantService.getCurrentTenant();
+        vente.setTenant(tenantActuel);
+
+        // DEVISE : Stocker la devise active du tenant + son taux au moment de la saisie
+        String codeDevise = (tenantActuel.getDevisePreferee() != null) ? tenantActuel.getDevisePreferee() : "XOF";
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            vente.setDeviseCode(devise.getCode());
+            vente.setTauxChangeApplique(devise.getTauxChange());
+        } catch (RuntimeException e) {
+            vente.setDeviseCode("XOF");
+            vente.setTauxChangeApplique(1.0);
+        }
 
         // Récupérer automatiquement la photo du produit depuis le stock si non fournie
         if (vente.getPhotoUrl() == null || vente.getPhotoUrl().trim().isEmpty()) {
@@ -735,10 +753,28 @@ public class VenteService {
      * de manière unifiée dans le tableau.
      */
     @Transactional(readOnly = true)
-    public List<com.example.dijasaliou.dto.VenteDto> obtenirSortiesPeriode(LocalDate debut, LocalDate fin) {
-        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+    public List<com.example.dijasaliou.dto.VenteDto> obtenirSortiesPeriode(LocalDate debut, LocalDate fin, String devise) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        String tenantUuid = tenant.getTenantUuid();
         LocalDateTime debutDt = debut.atStartOfDay();
         LocalDateTime finDt = fin.atTime(LocalTime.MAX);
+
+        // Devise de rapport : paramètre explicite ou préférence du tenant (même logique que calculerRapportModePaiement)
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        String symboleCible = "CFA";
+        double tauxCible = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            if (deviseRapport != null) {
+                tauxCible = deviseRapport.getTauxChange() != null ? deviseRapport.getTauxChange() : 1.0;
+                symboleCible = deviseRapport.getSymbole() != null ? deviseRapport.getSymbole() : "CFA";
+            }
+        } catch (RuntimeException e) {
+            symboleCible = "CFA";
+            tauxCible = 1.0;
+        }
 
         List<com.example.dijasaliou.dto.VenteDto> resultat = new java.util.ArrayList<>(
                 venteRepository.findSortiesBetween(debutDt, finDt, tenantUuid).stream()
@@ -749,7 +785,7 @@ public class VenteService {
         // Crédits passés en perte sur la période — virtual sorties
         for (com.example.dijasaliou.entity.CreditClientEntity credit :
                 creditClientRepository.findCreditsPassesEnPerteBetween(debut, fin, tenantUuid)) {
-            resultat.add(com.example.dijasaliou.dto.VenteDto.fromCreditPerdu(credit));
+            resultat.add(com.example.dijasaliou.dto.VenteDto.fromCreditPerdu(credit, symboleCible, tauxCible));
         }
 
         // Tri global par date desc
@@ -780,7 +816,7 @@ public class VenteService {
      * sont comptées dans nbVentesSansBenefice.
      */
     @Transactional(readOnly = true)
-    public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin) {
+    public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin, String devise) {
         TenantEntity tenant = tenantService.getCurrentTenant();
         LocalDateTime debutDt = debut.atStartOfDay();
         LocalDateTime finDt   = fin.atTime(LocalTime.MAX);
@@ -868,8 +904,11 @@ public class VenteService {
             VenteEntity vente = credit.getVente();
             if (vente == null || vente.getPrixTotal() == null
                     || vente.getPrixTotal().compareTo(BigDecimal.ZERO) <= 0) {
-                // Sans vente associée, on prend la perte = montant restant (pas de coût FIFO calculable)
-                pertesCreditImpaye = pertesCreditImpaye.add(montantRestant);
+                // Sans vente associée, on prend la perte = montant restant (pas de coût FIFO calculable),
+                // ramené en XOF via le taux propre du crédit (même devise que le montant restant).
+                double tauxCredit = (credit.getTauxChangeApplique() != null && credit.getTauxChangeApplique() > 0)
+                        ? credit.getTauxChangeApplique() : 1.0;
+                pertesCreditImpaye = pertesCreditImpaye.add(montantRestant.multiply(BigDecimal.valueOf(tauxCredit)));
                 nbCreditsEnPerte++;
                 continue;
             }
@@ -895,6 +934,63 @@ public class VenteService {
                     .divide(ca, 2, java.math.RoundingMode.HALF_UP);
         }
 
+        // 6. Conversion devise vers la devise demandée pour le rapport.
+        //
+        // coutTotal / beneficeTotal / totalPertes / pertesParType sont désormais
+        // exprimés en XOF : les requêtes SQL qui les alimentent (sumCoutAchatByVenteId,
+        // sumBeneficeByVenteId, sumCoutAchatNonCreditBetween, sumBeneficeNonCreditBetween,
+        // sumPertesFifoParTypeBetween) multiplient chaque ligne par le taux de change de
+        // SON propre achat/vente avant de sommer — indispensable car deux lots consommés
+        // sur une même période peuvent avoir été achetés dans des devises différentes.
+        // On divise donc simplement par le taux de la devise cible.
+        //
+        // ca reste, lui, une somme brute non normalisée (voir calculerChiffreAffaires) —
+        // on le pivote depuis la devise courante du tenant comme avant, en l'absence
+        // d'affichage testé qui en dépende actuellement.
+        String codeDeviseTenant = tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF";
+        double tauxTenant = 1.0;
+        try {
+            DeviseEntity deviseTenant = deviseService.obtenirDeviseParCode(codeDeviseTenant);
+            if (deviseTenant != null && deviseTenant.getTauxChange() != null) {
+                tauxTenant = deviseTenant.getTauxChange();
+            }
+        } catch (RuntimeException e) {
+            tauxTenant = 1.0;
+        }
+
+        String codeDeviseCible = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim() : codeDeviseTenant;
+        double tauxCible = tauxTenant;
+        if (!codeDeviseCible.equals(codeDeviseTenant)) {
+            try {
+                DeviseEntity deviseCible = deviseService.obtenirDeviseParCode(codeDeviseCible);
+                tauxCible = (deviseCible != null && deviseCible.getTauxChange() != null)
+                        ? deviseCible.getTauxChange() : tauxTenant;
+            } catch (RuntimeException e) {
+                tauxCible = tauxTenant;
+            }
+        }
+        final double tauxTenantFinal = tauxTenant > 0 ? tauxTenant : 1.0;
+        final double tauxCibleFinal = tauxCible > 0 ? tauxCible : 1.0;
+
+        // ca : pivot depuis la devise courante du tenant (comportement pré-existant)
+        java.util.function.UnaryOperator<BigDecimal> convertirDepuisDeviseTenant = montant -> montant
+                .multiply(BigDecimal.valueOf(tauxTenantFinal))
+                .divide(BigDecimal.valueOf(tauxCibleFinal), 2, java.math.RoundingMode.HALF_UP);
+        // coutTotal / beneficeTotal / totalPertes / pertesParType : déjà en XOF, pivot direct
+        java.util.function.UnaryOperator<BigDecimal> convertirDepuisXof = montant -> montant
+                .divide(BigDecimal.valueOf(tauxCibleFinal), 2, java.math.RoundingMode.HALF_UP);
+
+        ca = convertirDepuisDeviseTenant.apply(ca);
+        coutTotal = convertirDepuisXof.apply(coutTotal);
+        beneficeTotal = convertirDepuisXof.apply(beneficeTotal);
+        totalPertes = convertirDepuisXof.apply(totalPertes);
+        java.util.Map<String, BigDecimal> pertesParTypeConverties = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, BigDecimal> entry : pertesParType.entrySet()) {
+            pertesParTypeConverties.put(entry.getKey(), convertirDepuisXof.apply(entry.getValue()));
+        }
+        pertesParType = pertesParTypeConverties;
+
         return BeneficeStatistiquesDto.builder()
                 .dateDebut(debut)
                 .dateFin(fin)
@@ -915,75 +1011,61 @@ public class VenteService {
      * Calcule la répartition du CA par mode de paiement pour une période.
      *
      * Logique :
-     * - ESPECES / WAVE / ORANGE_MONEY = ventes directes + remboursements de crédits du même mode
-     * - CREDIT = somme des montants restants dus sur les crédits non soldés (créés dans la période)
+     * - ESPECES / WAVE / ORANGE_MONEY = ventes directes dans ce mode
+     * - CREDIT = toutes les ventes à crédit (soldées ou non) — le mode de paiement reste CREDIT
+     *
+     * Les remboursements de crédits ne modifient pas le mode de paiement original de la vente.
      *
      * Retourne une map : mode → {total, nombre}
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> calculerRapportModePaiement(LocalDate debut, LocalDate fin) {
-        String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
+    public Map<String, Object> calculerRapportModePaiement(LocalDate debut, LocalDate fin, String devise) {
+        TenantEntity tenant = tenantService.getCurrentTenant();
 
-        Map<String, java.math.BigDecimal> totaux = new java.util.LinkedHashMap<>();
-        Map<String, Long> nombres = new java.util.LinkedHashMap<>();
+        // Devise de rapport : paramètre explicite ou préférence du tenant
+        String codeDevise = (devise != null && !devise.isBlank())
+                ? devise.toUpperCase().trim()
+                : (tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF");
+        double tauxTenant = 1.0;
+        try {
+            DeviseEntity deviseRapport = deviseService.obtenirDeviseParCode(codeDevise);
+            tauxTenant = (deviseRapport != null && deviseRapport.getTauxChange() != null)
+                    ? deviseRapport.getTauxChange() : 1.0;
+        } catch (RuntimeException e) {
+            tauxTenant = 1.0;
+        }
+        final double tauxFinal = tauxTenant;
+
+        Map<String, BigDecimal> totaux = new LinkedHashMap<>();
+        Map<String, Long> nombres = new LinkedHashMap<>();
         for (String mode : List.of("ESPECES", "WAVE", "ORANGE_MONEY", "VIREMENT", "CREDIT")) {
-            totaux.put(mode, java.math.BigDecimal.ZERO);
+            totaux.put(mode, BigDecimal.ZERO);
             nombres.put(mode, 0L);
         }
 
-        // 1. Ventes directes non-CREDIT groupées par mode
-        List<Object[]> directVentes = venteRepository.sumDirectVentesParModeEtPeriode(
-                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), VenteEntity.ModePaiementVente.CREDIT, tenantUuid);
-        for (Object[] row : directVentes) {
-            String mode = ((VenteEntity.ModePaiementVente) row[0]).name();
-            Long count = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
-            java.math.BigDecimal total = row[2] instanceof java.math.BigDecimal
-                    ? (java.math.BigDecimal) row[2]
-                    : (row[2] instanceof Number ? new java.math.BigDecimal(row[2].toString()) : java.math.BigDecimal.ZERO);
-            totaux.put(mode, total);
-            nombres.put(mode, count);
-        }
+        // Toutes les ventes de la période, regroupées par modePaiement (CREDIT inclus)
+        List<VenteEntity> toutesVentes = obtenirVentesParPeriode(debut, fin);
+        toutesVentes.forEach(v -> {
+            String mode = v.getModePaiement() != null ? v.getModePaiement().name() : "ESPECES";
+            double taux = (v.getTauxChangeApplique() != null) ? v.getTauxChangeApplique() : 1.0;
+            BigDecimal montantConverti = v.getPrixTotal() != null
+                    ? v.getPrixTotal()
+                            .multiply(BigDecimal.valueOf(taux))
+                            .divide(BigDecimal.valueOf(tauxFinal), 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            totaux.merge(mode, montantConverti, BigDecimal::add);
+            nombres.merge(mode, 1L, Long::sum);
+        });
 
-        // 2. Montant restant dû sur les crédits non soldés créés dans la période
-        List<Object[]> creditRows = creditClientRepository.sumCreditsRestantParPeriode(
-                debut.atStartOfDay(), fin.atTime(LocalTime.MAX), StatutCredit.SOLDE, tenantUuid);
-        if (creditRows != null && !creditRows.isEmpty()) {
-            Object[] creditRow = creditRows.get(0);
-            if (creditRow != null && creditRow.length >= 2 && creditRow[1] != null) {
-                java.math.BigDecimal creditTotal = creditRow[1] instanceof java.math.BigDecimal
-                        ? (java.math.BigDecimal) creditRow[1]
-                        : new java.math.BigDecimal(creditRow[1].toString());
-                Long creditCount = creditRow[0] instanceof Number ? ((Number) creditRow[0]).longValue() : 0L;
-                totaux.put("CREDIT", creditTotal);
-                nombres.put("CREDIT", creditCount);
-            }
-        }
-
-        // 3. Remboursements de crédits par mode, additionnés aux totaux correspondants
-        List<Object[]> paiementsCredit = paiementCreditRepository.sumParModeEtPeriode(
-                debut, fin, tenantUuid);
-        for (Object[] row : paiementsCredit) {
-            String mode = ((PaiementCreditEntity.ModePaiement) row[0]).name();
-            Long count = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
-            java.math.BigDecimal total = row[2] instanceof java.math.BigDecimal
-                    ? (java.math.BigDecimal) row[2]
-                    : (row[2] instanceof Number ? new java.math.BigDecimal(row[2].toString()) : null);
-            if (total != null) {
-                totaux.merge(mode, total, java.math.BigDecimal::add);
-            }
-            if (count > 0) {
-                nombres.merge(mode, count, Long::sum);
-            }
-        }
-
-        // Construire la réponse : {ESPECES: {total, nombre}, WAVE: {...}, ...}
-        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        // Construire la réponse avec deviseCode
+        Map<String, Object> result = new LinkedHashMap<>();
         for (String mode : totaux.keySet()) {
-            Map<String, Object> entry = new java.util.LinkedHashMap<>();
+            Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("total", totaux.get(mode));
             entry.put("nombre", nombres.get(mode));
             result.put(mode, entry);
         }
+        result.put("deviseCode", codeDevise);
         return result;
     }
 

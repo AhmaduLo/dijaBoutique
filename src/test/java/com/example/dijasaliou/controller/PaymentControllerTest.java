@@ -188,18 +188,8 @@ class PaymentControllerTest {
     @DisplayName("POST /payment/wave/initiate - Devrait initier un paiement Wave")
     @WithMockUser(username = "admin@boutique.com", authorities = {"ADMIN"})
     void initiateWavePayment_DevraitInitierPaiement() throws Exception {
-        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        WavePaymentResponse waveResponse = WavePaymentResponse.builder()
-                .waveTransactionId("wave_txn_12345")
-                .waveUrl("https://pay.wave.com/wave_txn_12345")
-                .montant(6500.0)
-                .devise("XOF")
-                .plan("STARTER")
-                .statut("PENDING")
-                .build();
-        when(waveService.initiatePayment(any(WavePaymentRequest.class), eq("tenant-uuid-001")))
-                .thenReturn(waveResponse);
-
+        // Le paiement en ligne Wave est désactivé côté serveur : la route répond
+        // toujours 503, sans jamais appeler waveService (redirection vers le support).
         WavePaymentRequest request = WavePaymentRequest.builder()
                 .plan(TenantEntity.Plan.STARTER)
                 .numeroTelephone("+221771234567")
@@ -209,26 +199,24 @@ class PaymentControllerTest {
                         .principal(principalAdmin)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.waveTransactionId", is("wave_txn_12345")))
-                .andExpect(jsonPath("$.statut", is("PENDING")))
-                .andExpect(jsonPath("$.devise", is("XOF")));
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message", containsString("indisponible")));
 
-        verify(waveService, times(1)).initiatePayment(any(), eq("tenant-uuid-001"));
+        verify(waveService, never()).initiatePayment(any(), any());
     }
 
     @Test
-    @DisplayName("POST /payment/wave/initiate - Devrait retourner 500 si champs manquants")
+    @DisplayName("POST /payment/wave/initiate - Devrait retourner 400 si champs manquants")
     @WithMockUser(username = "admin@boutique.com", authorities = {"ADMIN"})
     void initiateWavePayment_DevraitRetourner500SiValidationEchoue() throws Exception {
-        // plan null et numeroTelephone vide → @Valid échoue
+        // plan null et numeroTelephone vide → @Valid échoue avant même d'atteindre le controleur
         WavePaymentRequest requestInvalide = new WavePaymentRequest(null, "");
 
         mockMvc.perform(post("/payment/wave/initiate")
                         .principal(principalAdmin)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestInvalide)))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
 
         verify(waveService, never()).initiatePayment(any(), any());
     }
@@ -236,18 +224,10 @@ class PaymentControllerTest {
     // ==================== POST /payment/wave/confirm ====================
 
     @Test
-    @DisplayName("POST /payment/wave/confirm - Devrait confirmer un paiement valide")
+    @DisplayName("POST /payment/wave/confirm - Le paiement en ligne est desactive (503)")
     @WithMockUser(username = "admin@boutique.com", authorities = {"ADMIN"})
     void confirmWavePayment_DevraitConfirmerPaiement() throws Exception {
-        when(waveService.verifyPayment("wave_txn_12345")).thenReturn(true);
-        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        when(tenantRepository.save(any(TenantEntity.class))).thenReturn(tenantTest);
-        when(userRepository.findByEmailAndDeletedFalse("admin@boutique.com"))
-                .thenReturn(Optional.of(adminTest));
-        doNothing().when(emailService).sendPaymentConfirmationEmail(
-                any(), any(), any(), any(), anyDouble(), any(), any());
-        when(factureService.creerFacture(any(), any(), anyInt(), any(), any())).thenReturn(null);
-
+        // Comme pour l'initiation, la confirmation Wave est désactivée côté serveur.
         WavePaymentConfirmRequest request = WavePaymentConfirmRequest.builder()
                 .waveTransactionId("wave_txn_12345")
                 .plan(TenantEntity.Plan.STARTER)
@@ -257,21 +237,17 @@ class PaymentControllerTest {
                         .principal(principalAdmin)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.plan", is("STARTER")))
-                .andExpect(jsonPath("$.message", containsString("Paiement Wave confirmé")));
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message", containsString("indisponible")));
 
-        verify(waveService, times(1)).verifyPayment("wave_txn_12345");
-        verify(tenantRepository, times(1)).save(any());
+        verify(waveService, never()).verifyPayment(any());
+        verify(tenantRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("POST /payment/wave/confirm - Devrait retourner 400 si paiement non confirmé")
+    @DisplayName("POST /payment/wave/confirm - Le paiement en ligne est desactive (503) meme avec un transactionId invalide")
     @WithMockUser(username = "admin@boutique.com", authorities = {"ADMIN"})
     void confirmWavePayment_DevraitRetourner400SiPaiementInvalide() throws Exception {
-        when(waveService.verifyPayment("wave_txn_INVALID")).thenReturn(false);
-        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-
         WavePaymentConfirmRequest request = WavePaymentConfirmRequest.builder()
                 .waveTransactionId("wave_txn_INVALID")
                 .plan(TenantEntity.Plan.STARTER)
@@ -281,7 +257,7 @@ class PaymentControllerTest {
                         .principal(principalAdmin)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isServiceUnavailable());
 
         verify(tenantRepository, never()).save(any());
     }

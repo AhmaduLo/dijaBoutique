@@ -3,6 +3,7 @@ package com.example.dijasaliou.service;
 import com.example.dijasaliou.dto.DepenseDto;
 import com.example.dijasaliou.dto.PagedResponse;
 import com.example.dijasaliou.entity.DepenseEntity;
+import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.UserNotificationType;
@@ -30,15 +31,18 @@ public class DepenseService {
 
     private final DepenseRepository depenseRepository;
     private final TenantService tenantService;
+    private final DeviseService deviseService;
     private final UserPushNotificationService userPushService;
     private final UserRepository userRepository;
 
     public DepenseService(DepenseRepository depenseRepository,
                           TenantService tenantService,
+                          DeviseService deviseService,
                           UserPushNotificationService userPushService,
                           UserRepository userRepository) {
         this.depenseRepository = depenseRepository;
         this.tenantService = tenantService;
+        this.deviseService = deviseService;
         this.userPushService = userPushService;
         this.userRepository = userRepository;
     }
@@ -93,7 +97,19 @@ public class DepenseService {
         depense.setUtilisateur(utilisateur);
 
         // MULTI-TENANT : Assigner le tenant actuel (CRUCIAL!)
-        depense.setTenant(tenantService.getCurrentTenant());
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        depense.setTenant(tenant);
+
+        // DEVISE : Stocker la devise active du tenant + son taux au moment de la saisie
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            depense.setDeviseCode(devise.getCode());
+            depense.setTauxChangeApplique(devise.getTauxChange());
+        } catch (RuntimeException e) {
+            depense.setDeviseCode("XOF");
+            depense.setTauxChangeApplique(1.0);
+        }
 
         // DATE : Utiliser la date fournie par le frontend ; fallback = maintenant
         if (depense.getDateDepense() == null) {
@@ -131,8 +147,9 @@ public class DepenseService {
                 : "0";
         String title = "Dépense saisie par " + auteur.getPrenom();
         String categorieLabel = depense.getCategorie() != null ? depense.getCategorie().getLibelle() : null;
+        String devise = depense.getDeviseCode() != null ? depense.getDeviseCode() : "XOF";
         String body = auteur.getPrenom() + " " + auteur.getNom() + " vient d'enregistrer une dépense de "
-                + montantFmt + " CFA"
+                + montantFmt + " " + devise
                 + (categorieLabel != null && !categorieLabel.isBlank()
                     ? " (" + categorieLabel + ")." : ".");
         userPushService.notifyUser(admin, UserNotificationType.DEPENSE_EMPLOYE, title, body, "/depenses");
@@ -209,7 +226,8 @@ public class DepenseService {
         List<DepenseEntity> depenses = obtenirDepensesParPeriode(debut, fin);
 
         return depenses.stream()
-                .map(DepenseEntity::getMontant)
+                .filter(d -> d.getMontant() != null && d.getTauxChangeApplique() != null)
+                .map(d -> d.getMontant().multiply(BigDecimal.valueOf(d.getTauxChangeApplique())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

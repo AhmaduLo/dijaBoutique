@@ -63,6 +63,7 @@ public class CaisseService {
     private final UserRepository                      userRepository;
     private final UserPushNotificationService         userPushService;
     private final UserNotificationPreferenceService   prefService;
+    private final DeviseService                       deviseService;
 
     /**
      * Borne supérieure utilisée pour la vue "temps réel" (asOfDate non fourni).
@@ -98,37 +99,91 @@ public class CaisseService {
     // ── ACTIVATION ───────────────────────────────────────────────────────────
 
     /**
-     * Active la caisse pour le tenant courant. Idempotent : si déjà active,
-     * met à jour les soldes initiaux et la date d'activation (réinitialisation).
+     * Active la caisse pour le tenant courant, ou corrige son solde vers une
+     * nouvelle valeur cible (ex: après un comptage physique).
+     *
+     * request.soldeInitial* représente le TOTAL ACTUEL VOULU pour chaque compte,
+     * exprimé dans request.devise (pas un "solde initial" technique en XOF) — c'est
+     * ce que l'utilisateur voit et corrige dans le formulaire "Modifier les soldes",
+     * pré-rempli avec le solde actuel dans la devise d'affichage active.
+     *
+     * IMPORTANT : la date d'activation n'est (ré)initialisée qu'à la toute première
+     * activation (ou si l'appelant la fournit explicitement — vraie réinitialisation
+     * volontaire). Sur une caisse déjà active sans date explicite, la date existante
+     * est conservée : on ne recalcule PAS le solde_initial comme la cible saisie,
+     * mais on le retro-calcule pour que solde_initial + mouvements déjà enregistrés
+     * depuis la date d'activation = cible saisie. Ainsi le total affiché devient
+     * exactement ce que l'utilisateur a validé, sans effacer l'historique ni changer
+     * la fenêtre de suivi — contrairement à l'ancien comportement qui réinitialisait
+     * tout à chaque enregistrement (voir commit précédent).
      */
     @Transactional
     public CaisseSoldeDto activerCaisse(ActiverCaisseRequest request, String userUuid) {
         TenantEntity tenant = tenantService.getCurrentTenant();
 
+        boolean dejaActive = caisseConfigRepository.findByTenant(tenant).isPresent();
         CaisseConfigEntity config = caisseConfigRepository.findByTenant(tenant)
                 .orElseGet(CaisseConfigEntity::new);
-
         config.setTenant(tenant);
-        config.setSoldeInitialEspeces(request.getSoldeInitialEspeces());
-        config.setSoldeInitialWave(request.getSoldeInitialWave());
-        config.setSoldeInitialOm(request.getSoldeInitialOm());
-        config.setSoldeInitialVirement(request.getSoldeInitialVirement());
-        // Date d'activation : heure locale du navigateur si fournie, sinon serveur
-        config.setDateActivation(request.getDateActivation() != null
-                ? request.getDateActivation()
-                : tenantService.nowInTenantTz());
+
+        // Date d'activation : fournie explicitement → respectée (réinitialisation
+        // volontaire). Sinon : now() seulement à la toute première activation, sinon
+        // la date déjà stockée est conservée.
+        LocalDateTime dateActivation;
+        if (request.getDateActivation() != null) {
+            dateActivation = request.getDateActivation();
+        } else if (!dejaActive) {
+            dateActivation = tenantService.nowInTenantTz();
+        } else {
+            dateActivation = config.getDateActivation();
+        }
+        config.setDateActivation(dateActivation);
         config.setActivePar(userUuid);
 
+        // Convertit les totaux cibles saisis (dans la devise du formulaire) vers XOF —
+        // même logique que resoudreTauxTenant/resoudreTauxCible ailleurs dans ce fichier.
+        String codeDevise = (request.getDevise() != null && !request.getDevise().isBlank())
+                ? request.getDevise().toUpperCase().trim() : "XOF";
+        double tauxSaisie = 1.0;
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            if (devise != null && devise.getTauxChange() != null && devise.getTauxChange() > 0) {
+                tauxSaisie = devise.getTauxChange();
+            }
+        } catch (RuntimeException e) {
+            // fallback : traiter comme XOF
+        }
+        BigDecimal tauxSaisieBd = BigDecimal.valueOf(tauxSaisie);
+        BigDecimal cibleEspecesXof  = nz(request.getSoldeInitialEspeces()).multiply(tauxSaisieBd);
+        BigDecimal cibleWaveXof     = nz(request.getSoldeInitialWave()).multiply(tauxSaisieBd);
+        BigDecimal cibleOmXof       = nz(request.getSoldeInitialOm()).multiply(tauxSaisieBd);
+        BigDecimal cibleVirementXof = nz(request.getSoldeInitialVirement()).multiply(tauxSaisieBd);
+
+        // Contribution des mouvements déjà enregistrés depuis dateActivation (hors solde
+        // initial) : solde_initial = cible - cette_contribution, pour que le total tombe
+        // exactement sur la cible saisie sans toucher à l'historique.
+        SoldesAgreges agg = chargerAgregats(tenant, dateActivation, FUTUR_LOINTAIN);
+        BigDecimal contribEspeces  = soldeFromAgg(CompteCaisse.ESPECES,      BigDecimal.ZERO, agg);
+        BigDecimal contribWave     = soldeFromAgg(CompteCaisse.WAVE,         BigDecimal.ZERO, agg);
+        BigDecimal contribOm       = soldeFromAgg(CompteCaisse.ORANGE_MONEY, BigDecimal.ZERO, agg);
+        BigDecimal contribVirement = soldeFromAgg(CompteCaisse.VIREMENT,     BigDecimal.ZERO, agg);
+
+        config.setSoldeInitialEspeces(cibleEspecesXof.subtract(contribEspeces));
+        config.setSoldeInitialWave(cibleWaveXof.subtract(contribWave));
+        config.setSoldeInitialOm(cibleOmXof.subtract(contribOm));
+        config.setSoldeInitialVirement(cibleVirementXof.subtract(contribVirement));
+
         caisseConfigRepository.save(config);
-        log.info("Caisse activée pour tenant={} : Espèces={}, Wave={}, OM={}, Virement={}",
+        log.info("Caisse activée/corrigée pour tenant={} : cible Espèces={}, Wave={}, OM={}, Virement={} ({})",
                 tenant.getTenantUuid(),
                 request.getSoldeInitialEspeces(),
                 request.getSoldeInitialWave(),
                 request.getSoldeInitialOm(),
-                request.getSoldeInitialVirement());
+                request.getSoldeInitialVirement(),
+                codeDevise);
 
         // Futur lointain pour fin : inclut tous les flux (évite tout problème de TZ)
-        return calculerSolde(tenant, config, FUTUR_LOINTAIN);
+        return calculerSolde(tenant, config, FUTUR_LOINTAIN, null);
     }
 
     // ── CALCUL DU SOLDE ──────────────────────────────────────────────────────
@@ -139,7 +194,7 @@ public class CaisseService {
      */
     @Transactional(readOnly = true)
     public CaisseSoldeDto getSoldeActuel() {
-        return getSoldeAt(null);
+        return getSoldeAt(null, null);
     }
 
     /**
@@ -152,17 +207,26 @@ public class CaisseService {
      */
     @Transactional(readOnly = true)
     public CaisseSoldeDto getSoldeAt(LocalDate asOfDate) {
+        return getSoldeAt(asOfDate, null);
+    }
+
+    /**
+     * Variante avec devise cible explicite — utilisée par les rapports, où l'utilisateur
+     * choisit dans quelle devise afficher l'évolution de caisse.
+     */
+    @Transactional(readOnly = true)
+    public CaisseSoldeDto getSoldeAt(LocalDate asOfDate, String devise) {
         TenantEntity tenant = tenantService.getCurrentTenant();
         LocalDateTime fin = toFinJournee(asOfDate);
 
         return caisseConfigRepository.findByTenant(tenant)
-                .map(config -> calculerSolde(tenant, config, fin))
+                .map(config -> calculerSolde(tenant, config, fin, devise))
                 .orElseGet(() -> CaisseSoldeDto.builder()
                         .active(false)
                         .build());
     }
 
-    private CaisseSoldeDto calculerSolde(TenantEntity tenant, CaisseConfigEntity config, LocalDateTime fin) {
+    private CaisseSoldeDto calculerSolde(TenantEntity tenant, CaisseConfigEntity config, LocalDateTime fin, String devise) {
         LocalDateTime debut = config.getDateActivation();
 
         // Si la période se termine avant l'activation, la caisse n'existait pas
@@ -184,30 +248,83 @@ public class CaisseService {
                     .build();
         }
 
+        // Taux de la devise courante du tenant — sert uniquement à convertir le résultat
+        // final vers la devise cible demandée (resoudreTauxCible ci-dessous).
+        double tauxTenant = resoudreTauxTenant(tenant);
+
         // OPTIMISATION : 7 queries groupées au lieu de 28 (7 × 4 comptes avant)
         // Chaque query GROUP BY compte/mode retourne tous les comptes d'un coup.
+        // Ventes/achats/dépenses/paiements crédit sont déjà normalisés en XOF par
+        // la requête SQL (chacune multiplie par le taux propre de sa transaction).
         SoldesAgreges agg = chargerAgregats(tenant, debut, fin);
 
-        BigDecimal soldeEspeces  = soldeFromAgg(CompteCaisse.ESPECES,      config.getSoldeInitialEspeces(),  agg);
-        BigDecimal soldeWave     = soldeFromAgg(CompteCaisse.WAVE,         config.getSoldeInitialWave(),     agg);
-        BigDecimal soldeOm       = soldeFromAgg(CompteCaisse.ORANGE_MONEY, config.getSoldeInitialOm(),       agg);
-        BigDecimal soldeVirement = soldeFromAgg(CompteCaisse.VIREMENT,     nz(config.getSoldeInitialVirement()), agg);
+        // IMPORTANT : soldeInitial* est saisi et stocké directement en XOF (référence fixe),
+        // PAS dans la devise courante du tenant. Le formulaire "Modifier les soldes initiaux"
+        // (frontend) travaille toujours en XOF pour ces mêmes champs, quelle que soit la
+        // devise d'affichage active — sinon rouvrir/ré-enregistrer ce formulaire pendant
+        // qu'une devise ≠ XOF est affichée réécrirait la valeur brute avec un nombre déjà
+        // converti, ce qui gonfle ou réduit le solde initial à chaque aller-retour.
+        BigDecimal soldeInitialEspecesXof  = nz(config.getSoldeInitialEspeces());
+        BigDecimal soldeInitialWaveXof     = nz(config.getSoldeInitialWave());
+        BigDecimal soldeInitialOmXof       = nz(config.getSoldeInitialOm());
+        BigDecimal soldeInitialVirementXof = nz(config.getSoldeInitialVirement());
+
+        BigDecimal soldeEspeces  = soldeFromAgg(CompteCaisse.ESPECES,      soldeInitialEspecesXof,  agg);
+        BigDecimal soldeWave     = soldeFromAgg(CompteCaisse.WAVE,         soldeInitialWaveXof,     agg);
+        BigDecimal soldeOm       = soldeFromAgg(CompteCaisse.ORANGE_MONEY, soldeInitialOmXof,       agg);
+        BigDecimal soldeVirement = soldeFromAgg(CompteCaisse.VIREMENT,     soldeInitialVirementXof, agg);
 
         BigDecimal soldeTotal = soldeEspeces.add(soldeWave).add(soldeOm).add(soldeVirement);
+
+        // Tout ce qui précède est désormais en XOF — il ne reste qu'à diviser par le
+        // taux de la devise cible demandée pour le rapport (ou la devise du tenant si absente).
+        double tauxCible = resoudreTauxCible(devise, tauxTenant);
+        java.util.function.UnaryOperator<BigDecimal> convertirDepuisXof = montant -> (montant != null ? montant : BigDecimal.ZERO)
+                .divide(BigDecimal.valueOf(tauxCible), 2, java.math.RoundingMode.HALF_UP);
 
         return CaisseSoldeDto.builder()
                 .active(true)
                 .dateActivation(debut)
-                .soldeEspeces(soldeEspeces)
-                .soldeWave(soldeWave)
-                .soldeOm(soldeOm)
-                .soldeVirement(soldeVirement)
-                .soldeTotal(soldeTotal)
-                .soldeInitialEspeces(config.getSoldeInitialEspeces())
-                .soldeInitialWave(config.getSoldeInitialWave())
-                .soldeInitialOm(config.getSoldeInitialOm())
-                .soldeInitialVirement(nz(config.getSoldeInitialVirement()))
+                .soldeEspeces(convertirDepuisXof.apply(soldeEspeces))
+                .soldeWave(convertirDepuisXof.apply(soldeWave))
+                .soldeOm(convertirDepuisXof.apply(soldeOm))
+                .soldeVirement(convertirDepuisXof.apply(soldeVirement))
+                .soldeTotal(convertirDepuisXof.apply(soldeTotal))
+                .soldeInitialEspeces(convertirDepuisXof.apply(soldeInitialEspecesXof))
+                .soldeInitialWave(convertirDepuisXof.apply(soldeInitialWaveXof))
+                .soldeInitialOm(convertirDepuisXof.apply(soldeInitialOmXof))
+                .soldeInitialVirement(convertirDepuisXof.apply(soldeInitialVirementXof))
                 .build();
+    }
+
+    /** Taux de change (1 unité devise → XOF) de la devise actuellement utilisée par le tenant. */
+    private double resoudreTauxTenant(TenantEntity tenant) {
+        String codeDeviseTenant = tenant.getDevisePreferee() != null ? tenant.getDevisePreferee() : "XOF";
+        try {
+            DeviseEntity deviseTenant = deviseService.obtenirDeviseParCode(codeDeviseTenant);
+            if (deviseTenant != null && deviseTenant.getTauxChange() != null && deviseTenant.getTauxChange() > 0) {
+                return deviseTenant.getTauxChange();
+            }
+        } catch (RuntimeException e) {
+            // fallback ci-dessous
+        }
+        return 1.0;
+    }
+
+    /** Taux de change de la devise cible demandée (fallback : devise du tenant). */
+    private double resoudreTauxCible(String devise, double tauxTenant) {
+        if (devise == null || devise.isBlank()) {
+            return tauxTenant > 0 ? tauxTenant : 1.0;
+        }
+        try {
+            DeviseEntity deviseCible = deviseService.obtenirDeviseParCode(devise.toUpperCase().trim());
+            if (deviseCible != null && deviseCible.getTauxChange() != null && deviseCible.getTauxChange() > 0) {
+                return deviseCible.getTauxChange();
+            }
+        } catch (RuntimeException e) {
+            // fallback ci-dessous
+        }
+        return tauxTenant > 0 ? tauxTenant : 1.0;
     }
 
     /**
@@ -225,63 +342,85 @@ public class CaisseService {
         final Map<CompteCaisse, BigDecimal> sortiesManuelles   = new EnumMap<>(CompteCaisse.class);
     }
 
-    /** Charge tous les agrégats nécessaires au calcul du solde en 7 queries. */
+    /**
+     * Charge tous les agrégats nécessaires au calcul du solde en 7 queries.
+     *
+     * Transferts et mouvements manuels stockent désormais leur propre devise/taux
+     * (comme ventes/achats/dépenses/paiements crédit) : chaque montant est saisi dans
+     * la devise active du tenant au moment de la création, et déjà normalisé en XOF
+     * au niveau SQL par les repositories (SUM(montant * tauxChangeApplique)). Seul le
+     * solde initial (CaisseConfigEntity) reste une référence fixe en XOF, car il n'a
+     * pas de tauxChangeApplique propre.
+     */
     private SoldesAgreges chargerAgregats(TenantEntity tenant, LocalDateTime debut, LocalDateTime fin) {
         SoldesAgreges agg = new SoldesAgreges();
 
         // 1. Ventes par mode → entrées par compte (CREDIT exclu, n'impacte pas la caisse)
+        // Déjà en XOF : la requête multiplie chaque vente par son propre taux de change.
         for (Object[] row : venteRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             VenteEntity.ModePaiementVente mode = (VenteEntity.ModePaiementVente) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             CompteCaisse compte = modeVenteToCompte(mode);
             if (compte != null) agg.entreesVentes.merge(compte, sum, BigDecimal::add);
         }
 
-        // 2. Achats par mode → sorties par compte
+        // 2. Achats par mode → sorties par compte (déjà en XOF)
         for (Object[] row : achatRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             ModePaiementCaisse mode = (ModePaiementCaisse) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.sortiesAchats.merge(mode.toCompteCaisse(), sum, BigDecimal::add);
         }
 
-        // 3. Dépenses par mode → sorties par compte
+        // 3. Dépenses par mode → sorties par compte (déjà en XOF)
         for (Object[] row : depenseRepository.sumByModePaiementGrouped(tenant, debut, fin)) {
             ModePaiementCaisse mode = (ModePaiementCaisse) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.sortiesDepenses.merge(mode.toCompteCaisse(), sum, BigDecimal::add);
         }
 
-        // 4. Paiements crédit par mode → entrées par compte
+        // 4. Paiements crédit par mode → entrées par compte (déjà en XOF)
         for (Object[] row : paiementCreditRepository.sumByModeGrouped(tenant, debut.toLocalDate(), fin.toLocalDate())) {
             PaiementCreditEntity.ModePaiement mode = (PaiementCreditEntity.ModePaiement) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.entreesCredits.merge(modeCreditToCompte(mode), sum, BigDecimal::add);
         }
 
-        // 5. Transferts sortants (compte_source)
+        // 5. Transferts sortants (compte_source) — référence fixe en XOF, comme le solde initial.
         for (Object[] row : transfertRepository.sumSortiesGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.transfertsSortants.put(compte, sum);
         }
 
-        // 6. Transferts entrants (compte_destination)
+        // 6. Transferts entrants (compte_destination) — idem
         for (Object[] row : transfertRepository.sumEntreesGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
-            BigDecimal sum = (BigDecimal) row[1];
+            BigDecimal sum = toBigDecimal(row[1]);
             agg.transfertsEntrants.put(compte, sum);
         }
 
-        // 7. Mouvements manuels par (compte, type)
+        // 7. Mouvements manuels par (compte, type) — idem
         for (Object[] row : mouvementManuelRepository.sumByCompteAndTypeGrouped(tenant, debut, fin)) {
             CompteCaisse compte = (CompteCaisse) row[0];
             TypeMouvement type  = (TypeMouvement) row[1];
-            BigDecimal sum      = (BigDecimal) row[2];
+            BigDecimal sum      = toBigDecimal(row[2]);
             (type == TypeMouvement.ENTREE ? agg.entreesManuelles : agg.sortiesManuelles)
                     .put(compte, sum);
         }
 
         return agg;
+    }
+
+    /**
+     * Convertit défensivement une valeur de SUM(...) issue d'un Object[] JPQL en BigDecimal.
+     * Nécessaire dès qu'une somme multiplie par un champ Double (ex: tauxChangeApplique) :
+     * Hibernate renvoie alors un Double plutôt qu'un BigDecimal, et un cast direct échoue
+     * avec une ClassCastException.
+     */
+    private static BigDecimal toBigDecimal(Object value) {
+        if (value instanceof BigDecimal bd) return bd;
+        if (value instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        return BigDecimal.ZERO;
     }
 
     /** Assemble le solde d'un compte à partir des agrégats déjà chargés. */
@@ -393,13 +532,27 @@ public class CaisseService {
             throw new IllegalArgumentException("Le compte source et destination doivent être différents");
         }
 
-        verifierSoldeSuffisant(tenant, request.getCompteSource(), request.getMontant());
+        // DEVISE : le montant est saisi dans la devise active du tenant (comme un achat/vente/dépense),
+        // pas forcément en XOF — on stocke la devise + le taux, et on vérifie le solde en XOF.
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        double tauxChange = 1.0;
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            tauxChange = devise.getTauxChange();
+        } catch (RuntimeException e) {
+            codeDevise = "XOF";
+        }
+
+        verifierSoldeSuffisant(tenant, request.getCompteSource(),
+                request.getMontant().multiply(BigDecimal.valueOf(tauxChange)));
 
         TransfertCaisseEntity transfert = TransfertCaisseEntity.builder()
                 .tenant(tenant)
                 .compteSource(request.getCompteSource())
                 .compteDestination(request.getCompteDestination())
                 .montant(request.getMontant())
+                .deviseCode(codeDevise)
+                .tauxChangeApplique(tauxChange)
                 .motif(request.getMotif())
                 .dateTransfert(request.getDateTransfert() != null
                         ? request.getDateTransfert()
@@ -431,12 +584,24 @@ public class CaisseService {
     public CaisseSoldeDto creerMouvementManuel(MouvementCaisseRequest request, String userUuid) {
         TenantEntity tenant = tenantService.getCurrentTenant();
 
+        // DEVISE : le montant est saisi dans la devise active du tenant (comme un achat/vente/dépense),
+        // pas forcément en XOF — on stocke la devise + le taux, et on vérifie le solde en XOF.
+        String codeDevise = (tenant.getDevisePreferee() != null) ? tenant.getDevisePreferee() : "XOF";
+        double tauxChange = 1.0;
+        try {
+            DeviseEntity devise = deviseService.obtenirDeviseParCode(codeDevise);
+            tauxChange = devise.getTauxChange();
+        } catch (RuntimeException e) {
+            codeDevise = "XOF";
+        }
+
         // Verrou pessimiste pour les sorties (même raison que pour les transferts)
         if (request.getTypeMouvement() == TypeMouvement.SORTIE) {
             caisseConfigRepository.findByTenantForUpdate(tenant)
                     .orElseThrow(() -> new IllegalStateException(
                             "La caisse n'est pas activée. Activez-la d'abord."));
-            verifierSoldeSuffisant(tenant, request.getCompte(), request.getMontant());
+            verifierSoldeSuffisant(tenant, request.getCompte(),
+                    request.getMontant().multiply(BigDecimal.valueOf(tauxChange)));
         } else {
             verifierCaisseActive(tenant);
         }
@@ -446,6 +611,8 @@ public class CaisseService {
                 .typeMouvement(request.getTypeMouvement())
                 .compte(request.getCompte())
                 .montant(request.getMontant())
+                .deviseCode(codeDevise)
+                .tauxChangeApplique(tauxChange)
                 .motif(request.getMotif())
                 .dateMouvement(request.getDateMouvement() != null
                         ? request.getDateMouvement()
@@ -527,18 +694,23 @@ public class CaisseService {
      */
     @Transactional(readOnly = true)
     public List<MouvementHistoriqueDto> getHistorique() {
-        return getHistoriqueBetween(null, null);
+        return getHistoriqueBetween(null, null, null);
     }
 
     /**
-     * Historique borné à un intervalle [fromDate, toDate] (inclusif).
+     * Historique borné à un intervalle [fromDate, toDate] (inclusif), avec les montants
+     * convertis dans {@code devise} (référence du tenant par défaut). Chaque mouvement
+     * manuel/transfert garde sa propre devise/taux d'origine (comme une vente ou un
+     * achat) : on pivote donc d'abord vers le XOF via son propre tauxChangeApplique,
+     * avant de convertir vers la devise cible demandée.
+     *
      * {@code fromDate} = null → on part de la date d'activation.
      * {@code toDate}   = null → on va jusqu'à maintenant.
      * Sinon, l'intervalle est restreint à la fenêtre demandée (mais jamais avant
      * l'activation, qui reste la borne inférieure absolue).
      */
     @Transactional(readOnly = true)
-    public List<MouvementHistoriqueDto> getHistoriqueBetween(LocalDate fromDate, LocalDate toDate) {
+    public List<MouvementHistoriqueDto> getHistoriqueBetween(LocalDate fromDate, LocalDate toDate, String devise) {
         TenantEntity tenant = tenantService.getCurrentTenant();
 
         var configOpt = caisseConfigRepository.findByTenant(tenant);
@@ -556,6 +728,10 @@ public class CaisseService {
             return List.of();
         }
 
+        double tauxTenant = resoudreTauxTenant(tenant);
+        double tauxCible = resoudreTauxCible(devise, tauxTenant);
+        BigDecimal tauxCibleBd = BigDecimal.valueOf(tauxCible);
+
         List<MouvementHistoriqueDto> historique = new ArrayList<>();
 
         mouvementManuelRepository.findByTenantBetween(tenant, debut, fin).forEach(m ->
@@ -565,7 +741,7 @@ public class CaisseService {
                             ? TypeHistorique.ENTREE
                             : TypeHistorique.SORTIE)
                     .compte(m.getCompte())
-                    .montant(m.getMontant())
+                    .montant(convertirVersDeviseCible(versXof(m.getMontant(), m.getTauxChangeApplique()), tauxCibleBd))
                     .motif(m.getMotif())
                     .date(m.getDateMouvement())
                     .faitPar(m.getFaitPar())
@@ -578,7 +754,7 @@ public class CaisseService {
                     .type(TypeHistorique.TRANSFERT)
                     .compteSource(t.getCompteSource())
                     .compteDestination(t.getCompteDestination())
-                    .montant(t.getMontant())
+                    .montant(convertirVersDeviseCible(versXof(t.getMontant(), t.getTauxChangeApplique()), tauxCibleBd))
                     .motif(t.getMotif())
                     .date(t.getDateTransfert())
                     .faitPar(t.getFaitPar())
@@ -592,6 +768,17 @@ public class CaisseService {
         historique.forEach(h -> h.setFaitParNom(nomsParId.get(h.getFaitPar())));
 
         return historique;
+    }
+
+    /** Montant XOF (déjà pivoté) → devise cible demandée. */
+    private static BigDecimal convertirVersDeviseCible(BigDecimal montantXof, BigDecimal tauxCible) {
+        return nz(montantXof).divide(tauxCible, 2, java.math.RoundingMode.HALF_UP);
+    }
+
+    /** Montant dans sa devise propre → XOF, via son tauxChangeApplique (1.0 si absent). */
+    private static BigDecimal versXof(BigDecimal montant, Double tauxChangeApplique) {
+        double taux = tauxChangeApplique != null ? tauxChangeApplique : 1.0;
+        return nz(montant).multiply(BigDecimal.valueOf(taux));
     }
 
     /**

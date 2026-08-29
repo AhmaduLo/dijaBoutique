@@ -85,7 +85,7 @@ public class AuthController {
         String ipAddress = getClientIpAddress(httpRequest);
         if (!rateLimitService.allowRegister(ipAddress)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(java.util.Map.of("error", "Trop de tentatives de création de compte. Veuillez réessayer dans 1 heure."));
+                    .body(java.util.Map.of("message", "Trop de tentatives de création de compte. Veuillez réessayer dans 1 heure."));
         }
 
         AuthResponse authResponse = authService.register(request);
@@ -125,7 +125,7 @@ public class AuthController {
         String ipAddress = getClientIpAddress(httpRequest);
         if (!rateLimitService.allowLogin(ipAddress)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(java.util.Map.of("error", "Trop de tentatives de connexion. Veuillez réessayer dans 1 minute."));
+                    .body(java.util.Map.of("message", "Trop de tentatives de connexion. Veuillez réessayer dans 1 minute."));
         }
 
         AuthResponse authResponse = authService.login(request);

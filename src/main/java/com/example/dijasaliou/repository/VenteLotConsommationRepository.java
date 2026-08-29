@@ -63,14 +63,16 @@ public interface VenteLotConsommationRepository
                                    @Param("fin")   LocalDateTime fin);
 
     /**
-     * Somme des coûts FIFO des sorties hors vente sur une période, groupée par type.
-     * Retourne List<Object[]> : [typeSortie, sum(coût FIFO)].
+     * Somme des coûts FIFO des sorties hors vente sur une période, groupée par type,
+     * convertie en XOF via le taux de l'achat consommé par chaque ligne (chaque lot
+     * peut avoir été acheté dans une devise différente de la devise courante du tenant).
+     * Retourne List<Object[]> : [typeSortie, sum(coût FIFO en XOF)].
      * C'est la "vraie perte économique" : ce que tu as payé pour des marchandises
      * qui sont parties sans contrepartie financière (vol, casse, don…).
      */
     @Query("""
             SELECT v.vente.typeSortie,
-                   COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee), 0)
+                   COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee * v.achat.tauxChangeApplique), 0)
             FROM VenteLotConsommationEntity v
             WHERE v.tenant = :tenant
               AND v.dateVenteSnapshot BETWEEN :debut AND :fin
@@ -120,7 +122,7 @@ public interface VenteLotConsommationRepository
      * en compte au prorata via PaiementCreditEntity.
      */
     @Query("""
-            SELECT COALESCE(SUM(v.beneficeTotalLigne), 0)
+            SELECT COALESCE(SUM(v.beneficeTotalLigne * v.vente.tauxChangeApplique), 0)
             FROM VenteLotConsommationEntity v
             WHERE v.tenant = :tenant
               AND v.dateVenteSnapshot BETWEEN :debut AND :fin
@@ -132,12 +134,13 @@ public interface VenteLotConsommationRepository
                                            @Param("fin")   LocalDateTime fin);
 
     /**
-     * Coût FIFO sur les ventes NON-CRÉDIT d'une période.
+     * Coût FIFO sur les ventes NON-CRÉDIT d'une période, converti en XOF via le taux
+     * de l'achat consommé (chaque lot peut avoir été acheté dans une devise différente).
      * Pendant comptabilité de caisse de sumCoutAchatBetween.
      * Exclut aussi les sorties hors vente.
      */
     @Query("""
-            SELECT COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee), 0)
+            SELECT COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee * v.achat.tauxChangeApplique), 0)
             FROM VenteLotConsommationEntity v
             WHERE v.tenant = :tenant
               AND v.dateVenteSnapshot BETWEEN :debut AND :fin
@@ -149,11 +152,11 @@ public interface VenteLotConsommationRepository
                                             @Param("fin")   LocalDateTime fin);
 
     /**
-     * Coût FIFO total d'une vente précise (= somme des prix_achat × quantité de toutes ses lignes).
-     * Sert au calcul prorata du coût pour un paiement crédit partiel.
+     * Coût FIFO total d'une vente précise (= somme des prix_achat × quantité × taux de l'achat,
+     * donc déjà exprimé en XOF). Sert au calcul prorata du coût pour un paiement crédit partiel.
      */
     @Query("""
-            SELECT COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee), 0)
+            SELECT COALESCE(SUM(v.prixAchatUnitaireSnapshot * v.quantiteConsommee * v.achat.tauxChangeApplique), 0)
             FROM VenteLotConsommationEntity v
             WHERE v.vente.id = :venteId
               AND v.tenant = :tenant
@@ -162,11 +165,12 @@ public interface VenteLotConsommationRepository
                                      @Param("tenant") TenantEntity tenant);
 
     /**
-     * Bénéfice FIFO total d'une vente précise (= somme des benefice_total_ligne de toutes ses lignes).
+     * Bénéfice FIFO total d'une vente précise (= somme des benefice_total_ligne × taux de la
+     * vente de toutes ses lignes, donc déjà exprimé en XOF).
      * Permet de retrouver le bénéfice attendu d'une vente pour calcul prorata.
      */
     @Query("""
-            SELECT COALESCE(SUM(v.beneficeTotalLigne), 0)
+            SELECT COALESCE(SUM(v.beneficeTotalLigne * v.vente.tauxChangeApplique), 0)
             FROM VenteLotConsommationEntity v
             WHERE v.vente.id = :venteId
               AND v.tenant = :tenant
@@ -189,7 +193,7 @@ public interface VenteLotConsommationRepository
      */
     @Query("""
             SELECT v.vente.nomProduit,
-                   SUM(v.beneficeTotalLigne),
+                   SUM(v.beneficeTotalLigne * v.vente.tauxChangeApplique),
                    SUM(v.quantiteConsommee)
             FROM VenteLotConsommationEntity v
             WHERE v.tenant = :tenant

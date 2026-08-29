@@ -32,6 +32,7 @@ class StockAlertServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private EmailService emailService;
     @Mock private TenantService tenantService;
+    @Mock private com.example.dijasaliou.service.UserPushNotificationService userPushService;
 
     @InjectMocks
     private StockAlertService stockAlertService;

@@ -7,6 +7,7 @@ import com.example.dijasaliou.entity.DeviseEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.repository.TenantRepository;
 import com.example.dijasaliou.service.DeviseService;
+import com.example.dijasaliou.service.StockService;
 import com.example.dijasaliou.service.TenantService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -36,11 +37,14 @@ public class DeviseController {
     private final DeviseService deviseService;
     private final TenantService tenantService;
     private final TenantRepository tenantRepository;
+    private final StockService stockService;
 
-    public DeviseController(DeviseService deviseService, TenantService tenantService, TenantRepository tenantRepository) {
+    public DeviseController(DeviseService deviseService, TenantService tenantService,
+                             TenantRepository tenantRepository, StockService stockService) {
         this.deviseService = deviseService;
         this.tenantService = tenantService;
         this.tenantRepository = tenantRepository;
+        this.stockService = stockService;
     }
 
     /**
@@ -134,6 +138,12 @@ public class DeviseController {
                 .orElseThrow(() -> new RuntimeException("Tenant introuvable"));
         tenant.setDevisePreferee(devise.getCode());
         tenantRepository.save(tenant);
+        // Le cache "stocks" (obtenirTousLesStocks) est mis en clé "tenant:default" quand aucune
+        // devise explicite n'est demandée — il faut le vider ici, sinon les pages qui n'envoient
+        // pas de paramètre devise (ex. autocomplete achats/ventes, page Stock) continuent de
+        // servir les montants calculés avec l'ancienne devise préférée jusqu'à la prochaine
+        // vente/achat (seul autre déclencheur d'invalidation).
+        stockService.invalidateStockCache(tenant.getTenantUuid());
         return ResponseEntity.ok(DeviseDto.fromEntity(devise));
     }
 

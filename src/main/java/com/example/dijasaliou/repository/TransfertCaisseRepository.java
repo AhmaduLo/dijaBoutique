@@ -27,9 +27,9 @@ public interface TransfertCaisseRepository extends JpaRepository<TransfertCaisse
                                                     @Param("debut") LocalDateTime debut,
                                                     @Param("fin") LocalDateTime fin);
 
-    /** Somme des transferts SORTANT d'un compte entre deux dates. */
+    /** Somme des transferts SORTANT d'un compte entre deux dates, normalisée en XOF. */
     @Query("""
-            SELECT COALESCE(SUM(t.montant), 0) FROM TransfertCaisseEntity t
+            SELECT COALESCE(SUM(t.montant * t.tauxChangeApplique), 0) FROM TransfertCaisseEntity t
             WHERE t.tenant = :tenant
               AND t.compteSource = :compte
               AND t.dateTransfert >= :debut
@@ -40,9 +40,9 @@ public interface TransfertCaisseRepository extends JpaRepository<TransfertCaisse
                                          @Param("debut") LocalDateTime debut,
                                          @Param("fin") LocalDateTime fin);
 
-    /** Somme des transferts ARRIVANT sur un compte entre deux dates. */
+    /** Somme des transferts ARRIVANT sur un compte entre deux dates, normalisée en XOF. */
     @Query("""
-            SELECT COALESCE(SUM(t.montant), 0) FROM TransfertCaisseEntity t
+            SELECT COALESCE(SUM(t.montant * t.tauxChangeApplique), 0) FROM TransfertCaisseEntity t
             WHERE t.tenant = :tenant
               AND t.compteDestination = :compte
               AND t.dateTransfert >= :debut
@@ -53,9 +53,9 @@ public interface TransfertCaisseRepository extends JpaRepository<TransfertCaisse
                                          @Param("debut") LocalDateTime debut,
                                          @Param("fin") LocalDateTime fin);
 
-    /** Optimisation caisse : transferts SORTANTS GROUPÉS par compte source. */
+    /** Optimisation caisse : transferts SORTANTS GROUPÉS par compte source, normalisés en XOF. */
     @Query("""
-            SELECT t.compteSource, COALESCE(SUM(t.montant), 0)
+            SELECT t.compteSource, COALESCE(SUM(t.montant * t.tauxChangeApplique), 0)
             FROM TransfertCaisseEntity t
             WHERE t.tenant = :tenant
               AND t.dateTransfert >= :debut
@@ -66,9 +66,9 @@ public interface TransfertCaisseRepository extends JpaRepository<TransfertCaisse
                                                 @Param("debut") LocalDateTime debut,
                                                 @Param("fin") LocalDateTime fin);
 
-    /** Optimisation caisse : transferts ENTRANTS GROUPÉS par compte destination. */
+    /** Optimisation caisse : transferts ENTRANTS GROUPÉS par compte destination, normalisés en XOF. */
     @Query("""
-            SELECT t.compteDestination, COALESCE(SUM(t.montant), 0)
+            SELECT t.compteDestination, COALESCE(SUM(t.montant * t.tauxChangeApplique), 0)
             FROM TransfertCaisseEntity t
             WHERE t.tenant = :tenant
               AND t.dateTransfert >= :debut
