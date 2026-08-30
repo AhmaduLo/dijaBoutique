@@ -27,6 +27,13 @@ public class DeviseDto {
     private LocalDateTime dateCreation;
 
     /**
+     * true = devise personnalisée créée par la boutique connectée (modifiable/
+     * supprimable par elle). false = devise système partagée (XOF/EUR/USD…),
+     * en lecture seule pour tout le monde.
+     */
+    private Boolean personnalisee;
+
+    /**
      * Convertit une entité Devise en DTO
      */
     public static DeviseDto fromEntity(DeviseEntity entity) {
@@ -43,6 +50,7 @@ public class DeviseDto {
                 .tauxChange(entity.getTauxChange())
                 .isDefault(entity.getIsDefault())
                 .dateCreation(entity.getDateCreation())
+                .personnalisee(entity.getTenant() != null)
                 .build();
     }
 }

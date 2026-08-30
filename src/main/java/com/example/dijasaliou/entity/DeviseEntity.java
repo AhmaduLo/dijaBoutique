@@ -1,5 +1,6 @@
 package com.example.dijasaliou.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -37,10 +38,25 @@ public class DeviseEntity extends BaseEntity {
 
     /**
      * Code ISO de la devise (ex: USD, EUR, XOF)
-     * Doit être unique
+     * Unique par boutique (voir tenant) — pas unique globalement : deux boutiques
+     * différentes peuvent chacune avoir leur propre devise personnalisée "CAD".
      */
-    @Column(name = "code", unique = true, nullable = false, length = 10)
+    @Column(name = "code", nullable = false, length = 10)
     private String code;
+
+    /**
+     * Boutique propriétaire de cette devise personnalisée.
+     *
+     * NULL = devise "système" (XOF, EUR, USD…), partagée en lecture par toutes
+     * les boutiques, non modifiable via l'API tenant.
+     * Non-NULL = devise créée par cette boutique, visible et modifiable
+     * uniquement par elle.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "tenant_id", nullable = true, foreignKey = @ForeignKey(name = "fk_devise_tenant"))
+    @JsonIgnore
+    @ToString.Exclude
+    private TenantEntity tenant;
 
     /**
      * Nom complet de la devise (ex: "Dollar américain")
