@@ -113,7 +113,7 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
      * antérieure au seuil d'inactivité passé en paramètre — sinon la session en
      * cours continue, on ne touche pas à son point de départ.
      */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query("""
             UPDATE UserEntity u SET
