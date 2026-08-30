@@ -151,7 +151,6 @@ class DeviseServiceTest {
     @DisplayName("creerDevise() - Devrait créer une devise personnalisée pour le tenant courant")
     void creerDevise_DevraitCreer() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantA);
-        when(deviseRepository.existsByCodeAndTenantIsNull("USD")).thenReturn(false);
         when(deviseRepository.existsByCodeAndTenant("USD", tenantA)).thenReturn(false);
         when(deviseRepository.save(any(DeviseEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -166,21 +165,24 @@ class DeviseServiceTest {
     }
 
     @Test
-    @DisplayName("creerDevise() - Devrait refuser un code déjà pris par une devise système")
-    void creerDevise_DevraitRefuserCodeSysteme() {
+    @DisplayName("creerDevise() - Devrait autoriser un code déjà pris par une devise système (fork)")
+    void creerDevise_DevraitAutoriserCodeSysteme() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantA);
-        when(deviseRepository.existsByCodeAndTenantIsNull("USD")).thenReturn(true);
+        when(deviseRepository.existsByCodeAndTenant("USD", tenantA)).thenReturn(false);
+        when(deviseRepository.save(any(DeviseEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> deviseService.creerDevise(createDeviseDto))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("devise système");
+        DeviseEntity resultat = deviseService.creerDevise(createDeviseDto);
+
+        assertThat(resultat).isNotNull();
+        assertThat(resultat.getCode()).isEqualTo("USD");
+        assertThat(resultat.getTenant()).isEqualTo(tenantA);
+        verify(deviseRepository, never()).existsByCodeAndTenantIsNull(any());
     }
 
     @Test
     @DisplayName("creerDevise() - Devrait refuser un code déjà pris par ce même tenant")
     void creerDevise_DevraitRefuserCodeDejaPourCeTenant() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantA);
-        when(deviseRepository.existsByCodeAndTenantIsNull("USD")).thenReturn(false);
         when(deviseRepository.existsByCodeAndTenant("USD", tenantA)).thenReturn(true);
 
         assertThatThrownBy(() -> deviseService.creerDevise(createDeviseDto))
@@ -207,14 +209,47 @@ class DeviseServiceTest {
     }
 
     @Test
-    @DisplayName("modifierDevise() - Devrait refuser de modifier une devise système")
-    void modifierDevise_DevraitRefuserDeviseSysteme() {
-        when(deviseRepository.findById(1L)).thenReturn(Optional.of(deviseXOF));
-        when(tenantService.getCurrentTenant()).thenReturn(tenantA);
+    @DisplayName("modifierDevise() - Modifier une devise système crée une copie personnalisée pour ce tenant")
+    void modifierDevise_DevraitForkerDeviseSysteme() {
+        UpdateDeviseDto updateDto = UpdateDeviseDto.builder().tauxChange(700.0).build();
 
-        assertThatThrownBy(() -> deviseService.modifierDevise(1L, UpdateDeviseDto.builder().build()))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("système");
+        when(deviseRepository.findById(2L)).thenReturn(Optional.of(deviseEUR));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantA);
+        when(deviseRepository.findByCodeAndTenant("EUR", tenantA)).thenReturn(Optional.empty());
+        when(deviseRepository.save(any(DeviseEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        DeviseEntity resultat = deviseService.modifierDevise(2L, updateDto);
+
+        assertThat(resultat.getCode()).isEqualTo("EUR");
+        assertThat(resultat.getTauxChange()).isEqualTo(700.0);
+        assertThat(resultat.getTenant()).isEqualTo(tenantA);
+        // La ligne système EUR (id=2) n'est jamais sauvegardée elle-même :
+        // seule la copie forkée (nouvelle entité, sans id) est persistée.
+        ArgumentCaptor<DeviseEntity> captor = ArgumentCaptor.forClass(DeviseEntity.class);
+        verify(deviseRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).noneMatch(d -> d.getId() != null && d.getId().equals(2L));
+    }
+
+    @Test
+    @DisplayName("modifierDevise() - Modifier une devise système déjà forkée met à jour la copie existante")
+    void modifierDevise_DevraitReutiliserForkExistant() {
+        DeviseEntity forkExistant = DeviseEntity.builder()
+                .id(5L).code("EUR").nom("Euro").symbole("€").pays("Zone Euro")
+                .tauxChange(660.0).isDefault(false).tenant(tenantA)
+                .build();
+        UpdateDeviseDto updateDto = UpdateDeviseDto.builder().tauxChange(700.0).build();
+
+        when(deviseRepository.findById(2L)).thenReturn(Optional.of(deviseEUR));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantA);
+        when(deviseRepository.findByCodeAndTenant("EUR", tenantA)).thenReturn(Optional.of(forkExistant));
+        when(deviseRepository.save(any(DeviseEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        DeviseEntity resultat = deviseService.modifierDevise(2L, updateDto);
+
+        assertThat(resultat.getId()).isEqualTo(5L);
+        assertThat(resultat.getTauxChange()).isEqualTo(700.0);
+        // Une seule sauvegarde : la copie existante mise à jour, pas une nouvelle créée.
+        verify(deviseRepository, times(1)).save(any(DeviseEntity.class));
     }
 
     @Test

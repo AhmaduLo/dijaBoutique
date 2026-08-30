@@ -77,18 +77,18 @@ public class DeviseService {
 
     /**
      * Crée une nouvelle devise, personnalisée pour la boutique courante.
+     *
+     * Un code déjà utilisé par une devise système (EUR, USD...) est autorisé :
+     * cela crée une copie personnalisée qui prend le dessus pour cette
+     * boutique uniquement (voir {@link DeviseRepository#findVisiblesPourTenant}),
+     * sans toucher à la devise système partagée par les autres. Seul un doublon
+     * avec sa PROPRE devise du même code est refusé.
      */
     @Transactional
     public DeviseEntity creerDevise(CreateDeviseDto dto) {
         TenantEntity tenant = tenantService.getCurrentTenant();
         String codeNormalise = dto.getCode().toUpperCase();
 
-        // Le code ne doit collisionner ni avec une devise système, ni avec une
-        // devise déjà créée par cette même boutique (deux boutiques différentes
-        // peuvent en revanche avoir chacune leur propre devise du même code).
-        if (deviseRepository.existsByCodeAndTenantIsNull(codeNormalise)) {
-            throw new RuntimeException("Le code " + codeNormalise + " est déjà utilisé par une devise système");
-        }
         if (deviseRepository.existsByCodeAndTenant(codeNormalise, tenant)) {
             throw new RuntimeException("Vous avez déjà une devise avec le code " + codeNormalise);
         }
@@ -107,45 +107,76 @@ public class DeviseService {
     }
 
     /**
-     * Met à jour une devise — réservé aux devises personnalisées de la
-     * boutique courante. Les devises système (XOF/EUR/USD…) ne sont pas
-     * modifiables via cette méthode.
+     * Met à jour une devise.
+     *
+     * Modifier sa propre devise personnalisée l'édite directement. Modifier
+     * une devise système (EUR/USD...) ne touche JAMAIS la ligne partagée :
+     * ça crée (ou réutilise si elle existe déjà) une copie personnalisée pour
+     * la boutique courante, qui prend le dessus uniquement pour elle — les
+     * autres boutiques continuent de voir la valeur système inchangée.
      */
     @Transactional
     public DeviseEntity modifierDevise(Long id, UpdateDeviseDto dto) {
         DeviseEntity devise = deviseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Devise non trouvée avec l'ID : " + id));
-        verifierAppartientAuTenantCourant(devise);
+        verifierVisiblePourTenantCourant(devise);
+        DeviseEntity cible = resoudreCiblePourModification(devise);
 
         if (dto.getCode() != null) {
             String nouveauCode = dto.getCode().toUpperCase();
-            if (!devise.getCode().equals(nouveauCode)) {
+            if (!cible.getCode().equals(nouveauCode)) {
                 TenantEntity tenant = tenantService.getCurrentTenant();
                 if (deviseRepository.existsByCodeAndTenantIsNull(nouveauCode)
                         || deviseRepository.existsByCodeAndTenant(nouveauCode, tenant)) {
                     throw new RuntimeException("Une devise avec le code " + nouveauCode + " existe déjà");
                 }
             }
-            devise.setCode(nouveauCode);
+            cible.setCode(nouveauCode);
         }
 
         if (dto.getNom() != null) {
-            devise.setNom(dto.getNom());
+            cible.setNom(dto.getNom());
         }
 
         if (dto.getSymbole() != null) {
-            devise.setSymbole(dto.getSymbole());
+            cible.setSymbole(dto.getSymbole());
         }
 
         if (dto.getPays() != null) {
-            devise.setPays(dto.getPays());
+            cible.setPays(dto.getPays());
         }
 
         if (dto.getTauxChange() != null) {
-            devise.setTauxChange(dto.getTauxChange());
+            cible.setTauxChange(dto.getTauxChange());
         }
 
-        return deviseRepository.save(devise);
+        return deviseRepository.save(cible);
+    }
+
+    /**
+     * Détermine l'entité à réellement modifier : la devise elle-même si elle
+     * appartient déjà à la boutique courante, sinon (devise système) sa copie
+     * personnalisée — créée à la volée au premier "Modifier", réutilisée
+     * ensuite.
+     */
+    private DeviseEntity resoudreCiblePourModification(DeviseEntity devise) {
+        if (devise.getTenant() != null) {
+            return devise;
+        }
+        TenantEntity tenant = tenantService.getCurrentTenant();
+        return deviseRepository.findByCodeAndTenant(devise.getCode(), tenant)
+                .orElseGet(() -> {
+                    DeviseEntity copie = DeviseEntity.builder()
+                            .code(devise.getCode())
+                            .nom(devise.getNom())
+                            .symbole(devise.getSymbole())
+                            .pays(devise.getPays())
+                            .tauxChange(devise.getTauxChange())
+                            .isDefault(false)
+                            .tenant(tenant)
+                            .build();
+                    return deviseRepository.save(copie);
+                });
     }
 
     /**
@@ -223,8 +254,10 @@ public class DeviseService {
     }
 
     /**
-     * Bloque toute modification/suppression d'une devise système, ou d'une
-     * devise personnalisée appartenant à une AUTRE boutique.
+     * Bloque la suppression d'une devise système (la ligne partagée ne
+     * disparaît jamais — un tenant qui veut "revenir" à la valeur système
+     * supprime sa propre copie personnalisée, pas la ligne système elle-même),
+     * ou d'une devise personnalisée appartenant à une AUTRE boutique.
      */
     private void verifierAppartientAuTenantCourant(DeviseEntity devise) {
         TenantEntity tenant = tenantService.getCurrentTenant();

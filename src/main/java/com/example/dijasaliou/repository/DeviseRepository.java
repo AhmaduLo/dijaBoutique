@@ -40,6 +40,13 @@ public interface DeviseRepository extends JpaRepository<DeviseEntity, Long> {
     boolean existsByCodeAndTenant(String code, TenantEntity tenant);
 
     /**
+     * Trouve la copie personnalisée de cette boutique pour ce code, si elle
+     * existe (utilisé pour rediriger "Modifier une devise système" vers la
+     * copie déjà forkée au lieu d'en recréer une seconde).
+     */
+    Optional<DeviseEntity> findByCodeAndTenant(String code, TenantEntity tenant);
+
+    /**
      * Trouve une devise par son code, uniquement parmi les devises système
      * (tenant = null). Utilisé par le seed initial.
      */
@@ -58,10 +65,18 @@ public interface DeviseRepository extends JpaRepository<DeviseEntity, Long> {
     List<DeviseEntity> findByCodeVisiblePourTenant(@Param("code") String code, @Param("tenant") TenantEntity tenant);
 
     /**
-     * Liste toutes les devises visibles par ce tenant : les devises système
-     * (tenant = null) + les devises personnalisées de ce tenant uniquement.
+     * Liste toutes les devises visibles par ce tenant : ses propres devises
+     * personnalisées + les devises système dont il n'a PAS de copie perso
+     * (une boutique ayant forké "EUR" ne doit voir que SA version — jamais
+     * les deux lignes "EUR" en double).
      */
-    @Query("SELECT d FROM DeviseEntity d WHERE d.tenant = :tenant OR d.tenant IS NULL")
+    @Query("""
+            SELECT d FROM DeviseEntity d
+            WHERE d.tenant = :tenant
+               OR (d.tenant IS NULL AND d.code NOT IN (
+                     SELECT d2.code FROM DeviseEntity d2 WHERE d2.tenant = :tenant
+                   ))
+            """)
     List<DeviseEntity> findVisiblesPourTenant(@Param("tenant") TenantEntity tenant);
 
     /**
