@@ -95,6 +95,16 @@ public class UserEntity {
     @Column(name = "derniere_connexion")
     private LocalDateTime derniereConnexion;
 
+    /**
+     * Début de la session en cours — remis à zéro par {@code ActivityTrackingFilter}
+     * uniquement quand l'écart depuis derniereConnexion dépasse le seuil d'inactivité
+     * (30 min), pas à chaque requête. Permet de calculer une durée de session
+     * ("connecté depuis X min") sans confondre "vu pour la dernière fois" et
+     * "connecté depuis".
+     */
+    @Column(name = "date_debut_session")
+    private LocalDateTime dateDebutSession;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "deleted_by_user_id")
     @JsonIgnore

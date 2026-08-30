@@ -105,13 +105,27 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     boolean existsByEmailGlobal(@Param("email") String email);
 
     /**
-     * Met à jour derniereConnexion sans charger l'entité complète.
+     * Met à jour derniereConnexion (et dateDebutSession si la session précédente
+     * est expirée) sans charger l'entité complète.
      * Appelé par ActivityTrackingFilter à chaque requête authentifiée (throttlé à 5 min).
+     *
+     * dateDebutSession n'est remis à `now` que si derniereConnexion était NULL ou
+     * antérieure au seuil d'inactivité passé en paramètre — sinon la session en
+     * cours continue, on ne touche pas à son point de départ.
      */
     @Modifying
     @Transactional
-    @Query("UPDATE UserEntity u SET u.derniereConnexion = :now WHERE u.email = :email")
-    void updateDerniereConnexion(@Param("email") String email, @Param("now") LocalDateTime now);
+    @Query("""
+            UPDATE UserEntity u SET
+                u.dateDebutSession = CASE
+                    WHEN u.derniereConnexion IS NULL OR u.derniereConnexion < :seuilInactivite OR u.dateDebutSession IS NULL THEN :now
+                    ELSE u.dateDebutSession
+                END,
+                u.derniereConnexion = :now
+            WHERE u.email = :email
+            """)
+    void updateDerniereConnexion(@Param("email") String email, @Param("now") LocalDateTime now,
+                                  @Param("seuilInactivite") LocalDateTime seuilInactivite);
 
     /**
      * Utilisateurs non vérifiés inscrits depuis `since`, en excluant un rôle (ex. SUPER_ADMIN).
