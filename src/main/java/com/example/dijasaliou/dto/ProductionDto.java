@@ -30,6 +30,8 @@ public class ProductionDto {
     private String photoUrl;
     private BigDecimal prixVenteSuggere;
     private ModePaiementCaisse modePaiement;
+    /** Devise dans laquelle les montants de CETTE production ont été enregistrés (celle du lot d'achat lié, figée à la création) — pas la devise courante de la boutique. */
+    private String deviseCode;
     private List<IngredientLigneDto> ingredients;
 
     @Data
@@ -65,6 +67,7 @@ public class ProductionDto {
                 .photoUrl(production.getAchat() != null ? production.getAchat().getPhotoUrl() : null)
                 .prixVenteSuggere(production.getAchat() != null ? production.getAchat().getPrixVenteSuggere() : null)
                 .modePaiement(production.getAchat() != null ? production.getAchat().getModePaiement() : null)
+                .deviseCode(production.getAchat() != null ? production.getAchat().getDeviseCode() : null)
                 .ingredients(lignes)
                 .build();
     }
