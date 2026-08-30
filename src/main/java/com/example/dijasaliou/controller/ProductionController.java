@@ -1,10 +1,8 @@
 package com.example.dijasaliou.controller;
 
-import com.example.dijasaliou.annotation.RequiresPlan;
 import com.example.dijasaliou.dto.CreerProductionRequest;
 import com.example.dijasaliou.dto.ProductionDto;
 import com.example.dijasaliou.entity.ProductionEntity;
-import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.service.ProductionService;
 import com.example.dijasaliou.service.UserService;
@@ -79,10 +77,6 @@ public class ProductionController {
      * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PostMapping
-    @RequiresPlan(
-            plans = {TenantEntity.Plan.STARTER},
-            message = "La gestion de production est en test — pour l'instant réservée au plan Starter"
-    )
     public ResponseEntity<ProductionDto> creer(
             @Valid @RequestBody CreerProductionRequest request,
             Authentication authentication) {
@@ -99,10 +93,6 @@ public class ProductionController {
      * pas d'un paramètre fourni par le client (protection IDOR).
      */
     @PutMapping("/{id}")
-    @RequiresPlan(
-            plans = {TenantEntity.Plan.STARTER},
-            message = "La gestion de production est en test — pour l'instant réservée au plan Starter"
-    )
     public ResponseEntity<ProductionDto> modifier(
             @PathVariable String id,
             @Valid @RequestBody CreerProductionRequest request,
