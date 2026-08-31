@@ -34,6 +34,9 @@ public class ActivityTrackingFilter extends OncePerRequestFilter {
 
     private static final long THROTTLE_MINUTES = 5;
 
+    /** Écart d'inactivité au-delà duquel on considère qu'une nouvelle session commence. */
+    private static final long SEUIL_INACTIVITE_MINUTES = 30;
+
     private final UserRepository userRepository;
 
     /** Cache in-process : email → dernière écriture en BDD */
@@ -59,7 +62,7 @@ public class ActivityTrackingFilter extends OncePerRequestFilter {
 
             if (lastUpdate == null || lastUpdate.plusMinutes(THROTTLE_MINUTES).isBefore(now)) {
                 try {
-                    userRepository.updateDerniereConnexion(email, now);
+                    userRepository.updateDerniereConnexion(email, now, now.minusMinutes(SEUIL_INACTIVITE_MINUTES));
                     lastWritten.put(email, now);
                 } catch (Exception e) {
                     // Ne pas bloquer la requête si la mise à jour échoue
