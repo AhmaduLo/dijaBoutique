@@ -123,11 +123,21 @@ public class UserPushNotificationService {
 
     /**
      * Envoi INCONDITIONNEL à toutes les subscriptions d'un utilisateur,
-     * sans passer par le filtre des préférences.
+     * sans passer par le filtre des préférences ni par un {@link UserNotificationType}.
      *
-     * Réservé au diagnostic (bouton "Envoyer un test") — permet de vérifier
-     * l'infra Web Push même si l'utilisateur a désactivé tous les types dans
-     * ses préférences. Ne PAS utiliser pour les notifs métier réelles.
+     * Deux usages légitimes :
+     *  - Diagnostic (bouton "Envoyer un test") : vérifier l'infra Web Push même si
+     *    l'utilisateur a désactivé tous les types dans ses préférences.
+     *  - Notifications de compte obligatoires (ex. changement de plan / prolongation
+     *    d'abonnement par le super admin, cf. SuperAdminService.notifierChangementPlan) :
+     *    n'ayant pas de UserNotificationType associé, elles n'apparaissent jamais dans
+     *    la liste des préférences du commerçant et ne peuvent pas être désactivées
+     *    individuellement — seule l'activation générale des notifications push
+     *    (existence d'une subscription) les conditionne.
+     *
+     * Ne PAS l'utiliser pour une notification métier que l'utilisateur doit pouvoir
+     * désactiver — dans ce cas, ajouter un {@link UserNotificationType} et passer par
+     * {@link #notifyUser}.
      */
     @Async
     public void notifyUserRaw(UserEntity user, String title, String body, String url) {

@@ -68,6 +68,7 @@ public class SuperAdminService {
     private final PaiementSuperAdminRepository paiementSuperAdminRepository;
     private final AuthService authService;
     private final PushNotificationService pushService;
+    private final UserPushNotificationService userPushService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -82,7 +83,8 @@ public class SuperAdminService {
                              TenantCacheService tenantCacheService,
                              PaiementSuperAdminRepository paiementSuperAdminRepository,
                              @Lazy AuthService authService,
-                             PushNotificationService pushService) {
+                             PushNotificationService pushService,
+                             UserPushNotificationService userPushService) {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.venteRepository = venteRepository;
@@ -94,6 +96,7 @@ public class SuperAdminService {
         this.paiementSuperAdminRepository = paiementSuperAdminRepository;
         this.authService = authService;
         this.pushService = pushService;
+        this.userPushService = userPushService;
     }
 
     /**
@@ -332,7 +335,36 @@ public class SuperAdminService {
 
         saveLog("CHANGE_PLAN", ancienPlan + " → " + plan + " (" + jours + " jours)", tenant);
 
+        notifierChangementPlan(tenant, ancienPlan, plan, jours);
+
         return toDto(tenant);
+    }
+
+    /**
+     * Prévient l'admin du tenant par push qu'un super admin vient de changer son plan
+     * et/ou de prolonger son abonnement.
+     *
+     * Envoyée de façon inconditionnelle (notifyUserRaw) : c'est une notification de
+     * compte obligatoire, elle ne doit pas apparaître dans la liste des préférences du
+     * commerçant ni pouvoir être désactivée individuellement — seule l'activation
+     * générale des notifications push (existence d'une subscription) la conditionne.
+     */
+    private void notifierChangementPlan(TenantEntity tenant, TenantEntity.Plan ancienPlan,
+                                        TenantEntity.Plan nouveauPlan, int jours) {
+        UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
+        if (admin == null) return;
+
+        String titre;
+        String corps;
+        if (ancienPlan != nouveauPlan) {
+            titre = "🎉 Vous êtes maintenant sur le plan " + nouveauPlan.name();
+            corps = "Votre abonnement a été mis à jour. Il vous reste " + jours + " jour(s).";
+        } else {
+            titre = "✅ Abonnement prolongé";
+            corps = "Votre abonnement " + nouveauPlan.name() + " a été prolongé. Il vous reste " + jours + " jour(s).";
+        }
+
+        userPushService.notifyUserRaw(admin, titre, corps, "/subscription");
     }
 
     /**
