@@ -364,7 +364,7 @@ public class SuperAdminService {
             corps = "Votre abonnement " + nouveauPlan.name() + " a été prolongé. Il vous reste " + jours + " jour(s).";
         }
 
-        userPushService.notifyUserRaw(admin, titre, corps, "/subscription");
+        userPushService.notifyUserRaw(admin, titre, corps, "/admin?tab=subscription");
     }
 
     /**
