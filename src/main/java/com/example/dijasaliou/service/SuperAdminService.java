@@ -21,6 +21,7 @@ import com.example.dijasaliou.repository.FactureRepository;
 import com.example.dijasaliou.repository.NoteInterneRepository;
 import com.example.dijasaliou.repository.PaiementSuperAdminRepository;
 import com.example.dijasaliou.repository.TenantRepository;
+import com.example.dijasaliou.repository.UserPushSubscriptionRepository;
 import com.example.dijasaliou.repository.UserRepository;
 import com.example.dijasaliou.repository.VenteRepository;
 import jakarta.persistence.EntityManager;
@@ -64,6 +65,7 @@ public class SuperAdminService {
     private final VenteRepository venteRepository;
     private final AchatRepository achatRepository;
     private final CaisseConfigRepository caisseConfigRepository;
+    private final UserPushSubscriptionRepository userPushSubscriptionRepository;
     private final NoteInterneRepository noteInterneRepository;
     private final AuditLogRepository auditLogRepository;
     private final FactureService factureService;
@@ -82,6 +84,7 @@ public class SuperAdminService {
                              VenteRepository venteRepository,
                              AchatRepository achatRepository,
                              CaisseConfigRepository caisseConfigRepository,
+                             UserPushSubscriptionRepository userPushSubscriptionRepository,
                              NoteInterneRepository noteInterneRepository,
                              AuditLogRepository auditLogRepository,
                              FactureService factureService,
@@ -96,6 +99,7 @@ public class SuperAdminService {
         this.venteRepository = venteRepository;
         this.achatRepository = achatRepository;
         this.caisseConfigRepository = caisseConfigRepository;
+        this.userPushSubscriptionRepository = userPushSubscriptionRepository;
         this.noteInterneRepository = noteInterneRepository;
         this.auditLogRepository = auditLogRepository;
         this.factureService = factureService;
@@ -119,19 +123,20 @@ public class SuperAdminService {
      *   - null/vide      : tous les tenants
      */
     public PagedResponse<TenantAdminDto> getAllTenants(int page, int size, String search, String activite,
-                                                       String emailVerifie, String aVendu, String statut,
-                                                       String plan, boolean expiringSoon) {
+                                                       String emailVerifie, String aVendu, String hasNotifications,
+                                                       String statut, String plan, boolean expiringSoon) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         String searchParam = (search != null && !search.isBlank()) ? search : null;
 
         boolean hasActivite = activite != null && !activite.isBlank();
         boolean hasEmailFilter = emailVerifie != null && !emailVerifie.isBlank();
         boolean hasVenduFilter = aVendu != null && !aVendu.isBlank();
+        boolean hasNotifFilter = hasNotifications != null && !hasNotifications.isBlank();
         boolean hasStatutFilter = statut != null && !statut.isBlank();
         boolean hasPlanFilter = plan != null && !plan.isBlank();
 
         // Aucun filtre custom → comportement direct paginé par la DB
-        if (!hasActivite && !hasEmailFilter && !hasVenduFilter && !hasStatutFilter && !hasPlanFilter && !expiringSoon) {
+        if (!hasActivite && !hasEmailFilter && !hasVenduFilter && !hasNotifFilter && !hasStatutFilter && !hasPlanFilter && !expiringSoon) {
             Page<TenantEntity> tenantsPage = tenantRepository.findByDeletedFalseWithSearch(searchParam, pageable);
             return PagedResponse.from(tenantsPage.map(this::toDto));
         }
@@ -163,6 +168,15 @@ public class SuperAdminService {
             boolean wantSold = "oui".equalsIgnoreCase(aVendu);
             tous = tous.stream()
                     .filter(t -> idsWithVentes.contains(t.getId()) == wantSold)
+                    .toList();
+        }
+
+        // Filtre "notifications activées" (oui / non) — basé sur une seule requête optimisée
+        if (hasNotifFilter) {
+            Set<Long> idsWithNotifs = Set.copyOf(userPushSubscriptionRepository.findDistinctTenantIdsWithSubscriptions());
+            boolean wantNotif = "oui".equalsIgnoreCase(hasNotifications);
+            tous = tous.stream()
+                    .filter(t -> idsWithNotifs.contains(t.getId()) == wantNotif)
                     .toList();
         }
 
@@ -223,12 +237,16 @@ public class SuperAdminService {
                 .filter(nonDeletedIds::contains).count();
         long aVendu = venteRepository.findDistinctTenantIdsWithVentes().stream()
                 .filter(nonDeletedIds::contains).count();
+        long notifActives = userPushSubscriptionRepository.findDistinctTenantIdsWithSubscriptions().stream()
+                .filter(nonDeletedIds::contains).count();
         java.util.Map<String, Long> stats = new java.util.LinkedHashMap<>();
         stats.put("total", total);
         stats.put("emailVerifie", emailVerifie);
         stats.put("emailNonVerifie", Math.max(0, total - emailVerifie));
         stats.put("aVendu", aVendu);
         stats.put("pasVendu", Math.max(0, total - aVendu));
+        stats.put("notifActives", notifActives);
+        stats.put("notifInactives", Math.max(0, total - notifActives));
         return stats;
     }
 

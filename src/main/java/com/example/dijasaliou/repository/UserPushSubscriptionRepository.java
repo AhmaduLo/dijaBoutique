@@ -38,4 +38,11 @@ public interface UserPushSubscriptionRepository extends JpaRepository<UserPushSu
     void deleteByEndpoint(String endpoint);
 
     void deleteByUser(UserEntity user);
+
+    /**
+     * IDs des tenants ayant au moins une subscription push active.
+     * Utilisé par le super admin pour filtrer les boutiques ayant activé les notifications.
+     */
+    @Query("SELECT DISTINCT s.tenant.id FROM UserPushSubscription s")
+    List<Long> findDistinctTenantIdsWithSubscriptions();
 }
