@@ -78,6 +78,13 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
     List<AchatEntity> findAllByTenant(@Param("tenant") TenantEntity tenant);
 
     /**
+     * Compte les achats d'un tenant par son ID — utilisé par la vue Super Admin
+     * (fiche client) pour voir si le client a commencé à enregistrer des achats.
+     */
+    @Query("SELECT COUNT(a) FROM AchatEntity a WHERE a.tenant.id = :tenantId")
+    long countByTenantId(@Param("tenantId") Long tenantId);
+
+    /**
      * Trouver les achats par code-barre pour un tenant donné
      */
     @Query("SELECT a FROM AchatEntity a WHERE a.codeBarre = :codeBarre AND a.tenant = :tenant ORDER BY a.dateAchat DESC, a.id DESC")

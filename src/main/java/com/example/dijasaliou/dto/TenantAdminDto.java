@@ -51,12 +51,16 @@ public class TenantAdminDto {
     // Stats
     private Long nbUtilisateurs;
     private Long nbVentes;
+    private Long nbAchats;
+    /** true si le tenant a activé la caisse (ligne présente dans caisse_config). */
+    private Boolean caisseActive;
     private OffsetDateTime derniereActivite;
 
     // Statut calculé : ESSAI, ACTIF, EXPIRE, SUSPENDU
     private String statut;
 
-    public static TenantAdminDto fromEntity(TenantEntity tenant, long nbUsers, long nbVentes, UserEntity admin, LocalDateTime derniereActivite) {
+    public static TenantAdminDto fromEntity(TenantEntity tenant, long nbUsers, long nbVentes, long nbAchats,
+                                             boolean caisseActive, UserEntity admin, LocalDateTime derniereActivite) {
         return TenantAdminDto.builder()
                 .id(tenant.getId())
                 .tenantUuid(tenant.getTenantUuid())
@@ -79,6 +83,8 @@ public class TenantAdminDto {
                 .essaiUtilise(tenant.getEssaiUtilise())
                 .nbUtilisateurs(nbUsers)
                 .nbVentes(nbVentes)
+                .nbAchats(nbAchats)
+                .caisseActive(caisseActive)
                 .derniereActivite(derniereActivite != null ? derniereActivite.atOffset(ZoneOffset.UTC) : null)
                 .statut(calculerStatut(tenant))
                 .build();

@@ -14,7 +14,9 @@ import com.example.dijasaliou.entity.PaiementSuperAdminEntity;
 import com.example.dijasaliou.entity.TenantEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.NoteInterne;
+import com.example.dijasaliou.repository.AchatRepository;
 import com.example.dijasaliou.repository.AuditLogRepository;
+import com.example.dijasaliou.repository.CaisseConfigRepository;
 import com.example.dijasaliou.repository.FactureRepository;
 import com.example.dijasaliou.repository.NoteInterneRepository;
 import com.example.dijasaliou.repository.PaiementSuperAdminRepository;
@@ -60,6 +62,8 @@ public class SuperAdminService {
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final VenteRepository venteRepository;
+    private final AchatRepository achatRepository;
+    private final CaisseConfigRepository caisseConfigRepository;
     private final NoteInterneRepository noteInterneRepository;
     private final AuditLogRepository auditLogRepository;
     private final FactureService factureService;
@@ -76,6 +80,8 @@ public class SuperAdminService {
     public SuperAdminService(TenantRepository tenantRepository,
                              UserRepository userRepository,
                              VenteRepository venteRepository,
+                             AchatRepository achatRepository,
+                             CaisseConfigRepository caisseConfigRepository,
                              NoteInterneRepository noteInterneRepository,
                              AuditLogRepository auditLogRepository,
                              FactureService factureService,
@@ -88,6 +94,8 @@ public class SuperAdminService {
         this.tenantRepository = tenantRepository;
         this.userRepository = userRepository;
         this.venteRepository = venteRepository;
+        this.achatRepository = achatRepository;
+        this.caisseConfigRepository = caisseConfigRepository;
         this.noteInterneRepository = noteInterneRepository;
         this.auditLogRepository = auditLogRepository;
         this.factureService = factureService;
@@ -1096,8 +1104,10 @@ public class SuperAdminService {
     private TenantAdminDto toDto(TenantEntity tenant) {
         long nbUsers = userRepository.countByTenantAndDeletedFalse(tenant);
         long nbVentes = venteRepository.countByTenantId(tenant.getId());
+        long nbAchats = achatRepository.countByTenantId(tenant.getId());
+        boolean caisseActive = caisseConfigRepository.existsByTenant(tenant);
         UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
         LocalDateTime derniereActivite = userRepository.findDerniereActiviteByTenantId(tenant.getId()).orElse(null);
-        return TenantAdminDto.fromEntity(tenant, nbUsers, nbVentes, admin, derniereActivite);
+        return TenantAdminDto.fromEntity(tenant, nbUsers, nbVentes, nbAchats, caisseActive, admin, derniereActivite);
     }
 }
