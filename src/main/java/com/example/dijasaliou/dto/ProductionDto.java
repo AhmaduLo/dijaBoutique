@@ -32,6 +32,8 @@ public class ProductionDto {
     private ModePaiementCaisse modePaiement;
     /** Devise dans laquelle les montants de CETTE production ont été enregistrés (celle du lot d'achat lié, figée à la création) — pas la devise courante de la boutique. */
     private String deviseCode;
+    /** Taux de change figé à la création du lot d'achat lié — nécessaire pour reconvertir les montants vers cette devise d'origine quand le frontend les affiche/édite dans la devise courante. */
+    private Double tauxChangeApplique;
     private List<IngredientLigneDto> ingredients;
 
     @Data
@@ -68,6 +70,7 @@ public class ProductionDto {
                 .prixVenteSuggere(production.getAchat() != null ? production.getAchat().getPrixVenteSuggere() : null)
                 .modePaiement(production.getAchat() != null ? production.getAchat().getModePaiement() : null)
                 .deviseCode(production.getAchat() != null ? production.getAchat().getDeviseCode() : null)
+                .tauxChangeApplique(production.getAchat() != null ? production.getAchat().getTauxChangeApplique() : null)
                 .ingredients(lignes)
                 .build();
     }
