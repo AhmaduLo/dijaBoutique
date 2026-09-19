@@ -54,13 +54,16 @@ public class TenantAdminDto {
     private Long nbAchats;
     /** true si le tenant a activé la caisse (ligne présente dans caisse_config). */
     private Boolean caisseActive;
+    /** true si au moins un appareil du tenant a une subscription push active. */
+    private Boolean notificationsActives;
     private OffsetDateTime derniereActivite;
 
     // Statut calculé : ESSAI, ACTIF, EXPIRE, SUSPENDU
     private String statut;
 
     public static TenantAdminDto fromEntity(TenantEntity tenant, long nbUsers, long nbVentes, long nbAchats,
-                                             boolean caisseActive, UserEntity admin, LocalDateTime derniereActivite) {
+                                             boolean caisseActive, boolean notificationsActives,
+                                             UserEntity admin, LocalDateTime derniereActivite) {
         return TenantAdminDto.builder()
                 .id(tenant.getId())
                 .tenantUuid(tenant.getTenantUuid())
@@ -85,6 +88,7 @@ public class TenantAdminDto {
                 .nbVentes(nbVentes)
                 .nbAchats(nbAchats)
                 .caisseActive(caisseActive)
+                .notificationsActives(notificationsActives)
                 .derniereActivite(derniereActivite != null ? derniereActivite.atOffset(ZoneOffset.UTC) : null)
                 .statut(calculerStatut(tenant))
                 .build();

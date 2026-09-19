@@ -1124,8 +1124,10 @@ public class SuperAdminService {
         long nbVentes = venteRepository.countByTenantId(tenant.getId());
         long nbAchats = achatRepository.countByTenantId(tenant.getId());
         boolean caisseActive = caisseConfigRepository.existsByTenant(tenant);
+        boolean notificationsActives = userPushSubscriptionRepository.existsByTenant(tenant);
         UserEntity admin = userRepository.findFirstByTenantAndRole(tenant, UserEntity.Role.ADMIN).orElse(null);
         LocalDateTime derniereActivite = userRepository.findDerniereActiviteByTenantId(tenant.getId()).orElse(null);
-        return TenantAdminDto.fromEntity(tenant, nbUsers, nbVentes, nbAchats, caisseActive, admin, derniereActivite);
+        return TenantAdminDto.fromEntity(tenant, nbUsers, nbVentes, nbAchats, caisseActive, notificationsActives,
+                admin, derniereActivite);
     }
 }

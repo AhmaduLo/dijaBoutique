@@ -23,6 +23,9 @@ public interface UserPushSubscriptionRepository extends JpaRepository<UserPushSu
      */
     List<UserPushSubscription> findByTenant(TenantEntity tenant);
 
+    /** Utilisé par la fiche détail super admin pour afficher le statut "Notifications". */
+    boolean existsByTenant(TenantEntity tenant);
+
     /**
      * Utilisateurs distincts ayant au moins une subscription active.
      * Utilisé par les crons de résumé pour ne calculer les stats qu'une fois
