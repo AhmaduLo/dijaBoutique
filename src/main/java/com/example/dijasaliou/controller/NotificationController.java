@@ -36,7 +36,8 @@ public class NotificationController {
      *   "tenantId": null,          // null = tous, sinon ID ciblé
      *   "filtrePlan": null,        // null = tous, "PRO", "BUSINESS", etc.
      *   "canalApp": true,
-     *   "canalEmail": true
+     *   "canalEmail": true,
+     *   "lienAction": null         // null = pas de bouton, sinon route (ex: "/notifications")
      * }
      */
     @PostMapping("/superadmin/notifications")
@@ -53,9 +54,10 @@ public class NotificationController {
         String filtrePlan = (String) body.get("filtrePlan");
         boolean canalApp = body.get("canalApp") != null ? (Boolean) body.get("canalApp") : true;
         boolean canalEmail = body.get("canalEmail") != null ? (Boolean) body.get("canalEmail") : false;
+        String lienAction = (String) body.get("lienAction");
 
         NotificationEntity notif = notificationService.envoyer(
-                objet, message, tenantId, filtrePlan, canalApp, canalEmail, auth.getName());
+                objet, message, tenantId, filtrePlan, canalApp, canalEmail, auth.getName(), lienAction);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "message", "Notification envoyée à " + notif.getNbDestinataires() + " destinataire(s)",

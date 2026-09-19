@@ -39,11 +39,12 @@ public class NotificationService {
      * @param canalApp    Afficher dans l'app
      * @param canalEmail  Envoyer par email
      * @param envoyePar   Nom du super admin
+     * @param lienAction  Route optionnelle (ex: "/notifications") affichée comme bouton cliquable
      */
     @Transactional
     public NotificationEntity envoyer(String objet, String message, Long tenantId,
                                        String filtrePlan, boolean canalApp, boolean canalEmail,
-                                       String envoyePar) {
+                                       String envoyePar, String lienAction) {
 
         TenantEntity tenant = null;
         if (tenantId != null) {
@@ -75,6 +76,7 @@ public class NotificationService {
                 .canalEmail(canalEmail)
                 .nbDestinataires(destinataires.size())
                 .envoyePar(envoyePar)
+                .lienAction(lienAction)
                 .build();
         notification = notificationRepository.save(notification);
         if (tenant != null) {
@@ -130,6 +132,7 @@ public class NotificationService {
             entry.put("id", n.getId());
             entry.put("objet", n.getObjet());
             entry.put("message", n.getMessage());
+            entry.put("lienAction", n.getLienAction());
             entry.put("dateEnvoi", n.getDateEnvoi());
             result.add(entry);
         }

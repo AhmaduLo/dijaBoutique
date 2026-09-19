@@ -37,6 +37,11 @@ public class NotificationEntity {
     @Column(name = "message", nullable = false, columnDefinition = "TEXT")
     private String message;
 
+    /** Route optionnelle (ex: "/notifications") affichée comme bouton d'action cliquable. */
+    @Size(max = 200)
+    @Column(name = "lien_action", length = 200)
+    private String lienAction;
+
     /**
      * null = notification globale (tous les tenants)
      * renseigné = notification ciblée pour un tenant
