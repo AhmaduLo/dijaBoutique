@@ -24,6 +24,9 @@ public interface VenteLotConsommationRepository
     /** Lignes de consommation d'une vente donnée (filtre tenant via Hibernate filter). */
     List<VenteLotConsommationEntity> findByVenteId(String venteId);
 
+    /** true si la vente a au moins une ligne de consommation (coût FIFO connu). */
+    boolean existsByVenteId(String venteId);
+
     /** Lignes de consommation d'un achat (utile pour rollback ou audit). */
     List<VenteLotConsommationEntity> findByAchatId(String achatId);
 

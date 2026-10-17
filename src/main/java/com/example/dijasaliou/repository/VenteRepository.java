@@ -158,6 +158,20 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
                                      @Param("tenantUuid") String tenantUuid);
 
     /**
+     * Nombre de ventes non-crédit sur une période SANS aucune ligne de consommation FIFO
+     * (produit jamais acheté ⇒ coût d'achat inconnu ⇒ bénéfice non calculable).
+     */
+    @Query("SELECT COUNT(v) FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT " +
+           "AND v.typeSortie IS NULL " +
+           "AND NOT EXISTS (SELECT 1 FROM VenteLotConsommationEntity c WHERE c.vente = v)")
+    long countVentesNonCreditSansConsommationPeriode(@Param("debut") LocalDateTime debut,
+                                                     @Param("fin") LocalDateTime fin,
+                                                     @Param("tenantUuid") String tenantUuid);
+
+    /**
      * Groupe les sorties hors vente (perte, vol, casse, don, crédit impayé) par type sur une période.
      * Retourne List<Object[]> : [typeSortie, count, sumPrixTotal].
      * Utilisé par le widget "Pertes du mois" sur le dashboard ventes.

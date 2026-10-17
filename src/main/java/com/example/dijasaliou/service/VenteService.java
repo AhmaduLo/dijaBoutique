@@ -839,6 +839,10 @@ public class VenteService {
         BigDecimal caPaiementsCredit  = BigDecimal.ZERO;
         BigDecimal coutPaiementsCredit = BigDecimal.ZERO;
         BigDecimal beneficePaiementsCredit = BigDecimal.ZERO;
+        // Ventes crédit distinctes ayant reçu au moins un paiement dans la période
+        // (une vente payée en plusieurs fois ne compte qu'une fois)
+        java.util.Set<String> ventesCreditPayees = new java.util.HashSet<>();
+        java.util.Set<String> ventesCreditSansBenefice = new java.util.HashSet<>();
 
         for (PaiementCreditEntity p : paiements) {
             BigDecimal montantPaye = p.getMontantPaye();
@@ -854,6 +858,11 @@ public class VenteService {
 
             // Prorata = montant payé / prix total de la vente
             BigDecimal prorata = montantPaye.divide(vente.getPrixTotal(), 6, java.math.RoundingMode.HALF_UP);
+
+            if (ventesCreditPayees.add(vente.getId())
+                    && !consommationRepository.existsByVenteId(vente.getId())) {
+                ventesCreditSansBenefice.add(vente.getId());
+            }
 
             BigDecimal coutVente     = consommationRepository.sumCoutAchatByVenteId(vente.getId(), tenant);
             if (coutVente == null) coutVente = BigDecimal.ZERO;
@@ -874,8 +883,14 @@ public class VenteService {
         long nbVentesNonCredit  = venteRepository.countVentesNonCreditPeriode(debutDt, finDt, tenantUuid);
         long nbPaiementsCredit  = paiementCreditRepository.countByPeriodeAndTenant(debut, fin, tenantUuid);
         long nbVentes           = nbVentesNonCredit + nbPaiementsCredit;
-        long nbVentesAvecBenefice = consommationRepository.countVentesAvecBeneficeBetween(tenant, debutDt, finDt);
-        long nbVentesSansBenefice = Math.max(0L, nbVentes - nbVentesAvecBenefice);
+        // Ventes "sans bénéfice" = ventes prises en compte dans la période (non-crédit de la
+        // période + ventes crédit ayant reçu un paiement) dont le coût FIFO est inconnu.
+        // On ne déduit PAS ce nombre de nbVentes : celui-ci compte chaque paiement crédit,
+        // une vente crédit payée en 2 fois y apparaîtrait 2 fois.
+        long nbVentesSansBenefice = venteRepository.countVentesNonCreditSansConsommationPeriode(
+                debutDt, finDt, tenantUuid) + ventesCreditSansBenefice.size();
+        long nbVentesAvecBenefice = Math.max(0L,
+                nbVentesNonCredit + ventesCreditPayees.size() - nbVentesSansBenefice);
 
         // 5. Sorties hors vente (pertes, vols, dons) — comptabilisées séparément
         java.util.Map<String, BigDecimal> pertesParType = new java.util.LinkedHashMap<>();

@@ -1,6 +1,8 @@
 package com.example.dijasaliou.repository;
 
+import com.example.dijasaliou.entity.AchatEntity;
 import com.example.dijasaliou.entity.TenantEntity;
+import com.example.dijasaliou.entity.VenteLotConsommationEntity;
 import com.example.dijasaliou.entity.UserEntity;
 import com.example.dijasaliou.entity.VenteEntity;
 import com.example.dijasaliou.entity.VenteEntity.ModePaiementVente;
@@ -354,5 +356,49 @@ class VenteRepositoryTest {
         assertThat(page.getTotalElements()).isEqualTo(3L);
         assertThat(page.getContent()).hasSize(2);
         assertThat(page.getTotalPages()).isEqualTo(2);
+    }
+
+    // ==================== countVentesNonCreditSansConsommationPeriode ====================
+
+    @Test
+    @DisplayName("countVentesNonCreditSansConsommationPeriode — ne compte que les ventes non-crédit sans coût FIFO")
+    void countVentesNonCreditSansConsommationPeriode_ExclutVentesAvecConsommationEtCredit() {
+        LocalDateTime debut = LocalDateTime.of(2025, 1, 1, 0, 0);
+        LocalDateTime fin   = LocalDateTime.of(2025, 1, 31, 23, 59);
+
+        // Janvier tenant-001 : Collier (ESPECES) + Bracelet (WAVE) sans consommation ; Bague (CREDIT) exclue
+        assertThat(repo.countVentesNonCreditSansConsommationPeriode(debut, fin, "tenant-vente-001"))
+                .isEqualTo(2L);
+
+        // Le Collier de janvier reçoit une ligne FIFO → il a désormais un bénéfice calculable
+        VenteEntity collierJanvier = repo.findAll().stream()
+                .filter(v -> v.getTenant().getId().equals(tenant.getId())
+                        && v.getNomProduit().equals("Collier en or")
+                        && v.getDateVente().getMonthValue() == 1)
+                .findFirst().orElseThrow();
+        AchatEntity achat = em.persistAndFlush(AchatEntity.builder()
+                .nomProduit("Collier en or")
+                .quantite(10.0)
+                .prixUnitaire(new BigDecimal("4000"))
+                .prixTotal(new BigDecimal("40000"))
+                .dateAchat(LocalDateTime.of(2025, 1, 10, 0, 0))
+                .fournisseur("Fournisseur A")
+                .utilisateur(user)
+                .tenant(tenant)
+                .build());
+        em.persistAndFlush(VenteLotConsommationEntity.builder()
+                .vente(collierJanvier)
+                .achat(achat)
+                .quantiteConsommee(2.0)
+                .prixAchatUnitaireSnapshot(new BigDecimal("4000"))
+                .prixVenteUnitaireSnapshot(new BigDecimal("5000"))
+                .beneficeUnitaire(new BigDecimal("1000"))
+                .beneficeTotalLigne(new BigDecimal("2000"))
+                .dateVenteSnapshot(collierJanvier.getDateVente())
+                .tenant(tenant)
+                .build());
+
+        assertThat(repo.countVentesNonCreditSansConsommationPeriode(debut, fin, "tenant-vente-001"))
+                .isEqualTo(1L);
     }
 }
