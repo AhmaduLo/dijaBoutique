@@ -24,6 +24,11 @@ public class CreditClientDto {
     private String clientNom;
     private String clientTelephone;
     private String venteId;
+    /**
+     * Identifiant de la vente à crédit à laquelle appartient ce crédit (une vente de N
+     * articles = N crédits). Les crédits de même groupeCreditId forment une seule carte.
+     */
+    private String groupeCreditId;
     private BigDecimal montantInitial;
     private BigDecimal montantRestant;
     private BigDecimal montantPaye;
@@ -60,6 +65,7 @@ public class CreditClientDto {
                 .clientNom(credit.getClient() != null ? credit.getClient().getNom() : null)
                 .clientTelephone(credit.getClient() != null ? credit.getClient().getTelephone() : null)
                 .venteId(credit.getVente() != null ? credit.getVente().getId() : null)
+                .groupeCreditId(cleGroupe(credit))
                 .montantInitial(credit.getMontantInitial())
                 .montantRestant(credit.getMontantRestant())
                 .montantPaye(paye)
@@ -73,5 +79,22 @@ public class CreditClientDto {
                 .dateVente(credit.getVente() != null ? credit.getVente().getDateVente() : null)
                 .paiements(paiementsDto)
                 .build();
+    }
+
+    /**
+     * Clé de la vente à crédit d'un crédit :
+     *  - groupeVenteId de la vente (toutes les ventes depuis mars 2026) ;
+     *  - à défaut (ventes plus anciennes) : même client + même date de vente ;
+     *  - crédit sans vente : le crédit seul.
+     */
+    public static String cleGroupe(CreditClientEntity credit) {
+        if (credit.getVente() != null) {
+            if (credit.getVente().getGroupeVenteId() != null && !credit.getVente().getGroupeVenteId().isBlank()) {
+                return "G:" + credit.getVente().getGroupeVenteId();
+            }
+            String clientId = credit.getClient() != null ? credit.getClient().getId() : "";
+            return "V:" + clientId + "|" + credit.getVente().getDateVente();
+        }
+        return "C:" + credit.getId();
     }
 }

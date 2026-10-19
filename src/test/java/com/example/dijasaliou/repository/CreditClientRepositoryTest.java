@@ -325,4 +325,54 @@ class CreditClientRepositoryTest {
         assertThat(count).isEqualTo(0L);
         assertThat(sum).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    // ==================== CreditClientService.obtenirCredits (vraie requête JPA) ====================
+
+    @Test
+    @DisplayName("obtenirCredits — requête réelle : vente multi-articles regroupée, recherche client, statut de la vente")
+    void obtenirCredits_requeteReelle_regroupeParVente() {
+        // Vente de 2 articles pour Moussa : un article soldé, l'autre rien payé → vente PARTIEL
+        for (String[] ligne : new String[][]{{"cesar", "600", "0", "SOLDE"}, {"bracelet", "1800", "1800", "EN_ATTENTE"}}) {
+            VenteEntity v = em.persistAndFlush(VenteEntity.builder()
+                    .quantite(1.0)
+                    .nomProduit(ligne[0])
+                    .prixUnitaire(new BigDecimal(ligne[1]))
+                    .prixTotal(new BigDecimal(ligne[1]))
+                    .dateVente(LocalDateTime.of(2026, 10, 19, 21, 7))
+                    .modePaiement(VenteEntity.ModePaiementVente.CREDIT)
+                    .groupeVenteId("grp-moussa")
+                    .utilisateur(user)
+                    .tenant(tenant)
+                    .build());
+            em.persistAndFlush(CreditClientEntity.builder()
+                    .client(client2)
+                    .vente(v)
+                    .montantInitial(new BigDecimal(ligne[1]))
+                    .montantRestant(new BigDecimal(ligne[2]))
+                    .statut(StatutCredit.valueOf(ligne[3]))
+                    .tenant(tenant)
+                    .build());
+        }
+        em.clear();
+
+        com.example.dijasaliou.service.TenantService tenantService =
+                org.mockito.Mockito.mock(com.example.dijasaliou.service.TenantService.class);
+        org.mockito.Mockito.when(tenantService.getCurrentTenant()).thenReturn(tenant);
+        com.example.dijasaliou.service.CreditClientService service = new com.example.dijasaliou.service.CreditClientService(
+                repo, null, null, null, tenantService, null, null, null, null, null);
+
+        var partiel = service.obtenirCredits(0, 20, "Moussa", "PARTIEL", null, null, null);
+
+        assertThat(partiel.getTotalElements()).isEqualTo(1);
+        assertThat(partiel.getContent()).hasSize(2)
+                .allSatisfy(c -> {
+                    assertThat(c.getGroupeCreditId()).isEqualTo("G:grp-moussa");
+                    assertThat(c.getClientNom()).isEqualTo("Moussa Traoré");
+                });
+        // La même vente n'apparaît ni en attente ni en soldé
+        assertThat(service.obtenirCredits(0, 20, "Moussa", "EN_ATTENTE", null, null, null).getContent())
+                .noneMatch(c -> "G:grp-moussa".equals(c.getGroupeCreditId()));
+        assertThat(service.obtenirCredits(0, 20, "Moussa", "SOLDE", null, null, null).getContent())
+                .noneMatch(c -> "G:grp-moussa".equals(c.getGroupeCreditId()));
+    }
 }

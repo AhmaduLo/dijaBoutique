@@ -298,26 +298,35 @@ public class CreditClientService {
         return CreditClientDto.fromEntity(savedCredit);
     }
 
+    /**
+     * Liste paginée des crédits, regroupés PAR VENTE.
+     *
+     * Une vente à crédit de N articles crée N crédits (un par ligne, cf. creerCreditDepuisVente),
+     * chacun avec son propre statut. Filtrer ces crédits un par un faisait apparaître une même
+     * vente dans plusieurs onglets à la fois (un article "En attente", un autre "Partiel", un
+     * troisième "Soldé"). Le statut est donc calculé sur la vente entière (cf. statutGroupe) et
+     * le filtre statut + la pagination portent sur les ventes : page/size/totalElements comptent
+     * des ventes, et content contient tous les crédits des ventes de la page (tagués par
+     * groupeCreditId pour que le front les rassemble sur une seule carte).
+     */
     @Transactional(readOnly = true)
     public PagedResponse<CreditClientDto> obtenirCredits(int page, int size, String search,
                                                           String statut, LocalDate dateDebut, LocalDate dateFin,
                                                           Integer joursRetardMin) {
-        Pageable pageable = PageRequest.of(page, size,
-                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdDate"));
+        org.springframework.data.domain.Sort tri =
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdDate");
         String tenantUuid = tenantService.getCurrentTenant().getTenantUuid();
 
         Specification<CreditClientEntity> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            // La vente est nécessaire pour regrouper chaque crédit : chargée dans la même requête
+            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("vente", JoinType.LEFT);
+            }
+
             // Filtre tenant (obligatoire)
             predicates.add(cb.equal(root.get("tenant").get("tenantUuid"), tenantUuid));
-
-            // Filtre statut
-            if (statut != null && !statut.isBlank() && !statut.equals("TOUS")) {
-                try {
-                    predicates.add(cb.equal(root.get("statut"), StatutCredit.valueOf(statut.toUpperCase())));
-                } catch (IllegalArgumentException ignored) {}
-            }
 
             // Filtre recherche : nom ou téléphone du client
             if (search != null && !search.isBlank()) {
@@ -351,9 +360,60 @@ public class CreditClientService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        Page<CreditClientEntity> pageResult = creditClientRepository.findAll(spec, pageable);
-        Page<CreditClientDto> dtoPage = pageResult.map(CreditClientDto::fromEntity);
-        return PagedResponse.from(dtoPage);
+        // Regroupement par vente, dans l'ordre (plus récent d'abord) des crédits
+        Map<String, List<CreditClientEntity>> parVente = new java.util.LinkedHashMap<>();
+        for (CreditClientEntity credit : creditClientRepository.findAll(spec, tri)) {
+            parVente.computeIfAbsent(CreditClientDto.cleGroupe(credit), k -> new ArrayList<>()).add(credit);
+        }
+
+        String statutDemande = (statut == null || statut.isBlank() || statut.equalsIgnoreCase("TOUS"))
+                ? null : statut.toUpperCase();
+        List<List<CreditClientEntity>> ventes = parVente.values().stream()
+                .filter(credits -> statutDemande == null || statutGroupe(credits).name().equals(statutDemande))
+                .collect(Collectors.toList());
+
+        int totalPages = size > 0 ? (int) Math.ceil((double) ventes.size() / size) : 0;
+        int debut = Math.min(page * size, ventes.size());
+        int fin = Math.min(debut + size, ventes.size());
+        List<CreditClientDto> content = ventes.subList(debut, fin).stream()
+                .flatMap(List::stream)
+                .map(CreditClientDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return PagedResponse.<CreditClientDto>builder()
+                .content(content)
+                .currentPage(page)
+                .pageSize(size)
+                .totalElements(ventes.size())
+                .totalPages(totalPages)
+                .first(page == 0)
+                .last(page >= totalPages - 1)
+                .build();
+    }
+
+    /**
+     * Statut d'une vente à crédit, calculé sur l'ensemble de ses crédits (un par article) :
+     *   - rien payé                      → EN_ATTENTE
+     *   - une partie payée, reste dû > 0 → PARTIEL
+     *   - plus rien à payer              → SOLDE
+     *   - plus rien à payer mais tout ou partie passé en perte → PERTE (n'apparaît dans aucun onglet)
+     * Les crédits passés en perte sont exclus du calcul tant qu'il reste des articles à payer.
+     */
+    static StatutCredit statutGroupe(List<CreditClientEntity> credits) {
+        List<CreditClientEntity> actifs = credits.stream()
+                .filter(c -> c.getStatut() != StatutCredit.PERTE)
+                .collect(Collectors.toList());
+        boolean contientPerte = actifs.size() < credits.size();
+
+        BigDecimal initial = actifs.stream().map(CreditClientEntity::getMontantInitial)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal restant = actifs.stream().map(CreditClientEntity::getMontantRestant)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (restant.compareTo(BigDecimal.ZERO) <= 0) {
+            return contientPerte ? StatutCredit.PERTE : StatutCredit.SOLDE;
+        }
+        return restant.compareTo(initial) >= 0 ? StatutCredit.EN_ATTENTE : StatutCredit.PARTIEL;
     }
 
     @Transactional(readOnly = true)

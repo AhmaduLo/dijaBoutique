@@ -316,9 +316,8 @@ class CreditClientServiceTest {
     @DisplayName("obtenirCredits() — retourne une page de crédits du tenant")
     void obtenirCredits_retournePage() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        Page<CreditClientEntity> pageMock = new PageImpl<>(Collections.emptyList());
-        when(creditClientRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(pageMock);
+        when(creditClientRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(Collections.emptyList());
 
         var resultat = creditClientService.obtenirCredits(0, 10, null, "TOUS", null, null, null);
 
@@ -330,14 +329,13 @@ class CreditClientServiceTest {
     @DisplayName("obtenirCredits() — filtre par statut EN_ATTENTE")
     void obtenirCredits_filtreParStatut() {
         when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
-        Page<CreditClientEntity> pageMock = new PageImpl<>(Collections.emptyList());
-        when(creditClientRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(pageMock);
+        when(creditClientRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(Collections.emptyList());
 
         var resultat = creditClientService.obtenirCredits(0, 10, null, "EN_ATTENTE", null, null, null);
 
         assertThat(resultat).isNotNull();
-        verify(creditClientRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(creditClientRepository).findAll(any(Specification.class), any(org.springframework.data.domain.Sort.class));
     }
 
     // =========================================================
@@ -392,5 +390,123 @@ class CreditClientServiceTest {
         assertThatThrownBy(() -> creditClientService.obtenirHistoriqueClient("999"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Client introuvable");
+    }
+
+    // =========================================================
+    // obtenirCredits — une vente à crédit = une seule carte, dans un seul onglet
+    // =========================================================
+
+    /** Crédit d'un article d'une vente (groupeVenteId commun à tous les articles de la vente). */
+    private CreditClientEntity creditArticle(String id, String groupeVenteId, String initial, String restant,
+                                             StatutCredit statut) {
+        VenteEntity v = VenteEntity.builder()
+                .nomProduit("article-" + id)
+                .prixTotal(new BigDecimal(initial))
+                .modePaiement(VenteEntity.ModePaiementVente.CREDIT)
+                .groupeVenteId(groupeVenteId)
+                .tenant(tenantTest)
+                .build();
+        v.setId("vente-" + id);
+        CreditClientEntity c = CreditClientEntity.builder()
+                .client(client).vente(v)
+                .montantInitial(new BigDecimal(initial))
+                .montantRestant(new BigDecimal(restant))
+                .statut(statut)
+                .employe(employe).employeNom("Amadou Diop")
+                .tenant(tenantTest)
+                .build();
+        c.setId(id);
+        return c;
+    }
+
+    /** Cas réel : vente Palla de 3 articles (cesar soldé, arachides partiel, bracelet en attente). */
+    private List<CreditClientEntity> ventePallaPayeeEnPartie() {
+        return List.of(
+                creditArticle("cesar", "vente-palla", "600", "0", StatutCredit.SOLDE),
+                creditArticle("arachides", "vente-palla", "90000", "89200", StatutCredit.PARTIEL),
+                creditArticle("bracelet", "vente-palla", "1800", "1800", StatutCredit.EN_ATTENTE));
+    }
+
+    @Test
+    @DisplayName("obtenirCredits() — une vente payée en partie n'apparaît que dans PARTIEL, avec tous ses articles")
+    @SuppressWarnings("unchecked")
+    void obtenirCredits_venteMultiArticlesPayeeEnPartie_uniquementDansPartiel() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(creditClientRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(ventePallaPayeeEnPartie());
+
+        var partiel = creditClientService.obtenirCredits(0, 20, null, "PARTIEL", null, null, null);
+        assertThat(partiel.getTotalElements()).isEqualTo(1);
+        assertThat(partiel.getContent()).hasSize(3)
+                .extracting(CreditClientDto::getGroupeCreditId)
+                .containsOnly("G:vente-palla");
+
+        assertThat(creditClientService.obtenirCredits(0, 20, null, "EN_ATTENTE", null, null, null).getContent()).isEmpty();
+        assertThat(creditClientService.obtenirCredits(0, 20, null, "SOLDE", null, null, null).getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("obtenirCredits() — deux ventes du même client = deux cartes ; pagination par vente")
+    @SuppressWarnings("unchecked")
+    void obtenirCredits_deuxVentesMemeClient_paginationParVente() {
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(creditClientRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(List.of(
+                        creditArticle("a1", "vente-lundi", "1000", "1000", StatutCredit.EN_ATTENTE),
+                        creditArticle("a2", "vente-lundi", "2000", "2000", StatutCredit.EN_ATTENTE),
+                        creditArticle("b1", "vente-mardi", "500", "500", StatutCredit.EN_ATTENTE)));
+
+        var page0 = creditClientService.obtenirCredits(0, 1, null, "EN_ATTENTE", null, null, null);
+        assertThat(page0.getTotalElements()).isEqualTo(2);
+        assertThat(page0.getTotalPages()).isEqualTo(2);
+        assertThat(page0.getContent()).extracting(CreditClientDto::getId).containsExactly("a1", "a2");
+
+        var page1 = creditClientService.obtenirCredits(1, 1, null, "EN_ATTENTE", null, null, null);
+        assertThat(page1.getContent()).extracting(CreditClientDto::getId).containsExactly("b1");
+        assertThat(page1.isLast()).isTrue();
+    }
+
+    @Test
+    @DisplayName("statutGroupe() — rien payé / partiel / soldé / perte, calculé sur la vente entière")
+    void statutGroupe_calculeSurLaVenteEntiere() {
+        assertThat(CreditClientService.statutGroupe(List.of(
+                creditArticle("1", "g", "100", "100", StatutCredit.EN_ATTENTE),
+                creditArticle("2", "g", "200", "200", StatutCredit.EN_ATTENTE))))
+                .isEqualTo(StatutCredit.EN_ATTENTE);
+
+        assertThat(CreditClientService.statutGroupe(ventePallaPayeeEnPartie()))
+                .isEqualTo(StatutCredit.PARTIEL);
+
+        assertThat(CreditClientService.statutGroupe(List.of(
+                creditArticle("1", "g", "100", "0", StatutCredit.SOLDE),
+                creditArticle("2", "g", "200", "0", StatutCredit.SOLDE))))
+                .isEqualTo(StatutCredit.SOLDE);
+
+        // Article payé + article passé en perte : la vente est close en perte, pas "entièrement remboursée"
+        assertThat(CreditClientService.statutGroupe(List.of(
+                creditArticle("1", "g", "100", "0", StatutCredit.SOLDE),
+                creditArticle("2", "g", "200", "200", StatutCredit.PERTE))))
+                .isEqualTo(StatutCredit.PERTE);
+
+        // Article en perte mais un autre reste à payer : la vente reste active
+        assertThat(CreditClientService.statutGroupe(List.of(
+                creditArticle("1", "g", "100", "100", StatutCredit.EN_ATTENTE),
+                creditArticle("2", "g", "200", "200", StatutCredit.PERTE))))
+                .isEqualTo(StatutCredit.EN_ATTENTE);
+    }
+
+    @Test
+    @DisplayName("cleGroupe() — vente ancienne sans groupeVenteId : regroupée par client + date de vente")
+    void cleGroupe_venteAncienneSansGroupeVenteId() {
+        CreditClientEntity c1 = creditArticle("1", null, "100", "100", StatutCredit.EN_ATTENTE);
+        CreditClientEntity c2 = creditArticle("2", null, "200", "200", StatutCredit.EN_ATTENTE);
+        java.time.LocalDateTime date = java.time.LocalDateTime.of(2026, 1, 15, 10, 0);
+        c1.getVente().setDateVente(date);
+        c2.getVente().setDateVente(date);
+
+        assertThat(CreditClientDto.cleGroupe(c1)).isEqualTo(CreditClientDto.cleGroupe(c2));
+
+        c2.getVente().setDateVente(date.plusDays(1));
+        assertThat(CreditClientDto.cleGroupe(c1)).isNotEqualTo(CreditClientDto.cleGroupe(c2));
     }
 }
