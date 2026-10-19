@@ -232,7 +232,8 @@ public class PaymentController {
         Map<String, Object> plans = new HashMap<>();
 
         for (TenantEntity.Plan plan : TenantEntity.Plan.values()) {
-            if (plan != TenantEntity.Plan.GRATUIT) {
+            // STARTER n'est plus proposé à la vente (cf. TenantEntity.Plan.STARTER)
+            if (plan != TenantEntity.Plan.GRATUIT && plan != TenantEntity.Plan.STARTER) {
                 Map<String, Object> planInfo = new HashMap<>();
                 planInfo.put("libelle", plan.getLibelle());
                 planInfo.put("description", plan.getDescription());

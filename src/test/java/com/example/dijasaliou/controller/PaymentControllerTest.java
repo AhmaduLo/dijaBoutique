@@ -113,18 +113,21 @@ class PaymentControllerTest {
     // ==================== GET /payment/plans ====================
 
     @Test
-    @DisplayName("GET /payment/plans - Devrait retourner tous les plans disponibles")
+    @DisplayName("GET /payment/plans - Devrait retourner les plans à vendre : Pro 5 000, Business 10 000")
     void getAvailablePlans_DevraitRetournerPlans() throws Exception {
         mockMvc.perform(get("/payment/plans")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.STARTER").exists())
                 .andExpect(jsonPath("$.PRO").exists())
                 .andExpect(jsonPath("$.BUSINESS").exists())
                 // GRATUIT ne doit PAS être dans la liste (plan d'essai, pas à vendre)
                 .andExpect(jsonPath("$.GRATUIT").doesNotExist())
-                .andExpect(jsonPath("$.STARTER.libelle", notNullValue()))
-                .andExpect(jsonPath("$.STARTER.prixCFA", notNullValue()));
+                // STARTER n'est plus proposé (les boutiques déjà en Starter le gardent)
+                .andExpect(jsonPath("$.STARTER").doesNotExist())
+                .andExpect(jsonPath("$.PRO.libelle", notNullValue()))
+                .andExpect(jsonPath("$.PRO.prixCFA", is(5000.0)))
+                .andExpect(jsonPath("$.PRO.maxUtilisateurs", is(5)))
+                .andExpect(jsonPath("$.BUSINESS.prixCFA", is(10000.0)));
 
         // Aucun service appelé — données statiques de l'enum
         verifyNoInteractions(tenantService, waveService);
