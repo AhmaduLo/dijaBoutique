@@ -458,6 +458,9 @@ public class AuthService {
 
         // 5. Mettre à jour le mot de passe (avec hash)
         user.setMotDePasse(passwordEncoder.encode(request.getNouveauMotDePasse()));
+        // Le lien n'a pu être ouvert que depuis la boîte mail du compte : l'adresse est
+        // donc prouvée, on la marque vérifiée (évite un 2e lien de confirmation).
+        user.setEmailVerifie(true);
         userRepository.save(user);
 
         // 6. Marquer le token comme utilisé

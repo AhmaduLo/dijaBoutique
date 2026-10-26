@@ -275,6 +275,34 @@ class AuthServiceTest {
                 .hasMessageContaining("invalide ou expiré");
     }
 
+    @Test
+    @DisplayName("resetPassword() — via le lien reçu par email : nouveau mot de passe ET email marqué vérifié")
+    void resetPassword_marqueEmailVerifie() {
+        UserEntity nonVerifie = UserEntity.builder()
+                .id(7L).nom("Fall").prenom("Awa").email("awa@boutique.com")
+                .motDePasse("ancien-hash").emailVerifie(false)
+                .build();
+        PasswordResetToken token = PasswordResetToken.builder()
+                .token("token-valide").user(nonVerifie)
+                .expiryDate(java.time.LocalDateTime.now().plusHours(1)).used(false)
+                .build();
+
+        ResetPasswordRequest req = new ResetPasswordRequest();
+        req.setToken("token-valide");
+        req.setNouveauMotDePasse("Nouveau1!");
+        req.setConfirmationMotDePasse("Nouveau1!");
+
+        when(passwordResetTokenRepository.findByToken("token-valide")).thenReturn(Optional.of(token));
+        when(passwordEncoder.encode("Nouveau1!")).thenReturn("nouveau-hash");
+
+        authService.resetPassword(req);
+
+        assertThat(nonVerifie.getMotDePasse()).isEqualTo("nouveau-hash");
+        assertThat(nonVerifie.getEmailVerifie()).isTrue();
+        assertThat(token.isUsed()).isTrue();
+        verify(userRepository).save(nonVerifie);
+    }
+
     // =========================================================
     // deleteAdminAccount
     // =========================================================
