@@ -309,6 +309,7 @@ public class StockController {
                     produit.put("nomProduit", stock.getNomProduit());
                     produit.put("stockDisponible", stock.getStockDisponible());
                     produit.put("prixMoyenVente", stock.getPrixMoyenVente());
+                    produit.put("dernierPrixVente", stock.getDernierPrixVente());
                     produit.put("statut", stock.getStatut());
                     produit.put("unite", stock.getUnite());
                     return produit;

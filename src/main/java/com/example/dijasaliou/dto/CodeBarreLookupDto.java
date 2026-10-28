@@ -35,5 +35,8 @@ public class CodeBarreLookupDto {
     // Infos prix (uniquement si source = LOCAL)
     private BigDecimal prixUnitaire;
     private BigDecimal prixVenteSuggere;
+    /** Devise et taux dans lesquels prixVenteSuggere a été saisi (conversion côté front). */
+    private String deviseCode;
+    private Double tauxChangeApplique;
     private Double stockDisponible;
 }

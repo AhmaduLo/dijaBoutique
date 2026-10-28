@@ -100,6 +100,31 @@ class StockServiceTest {
         assertThat(resultat).isEmpty();
     }
 
+    @Test
+    @DisplayName("obtenirTousLesStocks — dernierPrixVente = prix de la vente la plus récente, hors sorties à 0")
+    void obtenirTousLesStocks_dernierPrixVente() {
+        LocalDateTime maintenant = LocalDateTime.now();
+        VenteEntity ancienne = VenteEntity.builder().nomProduit("Ordinateur").quantite(1.0)
+                .prixUnitaire(new BigDecimal("650.00")).dateVente(maintenant.minusDays(5)).build();
+        VenteEntity recente = VenteEntity.builder().nomProduit("ordinateur ").quantite(1.0)
+                .prixUnitaire(new BigDecimal("720.00")).dateVente(maintenant.minusDays(1)).build();
+        // Sortie hors vente (don) plus récente : ne doit pas compter
+        VenteEntity don = VenteEntity.builder().nomProduit("Ordinateur").quantite(1.0)
+                .prixUnitaire(BigDecimal.ZERO).dateVente(maintenant)
+                .typeSortie(VenteEntity.TypeSortie.OFFERT).build();
+
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.findAllByTenant(any())).thenReturn(Arrays.asList(achat1, achat2));
+        when(venteRepository.findAllByTenant(any())).thenReturn(Arrays.asList(ancienne, recente, don));
+
+        List<StockDto> resultat = stockService.obtenirTousLesStocks(null);
+
+        StockDto ordinateur = resultat.stream().filter(s -> s.getNomProduit().equals("ordinateur")).findFirst().orElseThrow();
+        StockDto souris = resultat.stream().filter(s -> s.getNomProduit().equals("souris")).findFirst().orElseThrow();
+        assertThat(ordinateur.getDernierPrixVente()).isEqualByComparingTo("720.00");
+        assertThat(souris.getDernierPrixVente()).isNull(); // jamais vendue
+    }
+
     // =========================================================
     // obtenirStockParNomProduit
     // =========================================================

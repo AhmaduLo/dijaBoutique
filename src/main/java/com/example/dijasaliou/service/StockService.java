@@ -512,6 +512,21 @@ public class StockService {
                     .orElse(BigDecimal.ZERO);
         }
 
+        // Dernier prix auquel le produit a réellement été vendu (hors sorties perte/vol/don
+        // à 0), en devise tenant. Proposé à la vente quand aucun prix de vente n'a été fixé
+        // à l'achat — jamais le prix d'achat.
+        BigDecimal dernierPrixVente = ventes.stream()
+                .filter(v -> v.getTypeSortie() == null
+                        && v.getPrixUnitaire() != null && v.getPrixUnitaire().signum() > 0
+                        && v.getDateVente() != null)
+                .max(Comparator.comparing(VenteEntity::getDateVente))
+                .map(v -> {
+                    double taux = (v.getTauxChangeApplique() != null) ? v.getTauxChangeApplique() : 1.0;
+                    return v.getPrixUnitaire().multiply(BigDecimal.valueOf(taux))
+                            .divide(BigDecimal.valueOf(tauxDeviceTenant), 2, RoundingMode.HALF_UP);
+                })
+                .orElse(null);
+
         // Calculer la valeur du stock
         BigDecimal valeurStock = prixMoyenAchat.multiply(BigDecimal.valueOf(stockDisponible));
 
@@ -573,6 +588,7 @@ public class StockService {
                 .stockDisponible(stockDisponible)
                 .prixMoyenAchat(prixMoyenAchat)
                 .prixMoyenVente(prixMoyenVente)
+                .dernierPrixVente(dernierPrixVente)
                 .valeurStock(valeurStock)
                 .margeUnitaire(margeUnitaire)
                 .statut(statut)

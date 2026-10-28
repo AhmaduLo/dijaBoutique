@@ -74,6 +74,12 @@ public class StockDto {
     private BigDecimal prixMoyenVente;
 
     /**
+     * Dernier prix unitaire auquel le produit a réellement été vendu (devise tenant,
+     * hors sorties perte/vol/don). null si jamais vendu.
+     */
+    private BigDecimal dernierPrixVente;
+
+    /**
      * Valeur totale du stock (stock × prix moyen d'achat)
      */
     private BigDecimal valeurStock;

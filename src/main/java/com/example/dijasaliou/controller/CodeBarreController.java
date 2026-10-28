@@ -125,6 +125,12 @@ public class CodeBarreController {
 
         // Prendre le dernier achat (le plus récent — la liste est triée DESC)
         AchatEntity dernier = achats.get(0);
+        // Prix de vente : celui fixé sur le dernier achat QUI EN A UN (un réapprovisionnement
+        // saisi sans prix de vente ne doit pas faire perdre le prix fixé précédemment)
+        AchatEntity avecPrixVente = achats.stream()
+                .filter(a -> a.getPrixVenteSuggere() != null && a.getPrixVenteSuggere().signum() > 0)
+                .findFirst()
+                .orElse(null);
 
         // Récupérer le stock disponible pour ce produit
         Double stockDisponible = null;
@@ -143,7 +149,11 @@ public class CodeBarreController {
                 .photoUrl(dernier.getPhotoUrl())
                 .unite(dernier.getUnite())
                 .prixUnitaire(dernier.getPrixUnitaire())
-                .prixVenteSuggere(dernier.getPrixVenteSuggere())
+                .prixVenteSuggere(avecPrixVente != null ? avecPrixVente.getPrixVenteSuggere() : null)
+                // Devise dans laquelle ce prix a été saisi : le front le convertit dans la
+                // devise actuelle de la boutique (sinon 3 000 CFA deviendrait "3 000 €")
+                .deviseCode(avecPrixVente != null ? avecPrixVente.getDeviseCode() : null)
+                .tauxChangeApplique(avecPrixVente != null ? avecPrixVente.getTauxChangeApplique() : null)
                 .stockDisponible(stockDisponible)
                 .build();
     }
