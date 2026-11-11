@@ -156,14 +156,29 @@ class AchatServiceTest {
     }
 
     @Test
-    @DisplayName("creerAchat() — lève exception si prix = 0")
-    void creerAchat_leveExceptionPrixZero() {
+    @DisplayName("creerAchat() — lève exception si prix négatif")
+    void creerAchat_leveExceptionPrixNegatif() {
         AchatEntity a = AchatEntity.builder().nomProduit("Produit").quantite(5.0)
-                .prixUnitaire(BigDecimal.ZERO).build();
+                .prixUnitaire(new BigDecimal("-1.00")).build();
 
         assertThatThrownBy(() -> achatService.creerAchat(a, utilisateurTest))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Le prix unitaire doit être supérieur à 0");
+                .hasMessageContaining("Le prix unitaire ne peut pas être négatif");
+    }
+
+    @Test
+    @DisplayName("creerAchat() — accepte un prix à 0 (marchandise reçue gratuitement)")
+    void creerAchat_acceptePrixZero() {
+        AchatEntity a = AchatEntity.builder().nomProduit("Échantillon").quantite(5.0)
+                .prixUnitaire(BigDecimal.ZERO).dateAchat(LocalDateTime.now()).build();
+
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.save(any())).thenReturn(a);
+
+        achatService.creerAchat(a, utilisateurTest);
+
+        verify(achatRepository).save(any());
+        assertThat(a.getPrixTotal()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test

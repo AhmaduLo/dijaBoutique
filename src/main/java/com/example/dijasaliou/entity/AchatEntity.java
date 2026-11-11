@@ -55,12 +55,12 @@ public class AchatEntity extends BaseEntity{
     private String nomProduit;
 
     @NotNull(message = "Le prix unitaire est obligatoire")
-    @DecimalMin(value = "0.01", message = "Le prix unitaire doit être supérieur à 0")
+    @DecimalMin(value = "0.00", message = "Le prix unitaire ne peut pas être négatif")
     @Column(name = "prix_unitaire", nullable = false, precision = 10, scale = 2)
     private BigDecimal prixUnitaire;
 
     @NotNull(message = "Le prix total est obligatoire")
-    @DecimalMin(value = "0.01", message = "Le prix total doit être supérieur à 0")
+    @DecimalMin(value = "0.00", message = "Le prix total ne peut pas être négatif")
     @Column(name = "prix_total", nullable = false, precision = 10, scale = 2)
     private BigDecimal prixTotal;
 

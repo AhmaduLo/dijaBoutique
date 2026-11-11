@@ -240,10 +240,11 @@ public class AchatService {
         if (achat.getQuantite() == null || achat.getQuantite() <= 0) {
             throw new IllegalArgumentException("La quantité doit être supérieure à 0");
         }
-        // Règle 2 : Prix unitaire doit être > 0
+        // Règle 2 : Prix unitaire >= 0 — 0 est autorisé (marchandise reçue gratuitement :
+        // don, échantillon, cadeau fournisseur…)
         if (achat.getPrixUnitaire() == null ||
-                achat.getPrixUnitaire().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Le prix unitaire doit être supérieur à 0");
+                achat.getPrixUnitaire().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Le prix unitaire ne peut pas être négatif");
         }
 
         // Règle 3 : Nom du produit obligatoire
