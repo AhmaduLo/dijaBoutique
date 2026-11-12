@@ -323,8 +323,11 @@ public class VenteController {
     public ResponseEntity<BeneficeStatistiquesDto> obtenirBenefice(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate debut,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
-            @RequestParam(required = false) String devise) {
+            @RequestParam(required = false) String devise,
+            @RequestParam(required = false) String search) {
 
-        return ResponseEntity.ok(venteService.calculerStatistiquesBenefice(debut, fin, devise));
+        // search (optionnel) : même filtre que la barre de recherche de la page Ventes
+        // (produit, client, téléphone, code-barre, catégorie) — ex. bénéfice d'une catégorie.
+        return ResponseEntity.ok(venteService.calculerStatistiquesBenefice(debut, fin, devise, search));
     }
 }

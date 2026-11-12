@@ -401,4 +401,100 @@ class VenteRepositoryTest {
         assertThat(repo.countVentesNonCreditSansConsommationPeriode(debut, fin, "tenant-vente-001"))
                 .isEqualTo(1L);
     }
+
+    // ==================== Recherche par catégorie / code-barre + bénéfice filtré ====================
+
+    @Autowired
+    private VenteLotConsommationRepository consommationRepo;
+
+    /** Achat du tenant avec une catégorie (la vente n'en a pas : elle hérite de celle des achats du produit). */
+    private AchatEntity achatAvecCategorie(String nomProduit, String categorie, TenantEntity t) {
+        return em.persistAndFlush(AchatEntity.builder()
+                .nomProduit(nomProduit)
+                .quantite(10.0)
+                .prixUnitaire(new BigDecimal("4000"))
+                .prixTotal(new BigDecimal("40000"))
+                .dateAchat(LocalDateTime.of(2025, 1, 10, 0, 0))
+                .categorie(categorie)
+                .utilisateur(user)
+                .tenant(t)
+                .build());
+    }
+
+    @Test
+    @DisplayName("Recherche par catégorie — via les achats du même produit, casse ignorée, isolée par boutique")
+    void recherche_ParCategorie_ListeEtSommes() {
+        achatAvecCategorie("COLLIER EN OR", "Bijoux", tenant);        // casse différente de la vente
+        achatAvecCategorie("Bracelet argent", "Argenterie", tenant);
+        achatAvecCategorie("Bracelet argent", "Bijoux", autreTenant); // autre boutique : ne doit pas compter
+
+        LocalDateTime debut = LocalDateTime.of(2025, 1, 1, 0, 0);
+        LocalDateTime fin   = LocalDateTime.of(2025, 1, 31, 23, 59);
+
+        // Janvier, "bijou" → seul le Collier de janvier (10 000, ESPECES)
+        Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", "bijou", debut, fin, PageRequest.of(0, 20));
+        assertThat(page.getTotalElements()).isEqualTo(1L);
+        assertThat(page.getContent().get(0).getNomProduit()).isEqualTo("Collier en or");
+
+        assertThat(repo.sumChiffreAffairesNonCreditPeriodeFiltre(debut, fin, "tenant-vente-001", "bijou"))
+                .isEqualByComparingTo("10000");
+        assertThat(repo.countVentesNonCreditPeriodeFiltre(debut, fin, "tenant-vente-001", "bijou"))
+                .isEqualTo(1L);
+        assertThat(repo.findNomsProduitsParCategorie("tenant-vente-001", "bijou"))
+                .containsExactly("collier en or");
+
+        // Sans recherche : mêmes résultats que les requêtes non filtrées
+        assertThat(repo.sumChiffreAffairesNonCreditPeriodeFiltre(debut, fin, "tenant-vente-001", null))
+                .isEqualByComparingTo(repo.sumChiffreAffairesNonCreditPeriode(debut, fin, "tenant-vente-001"));
+    }
+
+    @Test
+    @DisplayName("Bénéfice FIFO filtré par catégorie — ne compte que les ventes de la catégorie")
+    void beneficeFiltre_ParCategorie() {
+        AchatEntity achatCollier = achatAvecCategorie("Collier en or", "Bijoux", tenant);
+        AchatEntity achatBracelet = achatAvecCategorie("Bracelet argent", "Argenterie", tenant);
+        LocalDateTime debut = LocalDateTime.of(2025, 1, 1, 0, 0);
+        LocalDateTime fin   = LocalDateTime.of(2025, 1, 31, 23, 59);
+
+        for (VenteEntity v : repo.findAll()) {
+            if (!v.getTenant().getId().equals(tenant.getId()) || v.getDateVente().getMonthValue() != 1) continue;
+            // Bénéfice recalculé à la persistance : (prix vente − 1 000) × quantité
+            //   Collier : (5 000 − 1 000) × 2 = 8 000 ; Bracelet : (3 000 − 1 000) × 1 = 2 000
+            AchatEntity lot = switch (v.getNomProduit()) {
+                case "Collier en or" -> achatCollier;
+                case "Bracelet argent" -> achatBracelet;
+                default -> null;                          // Bague : crédit, hors calcul non-crédit
+            };
+            if (lot == null) continue;
+            em.persistAndFlush(VenteLotConsommationEntity.builder()
+                    .vente(v).achat(lot).quantiteConsommee(v.getQuantite())
+                    .prixAchatUnitaireSnapshot(new BigDecimal("1000"))
+                    .prixVenteUnitaireSnapshot(v.getPrixUnitaire())
+                    .dateVenteSnapshot(v.getDateVente()).tenant(tenant)
+                    .build());
+        }
+
+        assertThat(consommationRepo.sumBeneficeNonCreditBetweenFiltre(tenant, debut, fin, "bijou"))
+                .isEqualByComparingTo("8000");
+        assertThat(consommationRepo.sumBeneficeNonCreditBetweenFiltre(tenant, debut, fin, "argenterie"))
+                .isEqualByComparingTo("2000");
+        assertThat(consommationRepo.sumCoutAchatNonCreditBetweenFiltre(tenant, debut, fin, "bijou"))
+                .isEqualByComparingTo("2000"); // 1 000 × 2
+        assertThat(consommationRepo.sumBeneficeNonCreditBetweenFiltre(tenant, debut, fin, null))
+                .isEqualByComparingTo(consommationRepo.sumBeneficeNonCreditBetween(tenant, debut, fin));
+    }
+
+    @Test
+    @DisplayName("Recherche par code-barre — partiel")
+    void recherche_ParCodeBarre() {
+        VenteEntity bracelet = repo.findAll().stream()
+                .filter(v -> v.getTenant().getId().equals(tenant.getId()) && v.getNomProduit().equals("Bracelet argent"))
+                .findFirst().orElseThrow();
+        bracelet.setCodeBarre("6001234567890");
+        em.persistAndFlush(bracelet);
+
+        Page<VenteEntity> page = repo.findAllWithSearch("tenant-vente-001", "4567890", null, null, PageRequest.of(0, 20));
+        assertThat(page.getTotalElements()).isEqualTo(1L);
+        assertThat(page.getContent().get(0).getNomProduit()).isEqualTo("Bracelet argent");
+    }
 }

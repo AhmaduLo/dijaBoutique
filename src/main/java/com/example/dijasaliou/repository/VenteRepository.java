@@ -17,6 +17,22 @@ import java.util.List;
 @Repository
 public interface VenteRepository extends JpaRepository<VenteEntity, String> {
 
+    /**
+     * Filtre de la barre de recherche des ventes, sur une vente d'alias {@code v} :
+     * produit, client, téléphone, code-barre, ou CATÉGORIE. Une vente n'a pas de catégorie
+     * propre : elle correspond si un achat du même produit (même tenant) porte une
+     * catégorie contenant le terme. {@code :search} NULL = pas de filtre.
+     * Partagé par la liste paginée et le calcul du bénéfice, pour que le bénéfice
+     * affiché porte exactement sur les ventes listées.
+     */
+    String FILTRE_RECHERCHE_VENTE =
+            "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "OR LOWER(v.codeBarre) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "OR LOWER(v.nomProduit) IN (SELECT LOWER(a.nomProduit) FROM AchatEntity a " +
+            "WHERE a.tenant = v.tenant AND LOWER(a.categorie) LIKE LOWER(CONCAT('%', :search, '%'))))";
+
     // Recherche par produit (filtre tenant via Hibernate filter)
     List<VenteEntity> findByNomProduit(String nomProduit);
 
@@ -187,6 +203,63 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
                                                         @Param("tenantUuid") String tenantUuid);
 
     /**
+     * Noms de produits (en minuscules) dont au moins un achat du tenant a une catégorie
+     * contenant le terme. Pendant Java de la partie "catégorie" de FILTRE_RECHERCHE_VENTE,
+     * pour filtrer les paiements crédit et crédits en perte (traités en mémoire).
+     */
+    @Query("SELECT DISTINCT LOWER(a.nomProduit) FROM AchatEntity a " +
+           "WHERE a.tenant.tenantUuid = :tenantUuid " +
+           "AND LOWER(a.categorie) LIKE LOWER(CONCAT('%', :search, '%'))")
+    java.util.List<String> findNomsProduitsParCategorie(@Param("tenantUuid") String tenantUuid,
+                                                        @Param("search") String search);
+
+    // ── Variantes filtrées par la recherche (calcul du bénéfice de la page Ventes) ──
+    // Mêmes requêtes que ci-dessus + FILTRE_RECHERCHE_VENTE. search NULL = résultat identique.
+
+    @Query("SELECT COALESCE(SUM(v.prixTotal), 0) FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT " +
+           "AND v.typeSortie IS NULL AND " + FILTRE_RECHERCHE_VENTE)
+    BigDecimal sumChiffreAffairesNonCreditPeriodeFiltre(@Param("debut") LocalDateTime debut,
+                                                        @Param("fin") LocalDateTime fin,
+                                                        @Param("tenantUuid") String tenantUuid,
+                                                        @Param("search") String search);
+
+    @Query("SELECT COUNT(v) FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT " +
+           "AND v.typeSortie IS NULL AND " + FILTRE_RECHERCHE_VENTE)
+    long countVentesNonCreditPeriodeFiltre(@Param("debut") LocalDateTime debut,
+                                           @Param("fin") LocalDateTime fin,
+                                           @Param("tenantUuid") String tenantUuid,
+                                           @Param("search") String search);
+
+    @Query("SELECT COUNT(v) FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT " +
+           "AND v.typeSortie IS NULL " +
+           "AND NOT EXISTS (SELECT 1 FROM VenteLotConsommationEntity c WHERE c.vente = v) AND " +
+           FILTRE_RECHERCHE_VENTE)
+    long countVentesNonCreditSansConsommationPeriodeFiltre(@Param("debut") LocalDateTime debut,
+                                                           @Param("fin") LocalDateTime fin,
+                                                           @Param("tenantUuid") String tenantUuid,
+                                                           @Param("search") String search);
+
+    @Query("SELECT v.typeSortie, COUNT(v), COALESCE(SUM(v.prixTotal), 0) " +
+           "FROM VenteEntity v " +
+           "WHERE v.dateVente BETWEEN :debut AND :fin " +
+           "AND v.tenant.tenantUuid = :tenantUuid " +
+           "AND v.typeSortie IS NOT NULL AND " + FILTRE_RECHERCHE_VENTE + " " +
+           "GROUP BY v.typeSortie")
+    java.util.List<Object[]> sumSortiesParTypeEtPeriodeFiltre(@Param("debut") LocalDateTime debut,
+                                                              @Param("fin") LocalDateTime fin,
+                                                              @Param("tenantUuid") String tenantUuid,
+                                                              @Param("search") String search);
+
+    /**
      * Liste détaillée des sorties hors vente d'une période — triée par date décroissante.
      * Utilisée par la modale "Pertes" pour afficher la liste filtrable par mois/année.
      * Charge l'utilisateur en fetch pour éviter les N+1 dans le DTO.
@@ -219,18 +292,12 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
      * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_vente_tenant_date.
      */
     @Query(value = "SELECT v FROM VenteEntity v JOIN FETCH v.utilisateur JOIN FETCH v.tenant WHERE " +
-           "v.tenant.tenantUuid = :tenantUuid AND " +
-           "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "v.tenant.tenantUuid = :tenantUuid AND " + FILTRE_RECHERCHE_VENTE + " AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin) " +
            "ORDER BY v.dateVente DESC, v.id DESC",
            countQuery = "SELECT COUNT(v) FROM VenteEntity v WHERE " +
-           "v.tenant.tenantUuid = :tenantUuid AND " +
-           "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "v.tenant.tenantUuid = :tenantUuid AND " + FILTRE_RECHERCHE_VENTE + " AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
     Page<VenteEntity> findAllWithSearch(@Param("tenantUuid") String tenantUuid,
@@ -258,18 +325,12 @@ public interface VenteRepository extends JpaRepository<VenteEntity, String> {
                                                    @Param("tenantUuid") String tenantUuid);
 
     @Query(value = "SELECT v FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
-           "v.tenant.tenantUuid = :tenantUuid AND " +
-           "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "v.tenant.tenantUuid = :tenantUuid AND " + FILTRE_RECHERCHE_VENTE + " AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin) " +
            "ORDER BY v.dateVente DESC, v.id DESC",
            countQuery = "SELECT COUNT(v) FROM VenteEntity v WHERE v.utilisateur = :utilisateur AND " +
-           "v.tenant.tenantUuid = :tenantUuid AND " +
-           "(:search IS NULL OR LOWER(v.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.client) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(v.telephoneClient) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "v.tenant.tenantUuid = :tenantUuid AND " + FILTRE_RECHERCHE_VENTE + " AND " +
            "(:dateDebut IS NULL OR v.dateVente >= :dateDebut) AND " +
            "(:dateFin IS NULL OR v.dateVente <= :dateFin)")
     Page<VenteEntity> findByUtilisateurWithSearch(@Param("utilisateur") UserEntity utilisateur,

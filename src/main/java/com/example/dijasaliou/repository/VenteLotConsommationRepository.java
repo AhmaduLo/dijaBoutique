@@ -154,6 +154,44 @@ public interface VenteLotConsommationRepository
                                             @Param("debut") LocalDateTime debut,
                                             @Param("fin")   LocalDateTime fin);
 
+    // ── Variantes filtrées par la recherche de la page Ventes ──
+    // La vente est jointe sous l'alias "v" pour réutiliser VenteRepository.FILTRE_RECHERCHE_VENTE
+    // (la ligne de consommation est "c"). search NULL = résultat identique aux requêtes ci-dessus.
+
+    @Query("SELECT COALESCE(SUM(c.beneficeTotalLigne * v.tauxChangeApplique), 0) " +
+           "FROM VenteLotConsommationEntity c JOIN c.vente v " +
+           "WHERE c.tenant = :tenant " +
+           "AND c.dateVenteSnapshot BETWEEN :debut AND :fin " +
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT " +
+           "AND v.typeSortie IS NULL AND " + VenteRepository.FILTRE_RECHERCHE_VENTE)
+    BigDecimal sumBeneficeNonCreditBetweenFiltre(@Param("tenant") TenantEntity tenant,
+                                                 @Param("debut") LocalDateTime debut,
+                                                 @Param("fin")   LocalDateTime fin,
+                                                 @Param("search") String search);
+
+    @Query("SELECT COALESCE(SUM(c.prixAchatUnitaireSnapshot * c.quantiteConsommee * c.achat.tauxChangeApplique), 0) " +
+           "FROM VenteLotConsommationEntity c JOIN c.vente v " +
+           "WHERE c.tenant = :tenant " +
+           "AND c.dateVenteSnapshot BETWEEN :debut AND :fin " +
+           "AND v.modePaiement <> com.example.dijasaliou.entity.VenteEntity.ModePaiementVente.CREDIT " +
+           "AND v.typeSortie IS NULL AND " + VenteRepository.FILTRE_RECHERCHE_VENTE)
+    BigDecimal sumCoutAchatNonCreditBetweenFiltre(@Param("tenant") TenantEntity tenant,
+                                                  @Param("debut") LocalDateTime debut,
+                                                  @Param("fin")   LocalDateTime fin,
+                                                  @Param("search") String search);
+
+    @Query("SELECT v.typeSortie, " +
+           "COALESCE(SUM(c.prixAchatUnitaireSnapshot * c.quantiteConsommee * c.achat.tauxChangeApplique), 0) " +
+           "FROM VenteLotConsommationEntity c JOIN c.vente v " +
+           "WHERE c.tenant = :tenant " +
+           "AND c.dateVenteSnapshot BETWEEN :debut AND :fin " +
+           "AND v.typeSortie IS NOT NULL AND " + VenteRepository.FILTRE_RECHERCHE_VENTE + " " +
+           "GROUP BY v.typeSortie")
+    List<Object[]> sumPertesFifoParTypeBetweenFiltre(@Param("tenant") TenantEntity tenant,
+                                                     @Param("debut") LocalDateTime debut,
+                                                     @Param("fin")   LocalDateTime fin,
+                                                     @Param("search") String search);
+
     /**
      * Coût FIFO total d'une vente précise (= somme des prix_achat × quantité × taux de l'achat,
      * donc déjà exprimé en XOF). Sert au calcul prorata du coût pour un paiement crédit partiel.

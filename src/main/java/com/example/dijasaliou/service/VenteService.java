@@ -817,19 +817,40 @@ public class VenteService {
      */
     @Transactional(readOnly = true)
     public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin, String devise) {
+        return calculerStatistiquesBenefice(debut, fin, devise, null);
+    }
+
+    /**
+     * Même calcul, restreint aux ventes correspondant à la recherche de la page Ventes
+     * (produit, client, téléphone, code-barre ou catégorie — voir
+     * VenteRepository.FILTRE_RECHERCHE_VENTE), pour que le bénéfice affiché porte sur les
+     * ventes listées : ex. bénéfice de la catégorie "Tissus" sur le jour ou le mois filtré.
+     * search null/vide → exactement le calcul global (mêmes requêtes qu'avant).
+     */
+    @Transactional(readOnly = true)
+    public BeneficeStatistiquesDto calculerStatistiquesBenefice(LocalDate debut, LocalDate fin, String devise, String search) {
         TenantEntity tenant = tenantService.getCurrentTenant();
         LocalDateTime debutDt = debut.atStartOfDay();
         LocalDateTime finDt   = fin.atTime(LocalTime.MAX);
         String tenantUuid = tenant.getTenantUuid();
+        final String recherche = (search != null && !search.isBlank()) ? search.trim() : null;
+        // Pendant en mémoire du filtre SQL, pour les paiements crédit / crédits en perte.
+        final java.util.function.Predicate<VenteEntity> correspond = construireFiltreRecherche(recherche, tenantUuid);
 
         // 1. Partie NON-CRÉDIT : ventes payées immédiatement → on prend tout (CA + coût + bénéfice complets)
-        BigDecimal caNonCredit = venteRepository.sumChiffreAffairesNonCreditPeriode(debutDt, finDt, tenantUuid);
+        BigDecimal caNonCredit = recherche == null
+                ? venteRepository.sumChiffreAffairesNonCreditPeriode(debutDt, finDt, tenantUuid)
+                : venteRepository.sumChiffreAffairesNonCreditPeriodeFiltre(debutDt, finDt, tenantUuid, recherche);
         if (caNonCredit == null) caNonCredit = BigDecimal.ZERO;
 
-        BigDecimal coutAchat = consommationRepository.sumCoutAchatNonCreditBetween(tenant, debutDt, finDt);
+        BigDecimal coutAchat = recherche == null
+                ? consommationRepository.sumCoutAchatNonCreditBetween(tenant, debutDt, finDt)
+                : consommationRepository.sumCoutAchatNonCreditBetweenFiltre(tenant, debutDt, finDt, recherche);
         if (coutAchat == null) coutAchat = BigDecimal.ZERO;
 
-        BigDecimal benefice  = consommationRepository.sumBeneficeNonCreditBetween(tenant, debutDt, finDt);
+        BigDecimal benefice  = recherche == null
+                ? consommationRepository.sumBeneficeNonCreditBetween(tenant, debutDt, finDt)
+                : consommationRepository.sumBeneficeNonCreditBetweenFiltre(tenant, debutDt, finDt, recherche);
         if (benefice == null) benefice = BigDecimal.ZERO;
 
         // 2. Partie CRÉDIT : pour chaque paiement reçu dans la période, attribution prorata du coût/bénéfice
@@ -843,12 +864,18 @@ public class VenteService {
         // (une vente payée en plusieurs fois ne compte qu'une fois)
         java.util.Set<String> ventesCreditPayees = new java.util.HashSet<>();
         java.util.Set<String> ventesCreditSansBenefice = new java.util.HashSet<>();
+        long nbPaiementsCreditFiltres = 0L;
 
         for (PaiementCreditEntity p : paiements) {
             BigDecimal montantPaye = p.getMontantPaye();
             if (montantPaye == null || montantPaye.compareTo(BigDecimal.ZERO) <= 0) continue;
 
             VenteEntity vente = (p.getCredit() != null) ? p.getCredit().getVente() : null;
+            if (recherche != null) {
+                // Recherche active : un paiement sans vente ne peut correspondre à aucun filtre.
+                if (vente == null || !correspond.test(vente)) continue;
+                nbPaiementsCreditFiltres++;
+            }
             if (vente == null || vente.getPrixTotal() == null
                     || vente.getPrixTotal().compareTo(BigDecimal.ZERO) <= 0) {
                 // Paiement sans vente ou vente à prix 0 : on ajoute juste le CA, pas de coût attribuable
@@ -880,15 +907,21 @@ public class VenteService {
         BigDecimal beneficeTotal = benefice.add(beneficePaiementsCredit).setScale(2, java.math.RoundingMode.HALF_UP);
 
         // 4. Comptages
-        long nbVentesNonCredit  = venteRepository.countVentesNonCreditPeriode(debutDt, finDt, tenantUuid);
-        long nbPaiementsCredit  = paiementCreditRepository.countByPeriodeAndTenant(debut, fin, tenantUuid);
+        long nbVentesNonCredit  = recherche == null
+                ? venteRepository.countVentesNonCreditPeriode(debutDt, finDt, tenantUuid)
+                : venteRepository.countVentesNonCreditPeriodeFiltre(debutDt, finDt, tenantUuid, recherche);
+        long nbPaiementsCredit  = recherche == null
+                ? paiementCreditRepository.countByPeriodeAndTenant(debut, fin, tenantUuid)
+                : nbPaiementsCreditFiltres;
         long nbVentes           = nbVentesNonCredit + nbPaiementsCredit;
         // Ventes "sans bénéfice" = ventes prises en compte dans la période (non-crédit de la
         // période + ventes crédit ayant reçu un paiement) dont le coût FIFO est inconnu.
         // On ne déduit PAS ce nombre de nbVentes : celui-ci compte chaque paiement crédit,
         // une vente crédit payée en 2 fois y apparaîtrait 2 fois.
-        long nbVentesSansBenefice = venteRepository.countVentesNonCreditSansConsommationPeriode(
-                debutDt, finDt, tenantUuid) + ventesCreditSansBenefice.size();
+        long nbVentesSansBenefice = (recherche == null
+                ? venteRepository.countVentesNonCreditSansConsommationPeriode(debutDt, finDt, tenantUuid)
+                : venteRepository.countVentesNonCreditSansConsommationPeriodeFiltre(debutDt, finDt, tenantUuid, recherche))
+                + ventesCreditSansBenefice.size();
         long nbVentesAvecBenefice = Math.max(0L,
                 nbVentesNonCredit + ventesCreditPayees.size() - nbVentesSansBenefice);
 
@@ -896,7 +929,10 @@ public class VenteService {
         java.util.Map<String, BigDecimal> pertesParType = new java.util.LinkedHashMap<>();
         BigDecimal totalPertes = BigDecimal.ZERO;
         long nbSorties = 0L;
-        for (Object[] row : consommationRepository.sumPertesFifoParTypeBetween(tenant, debutDt, finDt)) {
+        List<Object[]> lignesPertes = recherche == null
+                ? consommationRepository.sumPertesFifoParTypeBetween(tenant, debutDt, finDt)
+                : consommationRepository.sumPertesFifoParTypeBetweenFiltre(tenant, debutDt, finDt, recherche);
+        for (Object[] row : lignesPertes) {
             String type = row[0] != null ? row[0].toString() : "AUTRE";
             BigDecimal cout = row[1] instanceof BigDecimal ? (BigDecimal) row[1]
                     : (row[1] instanceof Number ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO);
@@ -904,7 +940,10 @@ public class VenteService {
             totalPertes = totalPertes.add(cout);
         }
         // Compte les sorties via la query sumSortiesParTypeEtPeriode (compte les ventes, pas les lignes FIFO)
-        for (Object[] row : venteRepository.sumSortiesParTypeEtPeriode(debutDt, finDt, tenantUuid)) {
+        List<Object[]> lignesSorties = recherche == null
+                ? venteRepository.sumSortiesParTypeEtPeriode(debutDt, finDt, tenantUuid)
+                : venteRepository.sumSortiesParTypeEtPeriodeFiltre(debutDt, finDt, tenantUuid, recherche);
+        for (Object[] row : lignesSorties) {
             nbSorties += row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
         }
 
@@ -917,6 +956,7 @@ public class VenteService {
             if (montantRestant == null || montantRestant.compareTo(BigDecimal.ZERO) <= 0) continue;
 
             VenteEntity vente = credit.getVente();
+            if (recherche != null && (vente == null || !correspond.test(vente))) continue;
             if (vente == null || vente.getPrixTotal() == null
                     || vente.getPrixTotal().compareTo(BigDecimal.ZERO) <= 0) {
                 // Sans vente associée, on prend la perte = montant restant (pas de coût FIFO calculable),
@@ -1020,6 +1060,24 @@ public class VenteService {
                 .nbVentesAvecBenefice(nbVentesAvecBenefice)
                 .nbVentesSansBenefice(nbVentesSansBenefice)
                 .build();
+    }
+
+    /**
+     * Filtre en mémoire équivalent à VenteRepository.FILTRE_RECHERCHE_VENTE (produit, client,
+     * téléphone, code-barre — texte partiel, insensible à la casse — ou catégorie d'un achat
+     * du même produit). recherche null → toutes les ventes correspondent.
+     */
+    private java.util.function.Predicate<VenteEntity> construireFiltreRecherche(String recherche, String tenantUuid) {
+        if (recherche == null) return v -> true;
+        final String terme = recherche.toLowerCase();
+        final java.util.Set<String> produitsDeLaCategorie = new java.util.HashSet<>(
+                venteRepository.findNomsProduitsParCategorie(tenantUuid, recherche));
+        final java.util.function.Predicate<String> contient = s -> s != null && s.toLowerCase().contains(terme);
+        return v -> contient.test(v.getNomProduit())
+                || contient.test(v.getClient())
+                || contient.test(v.getTelephoneClient())
+                || contient.test(v.getCodeBarre())
+                || (v.getNomProduit() != null && produitsDeLaCategorie.contains(v.getNomProduit().toLowerCase()));
     }
 
     /**
