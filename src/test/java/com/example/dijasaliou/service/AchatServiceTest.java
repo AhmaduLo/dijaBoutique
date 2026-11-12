@@ -253,6 +253,43 @@ class AchatServiceTest {
     }
 
     @Test
+    @DisplayName("modifierAchat() — repasser le mode de paiement à \"Aucun\" (null) l'efface")
+    void modifierAchat_modePaiementNullEfface() {
+        achatValide.setModePaiement(com.example.dijasaliou.entity.ModePaiementCaisse.ESPECES);
+        AchatEntity modifie = AchatEntity.builder()
+                .nomProduit("Ordinateur portable").quantite(8.0)
+                .prixUnitaire(new BigDecimal("450.00"))
+                .dateAchat(LocalDateTime.now()).modePaiement(null).build();
+
+        when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AchatEntity resultat = achatService.modifierAchat("test-id-1", modifie);
+
+        assertThat(resultat.getModePaiement()).isNull();
+    }
+
+    @Test
+    @DisplayName("modifierAchat() — change le mode de paiement")
+    void modifierAchat_changeModePaiement() {
+        achatValide.setModePaiement(com.example.dijasaliou.entity.ModePaiementCaisse.ESPECES);
+        AchatEntity modifie = AchatEntity.builder()
+                .nomProduit("Ordinateur portable").quantite(8.0)
+                .prixUnitaire(new BigDecimal("450.00"))
+                .dateAchat(LocalDateTime.now())
+                .modePaiement(com.example.dijasaliou.entity.ModePaiementCaisse.WAVE).build();
+
+        when(achatRepository.findById("test-id-1")).thenReturn(Optional.of(achatValide));
+        when(tenantService.getCurrentTenant()).thenReturn(tenantTest);
+        when(achatRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AchatEntity resultat = achatService.modifierAchat("test-id-1", modifie);
+
+        assertThat(resultat.getModePaiement()).isEqualTo(com.example.dijasaliou.entity.ModePaiementCaisse.WAVE);
+    }
+
+    @Test
     @DisplayName("modifierAchat() — lève exception si achat non trouvé")
     void modifierAchat_leveExceptionSiAbsent() {
         AchatEntity modifie = AchatEntity.builder()

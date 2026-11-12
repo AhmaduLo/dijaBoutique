@@ -300,10 +300,11 @@ public class AchatService {
         if (achatModifie.getDateAchat() != null) {
             achatExistant.setDateAchat(achatModifie.getDateAchat());
         }
-        // Caisse multi-comptes : permettre la modification du mode de paiement
-        if (achatModifie.getModePaiement() != null) {
-            achatExistant.setModePaiement(achatModifie.getModePaiement());
-        }
+        // Caisse multi-comptes : le mode reçu remplace toujours l'ancien. null = "Aucun"
+        // (n'impacte aucun compte) — les deux appelants (formulaire d'achat, modification
+        // de production) envoient toujours le mode voulu, null compris ; ignorer null
+        // empêchait de repasser un achat d'un compte à "Aucun".
+        achatExistant.setModePaiement(achatModifie.getModePaiement());
 
         // NOTE : On ne modifie PAS le tenant pour des raisons de sécurité
         // Le tenant est défini à la création et ne change jamais
