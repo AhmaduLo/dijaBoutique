@@ -92,18 +92,26 @@ public interface AchatRepository extends JpaRepository<AchatEntity, String> {
 
     /**
      * Recherche paginée avec filtre tenant EXPLICITE — permet l'utilisation de idx_achat_tenant_date.
+     * Le terme est cherché dans : nom du produit, fournisseur, catégorie, description, code-barre
+     * (les colonnes NULL ne correspondent simplement pas).
      */
     @Query(value = "SELECT a FROM AchatEntity a JOIN FETCH a.utilisateur JOIN FETCH a.tenant WHERE " +
            "a.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(a.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(a.categorie) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(a.description) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(a.codeBarre) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR a.dateAchat >= :dateDebut) AND " +
            "(:dateFin IS NULL OR a.dateAchat <= :dateFin) " +
            "ORDER BY a.dateAchat DESC, a.id DESC",
            countQuery = "SELECT COUNT(a) FROM AchatEntity a WHERE " +
            "a.tenant.tenantUuid = :tenantUuid AND " +
            "(:search IS NULL OR LOWER(a.nomProduit) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "OR LOWER(a.fournisseur) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(a.categorie) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(a.description) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(a.codeBarre) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:dateDebut IS NULL OR a.dateAchat >= :dateDebut) AND " +
            "(:dateFin IS NULL OR a.dateAchat <= :dateFin)")
     Page<AchatEntity> findAllWithSearch(@Param("tenantUuid") String tenantUuid,

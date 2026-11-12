@@ -239,6 +239,41 @@ class AchatRepositoryTest {
     }
 
     @Test
+    @DisplayName("findAllWithSearch — recherche par catégorie, description et code-barre")
+    void findAllWithSearch_RechercheCategorieDescriptionCodeBarre() {
+        // Arrange — un achat avec catégorie/description/code-barre, un autre sans (champs NULL)
+        entityManager.persistAndFlush(AchatEntity.builder()
+                .nomProduit("Produit A")
+                .quantite(5.0)
+                .prixUnitaire(new BigDecimal("2000.00"))
+                .prixTotal(new BigDecimal("10000.00"))
+                .dateAchat(LocalDateTime.of(2025, 3, 10, 0, 0))
+                .categorie("Quincaillerie")
+                .description("Livraison lundi, facture 245")
+                .codeBarre("6001234567890")
+                .utilisateur(utilisateur)
+                .tenant(tenant)
+                .build());
+
+        entityManager.persistAndFlush(AchatEntity.builder()
+                .nomProduit("Produit B")
+                .quantite(3.0)
+                .prixUnitaire(new BigDecimal("3000.00"))
+                .prixTotal(new BigDecimal("9000.00"))
+                .dateAchat(LocalDateTime.of(2025, 3, 15, 0, 0))
+                .utilisateur(utilisateur)
+                .tenant(tenant)
+                .build());
+
+        // Act + Assert — chaque champ retrouve l'achat A, insensible à la casse
+        for (String terme : new String[]{"quincaill", "FACTURE 245", "4567890"}) {
+            Page<AchatEntity> page = achatRepository.findAllWithSearch(tenant.getTenantUuid(), terme, null, null, PageRequest.of(0, 20));
+            assertThat(page.getTotalElements()).as("recherche '%s'", terme).isEqualTo(1L);
+            assertThat(page.getContent().get(0).getNomProduit()).isEqualTo("Produit A");
+        }
+    }
+
+    @Test
     @DisplayName("findAllWithSearch — filtre dateDebut → retourne uniquement après la date")
     void findAllWithSearch_FiltreDateDebut_RetourneUniquementApresDate() {
         // Arrange
